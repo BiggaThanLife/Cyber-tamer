@@ -147,7 +147,7 @@
   </div>
 
   <div style="text-align:center; font-size:9.5px; color:var(--ink-dim); margin-top:10px;">
-    v0.1 prototype — progress saves automatically to this device
+    <span id="build-label"></span> — progress saves automatically to this device
   </div>
 </div>
 
@@ -1233,6 +1233,7 @@
       cosmetic: null,
       ownedCosmetics: ['none'],
       jobCooldown: 0,
+      playCooldown: 0,
       trainBonus: {str:0, def:0, spd:0},
       trainCooldown: 0,
       nickname: null,
@@ -1804,6 +1805,7 @@
       save();
       appMode = 'game';
       render();
+      markBuildSeen();
       showTutorial(0);
     };
     if(canContinue){
@@ -1833,6 +1835,7 @@
     }
     render();
     if(pendingTutorial){ pendingTutorial = false; showTutorial(0); }
+    else if(appMode === 'game') maybeShowWhatsNew();
   }
 
   function triggerImportFile(){
@@ -2636,6 +2639,7 @@
     state.storage.forEach(mon => {
       if(mon.jobCooldown > 0) mon.jobCooldown--;
       if(mon.trainCooldown > 0) mon.trainCooldown--;
+      if(mon.playCooldown > 0) mon.playCooldown--;
     });
     if(state.farm){
       state.farm.pods.forEach(pod => {
@@ -3156,7 +3160,7 @@
       { h:'STR — Strength', b:'Powers the damage of every move you use, before type effectiveness and the target\'s DEF.' },
       { h:'DEF — Defense', b:'Reduces damage taken from enemy attacks.' },
       { h:'SPD — Speed', b:'Improves your chance to dodge counterattacks and to flee successfully.' },
-      { h:'Hunger and Energy', b:'Exploring drains both. Feed a partner with <b>Prime Meat</b> from the Inventory (+40 Hunger), or use <b>Rest Partner</b> in town (+35 Energy, a little Hunger lost). <b>Play</b> is a short timing game that earns small Bits and XP. Jobs and Training need a minimum Energy.' },
+      { h:'Hunger and Energy', b:'Exploring drains both. Feed a partner with <b>Prime Meat</b> from the Inventory (+40 Hunger), or use <b>Rest Partner</b> in town (+35 Energy, a little Hunger lost). <b>Play</b> is a short timing game that earns small Bits and XP, but every try costs Energy and Hunger (hit or miss) and only a few tries fit before your partner needs a break — explore to recover. Jobs and Training need a minimum Energy too.' },
       { h:'Levels and evolution', b:'Partners gain XP from exploring and battles. Many species evolve into a stronger form at a set level. The Dex shows each line\'s stages.' },
       { h:'IVs and Potential', b:'Every monster has hidden ±15% variance on each stat, fixed for life at capture or hatch. It\'s shown as a Potential star rating (☆ to ★★★★★). Breeding can pass IVs down, sometimes with a mutation.' },
     ]},
@@ -4301,6 +4305,9 @@
      SHARED TIMING MINIGAME ENGINE (used by Play and Job attempts)
   --------------------------------------------------------- */
   let tgGen = 0;
+  // One clock for the whole session: Play uses it so re-entering the screen (every tap re-renders)
+  // can never re-roll the marker's starting position.
+  const TG_CLOCK = { speed: 220 + Math.random()*80, phase: Math.random()*Math.PI*2 };
   let tgMarkerEl = null;
 
   function trackGradient(greatHalf, goodHalf){
@@ -4334,12 +4341,12 @@
     const myGen = tgGen;
     tgMarkerEl = screenEl.querySelector('#tg-marker');
     const startTs = performance.now();
-    const speed = 220 + Math.random()*80;
-    const phase = Math.random()*Math.PI*2;
+    const speed = cfg.continuous ? TG_CLOCK.speed : 220 + Math.random()*80;
+    const phase = cfg.continuous ? TG_CLOCK.phase : Math.random()*Math.PI*2;
     function tick(ts){
       if(myGen !== tgGen) return;
       if(!tgMarkerEl || !document.body.contains(tgMarkerEl)) return;
-      const elapsed = ts - startTs;
+      const elapsed = cfg.continuous ? ts : ts - startTs;
       const pct = 50 + 46*Math.sin(phase + elapsed/speed);
       tgMarkerEl.style.left = pct + '%';
       tgMarkerEl.setAttribute('data-pct', pct.toFixed(2));
@@ -4351,30 +4358,42 @@
   /* ---------------------------------------------------------
      PLAY MINIGAME
   --------------------------------------------------------- */
+  // Play: every try costs Energy and Hunger (hit or miss), and a few tries in a row put the partner
+  // on a break that only shortens while exploring (same idea as Jobs/Training). It pays Bits and XP
+  // only; it never restores Hunger or Energy, so it can't be spammed as a free source of either.
+  const PLAY_ENERGY_COST = 6;
+  const PLAY_HUNGER_COST = 3;
+  const PLAY_COOLDOWN_STEP = 8;   // ticks added per try
+  const PLAY_COOLDOWN_MAX = 24;   // at this many ticks the partner needs a break (3 tries in a row)
   function renderPlay(screenEl, controlsEl){
     const p = getActive();
     const sp = getForm(p);
+    const triesLeft = Math.max(0, Math.ceil((PLAY_COOLDOWN_MAX - (p.playCooldown||0)) / PLAY_COOLDOWN_STEP));
     mountTimingGame(screenEl, controlsEl, {
       title: '🎮 PLAYTIME',
       accent: 'var(--violet)',
       headerHtml: `<div style="text-align:center; margin-bottom:10px;">${spriteImgHtml(p,56)}<div style="color:${sp.color}; margin-top:4px;">${p.nickname||sp.name} wants to play!</div></div>`,
-      hint: 'Tap Catch when the marker is in the bright green zone for the best reward.',
+      hint: `Tap Catch when the marker is in the bright green zone. Every try costs ${PLAY_ENERGY_COST} Energy and ${PLAY_HUNGER_COST} Hunger, hit or miss. ${triesLeft > 0 ? `Tries before a break: ${triesLeft}.` : 'Needs a break — explore to recover.'}`,
       greatHalf: 8, goodHalf: 22,
       tapLabel: 'Catch!',
       backLabel: '← Back to Town',
+      continuous: true,
       onBack: ()=>{ state.screen='town'; render(); },
       onTap: (pct)=>{
+        if((p.playCooldown||0) >= PLAY_COOLDOWN_MAX){ logMsg(`${getForm(p).name} needs a break — explore a bit to recover before playing again.`); render(); return; }
+        if(p.energy < PLAY_ENERGY_COST){ logMsg(`${getForm(p).name} is too tired to play — rest first.`); render(); return; }
         const dist = Math.abs(pct - 50);
-        let tier, bits=0, energy=0, hungerDelta=0, xp=0;
-        if(dist <= 8){ tier='GREAT'; bits=15; energy=22; hungerDelta=7; xp=6; }
-        else if(dist <= 22){ tier='GOOD'; bits=6; energy=12; hungerDelta=2; xp=2; }
-        else { tier='MISS'; bits=0; energy=4; hungerDelta=-3; xp=0; }
-        p.energy = Math.min(100, p.energy + energy);
-        p.hunger = Math.max(0, Math.min(100, p.hunger + hungerDelta));
+        let tier, bits=0, xp=0;
+        if(dist <= 8){ tier='GREAT'; bits=12; xp=6; }
+        else if(dist <= 22){ tier='GOOD'; bits=5; xp=2; }
+        else { tier='MISS'; }
+        p.energy = Math.max(0, p.energy - PLAY_ENERGY_COST);
+        p.hunger = Math.max(0, p.hunger - PLAY_HUNGER_COST);
+        p.playCooldown = (p.playCooldown||0) + PLAY_COOLDOWN_STEP;
         state.bits += bits;
         if(xp) gainXp(p, xp);
-        const tierMsg = tier==='GREAT' ? 'Perfect catch!' : (tier==='GOOD' ? 'Nice catch!' : 'Just missed!');
-        logMsg(`${tierMsg} ${getForm(p).name} had fun.${bits?` +◈${bits} Bits`:''}${energy?` +${energy} Energy`:''}`);
+        const tierMsg = tier==='GREAT' ? 'Perfect catch!' : (tier==='GOOD' ? 'Nice catch!' : 'Missed it!');
+        logMsg(`${tierMsg} ${getForm(p).name} played.${bits?` +◈${bits} Bits`:' No reward.'} -${PLAY_ENERGY_COST} Energy, -${PLAY_HUNGER_COST} Hunger.`);
         render();
       }
     });
@@ -4774,6 +4793,7 @@
     if(m.module){ const md = MODULES[m.module.id]; if(md.ticks == null) m.module.ticksLeft = null; else if(typeof m.module.ticksLeft !== 'number' || m.module.ticksLeft <= 0) m.module = null; }
     if(m.module === undefined) m.module = null;
     if(typeof m.jobCooldown !== 'number') m.jobCooldown = 0;
+    if(typeof m.playCooldown !== 'number' || m.playCooldown < 0) m.playCooldown = 0;
     if(!m.trainBonus || typeof m.trainBonus !== 'object') m.trainBonus = {str:0, def:0, spd:0};
     TRAIN_STATS.forEach(k => { if(typeof m.trainBonus[k] !== 'number') m.trainBonus[k] = 0; });
     if(typeof m.trainCooldown !== 'number') m.trainCooldown = 0;
@@ -4977,6 +4997,100 @@
     return s;
   }
 
+
+  /* ---------------------------------------------------------
+     BUILD + UPDATE NOTICES
+     BUILD is the single source of truth for the version. `tools/sync_version.py`
+     copies it into version.json (the tiny file the game polls). To ship an update:
+     bump BUILD.version, add notes, run the script, then commit both files.
+     Versions compare numerically (25.10 is newer than 25.9).
+  --------------------------------------------------------- */
+  const BUILD = {
+    version: '25.1',
+    date: '2026-09-21',
+    notes: [
+      'Play now costs Energy and Hunger on every try, hit or miss, and only allows a few tries in a row before a short break. It no longer refills Hunger or Energy.',
+      'New: the game tells you when an update is available, and shows what changed after you update.',
+      'The title screen now shows the version number.',
+    ],
+  };
+  const SEEN_BUILD_KEY = 'cybertamer_seen_build';
+  function versionParts(v){ return String(v).split('.').map(n => parseInt(n, 10) || 0); }
+  function isNewerVersion(remote, local){
+    const a = versionParts(remote), b = versionParts(local);
+    for(let i = 0; i < Math.max(a.length, b.length); i++){
+      const x = a[i] || 0, y = b[i] || 0;
+      if(x !== y) return x > y;
+    }
+    return false;
+  }
+  function escapeHtml(t){ return String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  let dismissedUpdate = null;   // version the player chose "Later" for this session
+  let lastUpdateCheck = 0;
+  async function checkForUpdate(force){
+    const now = Date.now();
+    if(!force && now - lastUpdateCheck < 5*60*1000) return;   // at most every 5 minutes
+    lastUpdateCheck = now;
+    try{
+      const res = await fetch('version.json?ts=' + now, { cache: 'no-store' });
+      if(!res.ok) return;
+      const remote = await res.json();
+      if(!remote || typeof remote.version !== 'string') return;
+      if(isNewerVersion(remote.version, BUILD.version) && dismissedUpdate !== remote.version) showUpdateBanner(remote);
+    }catch(e){ /* offline, local file, or no version.json: stay quiet */ }
+  }
+  function showUpdateBanner(remote){
+    let bar = document.getElementById('update-banner');
+    if(!bar){
+      bar = document.createElement('div');
+      bar.id = 'update-banner';
+      bar.setAttribute('role', 'status');
+      bar.style.cssText = 'position:fixed; left:0; right:0; top:0; z-index:900; display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap; padding:calc(8px + env(safe-area-inset-top, 0px)) 12px 8px; background:#0b2a18; border-bottom:1px solid var(--phosphor); color:var(--ink); font-size:11px; box-shadow:0 4px 18px rgba(0,0,0,.5);';
+      document.body.appendChild(bar);
+    }
+    bar.innerHTML = `<span>🔄 <b>Update ${escapeHtml(remote.version)} is available.</b> Your progress is saved.</span>
+      <button class="btn btn-primary" id="update-now" style="padding:5px 10px; font-size:11px; min-height:0 !important;">Refresh now</button>
+      <button class="btn" id="update-later" style="padding:5px 10px; font-size:11px; min-height:0 !important;">Later</button>`;
+    bar.querySelector('#update-now').addEventListener('click', () => {
+      try{ if(appMode === 'game') save(); }catch(e){}
+      // A fresh query string forces the browser past its cached copy of the page; the save is untouched
+      // because localStorage belongs to the site, not to the URL.
+      location.replace(location.pathname + '?v=' + encodeURIComponent(remote.version));
+    });
+    bar.querySelector('#update-later').addEventListener('click', () => { dismissedUpdate = remote.version; bar.remove(); });
+  }
+  // After an update, show what changed once. A brand-new player (no stored version) just gets it recorded.
+  function markBuildSeen(){ try{ localStorage.setItem(SEEN_BUILD_KEY, BUILD.version); }catch(e){} }
+  function maybeShowWhatsNew(){
+    let seen = null;
+    try{ seen = localStorage.getItem(SEEN_BUILD_KEY); }catch(e){}
+    if(seen === BUILD.version) return;
+    const overlay = document.getElementById('modal-overlay');
+    if(overlay && overlay.style.display === 'flex') return;   // never stack on another dialog
+    markBuildSeen();
+    const box = document.getElementById('modal-box');
+    box.innerHTML = `
+      <div class="pixel-font glow" style="font-size:10px; color:var(--phosphor); margin-bottom:4px;">🆕 UPDATED TO v${escapeHtml(BUILD.version)}</div>
+      <div style="font-size:9.5px; color:var(--ink-dim); margin-bottom:8px;">${escapeHtml(BUILD.date)}</div>
+      <div style="font-size:11px; color:var(--ink); line-height:1.5; max-height:50vh; overflow-y:auto; margin-bottom:12px;">
+        ${BUILD.notes.map(n => `<div style="margin-bottom:6px;">· ${escapeHtml(n)}</div>`).join('')}
+      </div>
+      <button class="btn btn-primary" id="modal-ok" style="width:100%;">Got it</button>`;
+    overlay.style.display = 'flex';
+    document.getElementById('modal-ok').addEventListener('click', closeModal);
+  }
+  function startUpdateWatcher(){
+    const label = document.getElementById('build-label');
+    if(label) label.textContent = 'v' + BUILD.version;
+    // tidy the address bar after a forced refresh (?v=...)
+    try{ if(location.search.indexOf('v=') >= 0) history.replaceState(null, '', location.pathname); }catch(e){}
+    checkForUpdate(true);
+    document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') checkForUpdate(false); });
+    window.addEventListener('focus', () => checkForUpdate(false));
+    setInterval(() => checkForUpdate(false), 10*60*1000);
+  }
+
   /* ---------------------------------------------------------
      INIT
   --------------------------------------------------------- */
@@ -4991,6 +5105,7 @@
       console.error('Init error:', err);
     }
     render();
+    startUpdateWatcher();
   }
   init();
 })();

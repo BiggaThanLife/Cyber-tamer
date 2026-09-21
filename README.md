@@ -86,7 +86,7 @@ Some tiles block your way.
 ### Looking after your partner
 - **Hunger** and **Energy** drain as you explore.
 - Feed with **Prime Meat** from the Inventory (+40 Hunger). **Rest Partner** in town gives +35 Energy for a little Hunger.
-- **Play** is a short timing game that earns small amounts of Bits and XP.
+- **Play** is a short timing game that earns small amounts of Bits and XP. Every try costs Energy and Hunger, hit or miss, and only a few tries fit in a row before your partner needs a break. Exploring shortens the break.
 - Jobs and Training need a minimum amount of Energy.
 
 ### Stats
