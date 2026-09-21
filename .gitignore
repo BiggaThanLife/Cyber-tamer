@@ -1,0 +1,6 @@
+save*.json
+*save*.json
+.claude/
+scratch/
+*.log
+node_modules/
