@@ -3661,7 +3661,7 @@
         <div style="display:flex; align-items:center; gap:6px; color:${sp.color}; min-width:0;">
           ${spriteImgHtml(m, 36)}
           <div style="min-width:0; flex:1;">${m.nickname||sp.name} <span class="badge">Gen ${m.gen} · Lv${m.level}</span> ${isActive?'<span class="badge" style="color:var(--phosphor);border-color:var(--phosphor)">ACTIVE</span>':''} ${m.marked?'<span class="badge" style="color:#fff44d;border-color:#fff44d;">✦ MARKED</span>':''}</div>
-          <button data-lock="${m.uid}" title="${m.locked?'Unlock':'Lock (protects from selling)'}" style="all:unset; cursor:pointer; flex-shrink:0; font-size:16px; padding:2px 4px;">${m.locked?'🔒':'🔓'}</button>
+          <button data-lock="${m.uid}" title="${m.locked?'Unlock':'Lock (protects from selling)'}" style="all:unset; cursor:pointer; flex-shrink:0; display:flex; align-items:center; gap:3px; font-size:16px; padding:2px 4px; color:var(--ink-dim);">${m.locked?'🔒':'🔓'}<span style="font-size:8.5px; letter-spacing:.5px;">${m.locked?'LOCKED':'UNLOCKED'}</span></button>
         </div>
         <div style="display:grid; grid-template-columns:${isActive?'1fr':'1fr 1fr'}; gap:6px; margin-top:6px;">
           <button class="btn btn-cyan" style="padding:5px 8px; font-size:10px;" data-inspect="${m.uid}">🔍 Inspect</button>
@@ -6015,6 +6015,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.11', date:'2026-09-22', notes:[
+      'New: System > Update Notes shows the full history of past updates, with the date and version of each.',
+    ]},
     { version:'25.10', date:'2026-09-22', notes:[
       'You can now lock a monster in the Network Registry — tap the 🔓/🔒 icon on its card or Inspect screen to protect it from being sold by mistake, with a little animation on the lock itself.',
     ]},
@@ -6056,10 +6059,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.11',
+    version: '25.12',
     date: '2026-09-22',
     notes: [
-      'New: System > Update Notes shows the full history of past updates, with the date and version of each.',
+      'Fixed: locking a monster in the Network Registry now shows a clear LOCKED/UNLOCKED label, not just a small icon — the name row was also overlapping when a lock badge got added, so that badge was removed in favor of the label on the button itself.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

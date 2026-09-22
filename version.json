@@ -1,7 +1,7 @@
 {
-  "version": "25.11",
+  "version": "25.12",
   "date": "2026-09-22",
   "notes": [
-    "New: System > Update Notes shows the full history of past updates, with the date and version of each."
+    "Fixed: locking a monster in the Network Registry now shows a clear LOCKED/UNLOCKED label, not just a small icon — the name row was also overlapping when a lock badge got added, so that badge was removed in favor of the label on the button itself."
   ]
 }
