@@ -1340,7 +1340,7 @@
      PARTNER LIST ORDERING
      The active partner is always pinned to the top; everything
      else follows the chosen sort. Shared by Storage, Job Board,
-     Training Ground and Breeding Lab. The choice is saved.
+     Training Ground and Splice Lab. The choice is saved.
   --------------------------------------------------------- */
   const SORT_OPTIONS = [
     { id:'default',   label:'Order caught', dir:'asc'  },
@@ -2143,7 +2143,7 @@
       {label:'💼 Job Board', cls:'', fn:()=>{ state.screen='jobs'; render(); }},
       {label:'🌾 Server Farm', cls:'', fn:()=>{ state.screen='farm'; render(); }},
       {label:'🏋 Training Ground', cls:'', locked:!trainingUnlocked, lockMsg:'Defeat a biome boss to unlock the Training Ground.', fn:()=>{ state.screen='training'; render(); }},
-      {label:'🧬 Breeding Lab', cls:'btn-cyan', locked:!breedingUnlocked, lockMsg:'Upgrade your farm to a Server Shack to unlock the Breeding Lab.', fn:()=>{ state.breeding={a:null,b:null}; state.screen='breeding'; render(); }},
+      {label:'🧬 Splice Lab', cls:'btn-cyan', locked:!breedingUnlocked, lockMsg:'Upgrade your farm to a Server Shack to unlock the Splice Lab.', fn:()=>{ state.breeding={a:null,b:null}; state.screen='breeding'; render(); }},
       {label:'🎮 Play', cls:'btn-cyan', fn:()=>{ state.screen='play'; render(); }},
       {label:'💤 Rest Partner', cls:'', fn:()=>restPartner()},
       {label:'📦 Network Registry', cls:'', fn:()=>{ state.screen='storage'; render(); }},
@@ -3262,7 +3262,7 @@
     { id:'start', icon:'🚀', title:'Getting Started', color:'var(--phosphor)', blurb:'The goal, the town, and how saving works.', cards:[
       { h:'The goal', b:'Explore the wilderness, catch monsters, grow your partner stronger, and defeat each biome\'s boss. Beating a boss unlocks the next biome. Neon Haven (the town) is your home base.' },
       { h:'Your partner', b:'One monster is your <b>active partner</b> — the one who explores and fights. Everyone else waits in the Network Registry. Swap partners there any time.' },
-      { h:'The town menu', b:'Buttons are grouped in pairs: <b>Gate / Mine</b> to go out, <b>Wanted / Daily</b> for goals, <b>Jobs / Farm</b> to earn, <b>Training / Breeding</b> to grow, <b>Play / Rest</b> to care, <b>Storage / Inventory / Shop</b> to manage, then Dex, Help and System. A 🔒 means it isn\'t unlocked yet — tap it to see how.' },
+      { h:'The town menu', b:'Buttons are grouped in pairs: <b>Gate / Mine</b> to go out, <b>Wanted / Daily</b> for goals, <b>Jobs / Farm</b> to earn, <b>Training / Splice</b> to grow, <b>Play / Rest</b> to care, <b>Storage / Inventory / Shop</b> to manage, then Dex, Help and System. A 🔒 means it isn\'t unlocked yet — tap it to see how.' },
       { h:'The 📜 Log', b:'The Log button at the top of every screen shows your recent messages, newest first. A small amber dot means something new happened. In battle, a running log of that fight sits under the monsters.' },
       { h:'Motion', b:'Battles, catches, level-ups and evolutions are animated. If motion bothers you or your phone struggles, open <b>System</b> and switch <b>Motion</b> to Reduced. It follows your device\'s reduce-motion setting until you change it.' },
       { h:'Saving', b:'The game saves automatically to this device. Under <b>System</b> you can export your save to a file (a backup, or to move devices) and import it again. Importing overwrites your current progress.' },
@@ -3297,7 +3297,7 @@
     { id:'growth', icon:'💪', title:'Growing Stronger', color:'var(--violet)', blurb:'Crests, training, breeding, modules and gear.', cards:[
       { h:'Evolution Crests', b:'Bought in the Shop (or grown on the farm). They apply instantly and boost all four stats a little. Capped at <b>3 per monster</b>.' },
       { h:'Training Ground', b:'Unlocks after your first boss. Pick a stat and play a timing game; a good tap gains more. Each stat can be trained up to +10 per partner. It costs Energy and Hunger and puts that partner on a cooldown that shortens as you explore.' },
-      { h:'Breeding Lab', b:'Unlocks when your farm reaches a Server Shack. Pick two different monsters from storage and pay 50 Bits to make a hybrid egg. Offspring inherit IVs from their parents.' },
+      { h:'Splice Lab', b:'Unlocks when your farm reaches a Server Shack. Pick two different monsters from the Network Registry and pay 50 Bits to splice their genomes. The reveal shows the new hybrid, then opens straight to its Inspect screen. Offspring inherit IVs from their parents.' },
       { h:'Modules', b:'Each monster holds one module. Timed modules burn one tick per step or dig, only while that monster is your active partner. A few are permanent, and Sync Link shares XP with benched monsters. Equip them from the Inventory or Storage.' },
       { h:'Stat Drives and Capsules', b:'<b>Stat Drives</b> permanently add stats (capped at +10 STR/DEF/SPD and +40 HP per partner). <b>Exp Capsules</b> give a lump of XP.' },
       { h:'Gear', b:'Gear is found only in the Data Mine. Each monster has two gear slots; gear gives a stat bonus or a move any species can use. Extras can be sold.' },
@@ -3324,7 +3324,7 @@
     { id:'dex', icon:'📖', title:'Dex & Storage', color:'var(--violet)', blurb:'Collection tracking, sorting and milestones.', cards:[
       { h:'The Dex', b:'Meeting a species logs it; catching or hatching one reveals it fully. Filter by caught, missing or type. Some lines have more than two stages.' },
       { h:'Milestones', b:'Reach collection goals in the Dex (like catching half the lines) and claim a reward.' },
-      { h:'Storage and sorting', b:'The Network Registry, Job Board, Training and Breeding lists all pin your active partner first and share one sort setting (level, stats, potential and more). Tap the direction button to flip ascending/descending. The Network Registry also shows your total monster count, and each card has a 🔍 Inspect button for the full profile: exact IVs, moves and everything held.' },
+      { h:'Storage and sorting', b:'The Network Registry, Job Board, Training and Splice Lab lists all pin your active partner first and share one sort setting (level, stats, potential and more). Tap the direction button to flip ascending/descending. The Network Registry also shows your total monster count, and each card has a 🔍 Inspect button for the full profile: exact IVs, moves and everything held.' },
     ]},
   ];
   let helpSection = null; // transient UI state, not persisted
@@ -4825,14 +4825,15 @@
   }
 
   /* ---------------------------------------------------------
-     BREEDING LAB
+     SPLICE LAB (was "Breeding Lab") — internal names (renderBreeding, state.breeding,
+     doBreed, isBreedingUnlocked) are unchanged on purpose; only player-facing text renamed.
   --------------------------------------------------------- */
   function renderBreeding(screenEl, controlsEl){
     if(!isBreedingUnlocked()){ state.screen='town'; render(); return; }
     const br = state.breeding;
     screenEl.innerHTML = `
-      ${screenTitle('🧬 BREEDING LAB', 'var(--violet)')}
-      <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:8px;">Select two different partners from storage to hybridize their genomes. Costs 50 Bits.</div>
+      ${screenTitle('🧬 SPLICE LAB', 'var(--violet)')}
+      <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:8px;">Select two different partners from the Network Registry to splice their genomes. Costs 50 Bits.</div>
       ${sortBarHtml()}
       <div style="display:flex; flex-direction:column; gap:6px;">
         ${sortedMonsters().map(m=>{
@@ -4882,10 +4883,102 @@
     const child = newMonster(childSpecies, gen, 1, inheritIvs(a,b));
     state.storage.push(child);
     dexMarkCaught(child);
-    logMsg(`A hybrid egg hatched: ${getForm(child).name} (Gen ${gen}, Potential ${potentialStars(child.ivs)})!`);
+    logMsg(`A hybrid was spliced: ${getForm(child).name} (Gen ${gen}, Potential ${potentialStars(child.ivs)})!`);
     state.breeding = {a:null,b:null};
-    state.screen = 'storage';
-    render();
+    const finish = () => { inspectUid = child.uid; state.screen = 'inspect'; render(); };
+    if(motionOn()) playSpliceReveal(a, b, child, finish); else finish();
+  }
+
+  // Full-screen splice reveal: the two parents converge, flash, and the new hybrid is revealed.
+  // Ends on a tap (first tap skips ahead, second dismisses — same pattern as the evolution
+  // overlay), then hands off straight to the new monster's Inspect screen.
+  function playSpliceReveal(a, b, child, done){
+    const af = getForm(a), bf = getForm(b), cf = getForm(child);
+    const ov = document.createElement('div');
+    ov.id = 'splice-overlay';
+    ov.style.cssText = 'position:fixed; inset:0; z-index:950; display:flex; flex-direction:column; align-items:center; justify-content:center; background:radial-gradient(ellipse at 50% 45%, #241a3a 0%, #020a06 72%); color:#dff7e6; text-align:center; padding:24px; cursor:pointer;';
+    ov.innerHTML = `
+      <div id="splice-rays" style="position:absolute; left:50%; top:42%; width:150vmax; height:150vmax; margin:-75vmax 0 0 -75vmax; background:repeating-conic-gradient(${cf.color}30 0deg 6deg, transparent 6deg 18deg); border-radius:50%; pointer-events:none; opacity:0;"></div>
+      <div id="splice-parents" style="position:relative; display:flex; align-items:center; gap:18px;">
+        <div id="splice-a" style="filter:drop-shadow(0 0 12px ${af.color});">${spriteImgHtml(a,72)}</div>
+        <div id="splice-plus" class="pixel-font glow" style="font-size:20px; color:var(--violet);">+</div>
+        <div id="splice-b" style="filter:drop-shadow(0 0 12px ${bf.color});">${spriteImgHtml(b,72)}</div>
+      </div>
+      <div id="splice-child" style="position:relative; width:200px; height:200px; opacity:0;">${spriteImgHtml(child,200)}</div>
+      <div id="splice-title" class="pixel-font glow" style="margin-top:20px; font-size:13px; line-height:1.8; color:${cf.color}; max-width:300px; min-height:48px;"></div>
+      <div id="splice-hint" style="margin-top:14px; font-size:11px; color:#86ad96; opacity:0;">Tap to continue</div>
+    `;
+    document.body.appendChild(ov);
+    const $ = id => ov.querySelector('#'+id);
+    const rays = $('splice-rays'), parents = $('splice-parents'), childEl = $('splice-child'), title = $('splice-title'), hint = $('splice-hint');
+    const timers = [];
+    const at = (ms, f) => timers.push(setTimeout(() => { if(document.body.contains(ov)) f(); }, ms));
+    const shown = Date.now();
+    let done_ = false;
+    const finalTitle = `${escapeHtml(getForm(child).name)} joined your Network Registry!<br><span style="font-size:10px; color:var(--ink-dim);">Gen ${child.gen} · Potential ${potentialStars(child.ivs)}</span>`;
+    const showFinal = () => {
+      done_ = true;
+      timers.forEach(clearTimeout);
+      ov.getAnimations && ov.getAnimations({subtree:true}).forEach(a2 => a2.cancel());
+      parents.style.opacity = '0';
+      childEl.style.opacity = '1'; childEl.style.transform = 'none';
+      rays.style.opacity = '.5';
+      title.innerHTML = finalTitle; title.style.opacity = '1';
+      hint.style.opacity = '1';
+      if(motionOn()) animate(rays, [{transform:'rotate(0deg)'},{transform:'rotate(360deg)'}], {duration:24000, iterations:Infinity});
+    };
+    const close = () => {
+      const a2 = animate(ov, [{opacity:1},{opacity:0}], {duration:250, fill:'forwards'});
+      const end = () => { ov.remove(); done(); };
+      if(a2) a2.onfinish = end; else end();
+      setTimeout(() => { if(document.body.contains(ov)) end(); }, 600);
+    };
+    ov.addEventListener('click', () => {
+      if(Date.now() - shown < 500) return;
+      if(done_) close(); else showFinal();
+    });
+    if(!motionOn()){ showFinal(); return; }
+
+    // ---- full sequence (~3s) ----
+    animate(ov, [{opacity:0},{opacity:1}], {duration:300});
+    title.innerHTML = 'Splicing genomes...';
+    animate(title, [{opacity:0},{opacity:1}], {duration:400});
+    animate(rays, [{opacity:0},{opacity:.5}], {duration:900, fill:'forwards'});
+    animate(rays, [{transform:'rotate(0deg)'},{transform:'rotate(360deg)'}], {duration:14000, iterations:Infinity});
+    animate(parents, [{transform:'scale(1)'},{transform:'scale(1.05)'},{transform:'scale(1)'}], {duration:700, iterations:2, easing:'ease-in-out'});
+    at(1400, () => {
+      animate(parents, [{transform:'scale(1)', opacity:1},{transform:'scale(.5)', opacity:0}], {duration:600, fill:'forwards', easing:'ease-in'});
+      const c = centerOf(parents);
+      for(let i=0; i<18; i++){
+        const p = document.createElement('div');
+        const ang = Math.random()*Math.PI*2, r = 120 + Math.random()*90;
+        p.style.cssText = `position:fixed; left:${c.x+Math.cos(ang)*r}px; top:${c.y+Math.sin(ang)*r}px; width:4px; height:4px; background:${cf.color}; box-shadow:0 0 8px ${cf.color}; z-index:951; pointer-events:none; opacity:0;`;
+        document.body.appendChild(p);
+        const a3 = animate(p, [{transform:'translate(-50%,-50%)', opacity:0},{opacity:1, offset:.3},{transform:`translate(calc(-50% + ${-Math.cos(ang)*r}px), calc(-50% + ${-Math.sin(ang)*r}px))`, opacity:0}], {duration:700+Math.random()*400, delay:Math.random()*400, easing:'ease-in'});
+        if(a3) a3.onfinish = () => p.remove();
+        setTimeout(() => p.remove(), 1800);
+      }
+    });
+    at(2100, () => {
+      childEl.style.opacity = '1';
+      animate(childEl, [{transform:'scale(.4)', filter:'brightness(0) invert(1) drop-shadow(0 0 30px #fff)'},{transform:'scale(1.2)', filter:'brightness(0) invert(1) drop-shadow(0 0 30px #fff)', offset:.5},{transform:'scale(1)', filter:`drop-shadow(0 0 22px ${cf.color})`}], {duration:650, easing:'ease-out'});
+      const c = centerOf(childEl);
+      for(let k=0; k<2; k++){
+        const ring = document.createElement('div');
+        ring.style.cssText = `position:fixed; left:${c.x}px; top:${c.y}px; width:120px; height:120px; margin:-60px 0 0 -60px; border:3px solid ${cf.color}; border-radius:50%; z-index:951; pointer-events:none; box-shadow:0 0 14px ${cf.color};`;
+        document.body.appendChild(ring);
+        const a4 = animate(ring, [{transform:'scale(.3)', opacity:.9},{transform:'scale(3.2)', opacity:0}], {duration:850, delay:k*160, easing:'ease-out'});
+        if(a4) a4.onfinish = () => ring.remove();
+        setTimeout(() => ring.remove(), 1400);
+      }
+      burst(childEl, cf.color, 16, 110);
+      burst(childEl, '#ffffff', 8, 80);
+    });
+    at(2650, () => {
+      title.innerHTML = finalTitle;
+      animate(title, [{opacity:0, transform:'scale(.8)'},{opacity:1, transform:'scale(1)'}], {duration:450, easing:'ease-out'});
+    });
+    at(3100, () => { done_ = true; hint.style.opacity = '1'; animate(hint, [{opacity:0},{opacity:1}], {duration:400}); });
   }
 
   /* ---------------------------------------------------------
@@ -5826,11 +5919,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const BUILD = {
-    version: '25.7',
+    version: '25.8',
     date: '2026-09-21',
     notes: [
-      'New: Locked Nodes — sealed data caches you may find while exploring. Buy a Decrypter once in the Shop\'s new Tools tab, then solve a Data Sorting puzzle to open one for Bits and a capture program.',
-      'Data Sorting is a stack-sorting puzzle: move typed data chunks between containers until each one holds a single type. Running out of moves just re-locks the node for another try.',
+      'Breeding Lab is now the Splice Lab. Splicing two monsters shows a full-screen reveal of the new hybrid, then opens straight to its Inspect screen.',
     ],
   };
   const SEEN_BUILD_KEY = 'cybertamer_seen_build';

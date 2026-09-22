@@ -39,7 +39,7 @@ The buttons are grouped in pairs:
 | Wilderness Gate / Data Mine | Go out and explore |
 | Wanted Board / Daily | Goals and rewards |
 | Job Board / Server Farm | Earn Bits |
-| Training Ground / Breeding Lab | Grow and improve monsters |
+| Training Ground / Splice Lab | Grow and improve monsters |
 | Play / Rest Partner | Look after your partner |
 | Network Registry / Inventory | Manage what you own |
 | Shop / Dex | Buy things, track your collection |
@@ -105,7 +105,7 @@ Monsters gain XP from exploring and battles. Every species has a second, stronge
 ### Growing stronger
 - **Evolution Crests:** bought in the Shop or grown on the farm. They apply instantly and boost all four stats a little. Capped at 3 per monster.
 - **Training Ground:** unlocks after your first boss. Pick a stat (STR, DEF or SPD) and play a timing game. Each stat can be trained up to +10 per partner. It costs Energy and Hunger and starts a cooldown that shortens as you explore.
-- **Breeding Lab:** unlocks when your farm reaches a **Server Shack**. Pick two different monsters and pay 50 Bits to make a hybrid egg.
+- **Splice Lab** (formerly Breeding Lab): unlocks when your farm reaches a **Server Shack**. Pick two different monsters and pay 50 Bits to splice their genomes. A full-screen reveal shows the new hybrid, then opens straight to its Inspect screen.
 - **Modules:** each monster holds one. Timed modules burn one tick per step or dig, only while that monster is your active partner. Sync Link is the exception and keeps running on the bench.
 - **Stat Drives:** permanent stats, capped per partner.
 - **Gear:** found only in the Data Mine. Each monster has two gear slots.
@@ -289,7 +289,7 @@ Buy seeds, plant them in pods, and charge them to start growing. Crops grow as y
 | Farm level | Cost | Pods |
 |---|---|---|
 | Vacant Plot | Free | 6 |
-| Server Shack | 300 | 10 (unlocks Breeding) |
+| Server Shack | 300 | 10 (unlocks the Splice Lab) |
 | Small Farm | 800 | 16 |
 | Farmhouse | 2,000 | 24 |
 | Large Estate | 5,000 | 36 (unlocks automation) |

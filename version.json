@@ -1,8 +1,7 @@
 {
-  "version": "25.7",
+  "version": "25.8",
   "date": "2026-09-21",
   "notes": [
-    "New: Locked Nodes — sealed data caches you may find while exploring. Buy a Decrypter once in the Shop's new Tools tab, then solve a Data Sorting puzzle to open one for Bits and a capture program.",
-    "Data Sorting is a stack-sorting puzzle: move typed data chunks between containers until each one holds a single type. Running out of moves just re-locks the node for another try."
+    "Breeding Lab is now the Splice Lab. Splicing two monsters shows a full-screen reveal of the new hybrid, then opens straight to its Inspect screen."
   ]
 }
