@@ -1,8 +1,8 @@
 {
-  "version": "25.16",
+  "version": "25.17",
   "date": "2026-09-22",
   "notes": [
-    "New Explorer Tools in the Shop: Packet Tracer (shows the boss signal's direction and distance on any map, not just the Ghost Server), Port Scanner (reveals Locked Nodes through the fog before you've walked near them), and Firewall Breaker (forces open rare ⛔ Restricted Zones for a one-time reward, opening a new path for good).",
-    "New map feature: Restricted Zones, a rare blocked tile that needs a Firewall Breaker to pass. Old maps and favorited seeds are never blocked by a tool you don't own — it only ever opens up new ground."
+    "New: Layer 2. Once you've beaten a biome's boss, a 🌀 Layer 2 option opens on that biome's card at the Wilderness Gate — a harder remix with favored species spawning even more often, a denser version of the biome's own mechanic, a new ⚡ power surge hazard exclusive to Layer 2, and a much stronger boss under a new title.",
+    "Layer 2's layout is derived from the same seed you enter for Layer 1, so favoriting a seed favorites both layers."
   ]
 }

@@ -141,6 +141,12 @@ Unlocks after you defeat **two** biome bosses.
 - **Port Scanner** (◈350): reveals Locked Nodes through the fog, so you can spot one before you've walked near it.
 - **Restricted Zones:** a rare ⛔ tile that blocks the way outright, like a wall — until you own a **Firewall Breaker** (◈900). Walking into one with the tool forces the path open for good, for a one-time reward of Bits and a Basic Capture.exe. Old maps and favorited seeds are never blocked by a tool you don't own — it only ever opens up new ground.
 
+### Layer 2
+- Beat a biome's boss and a 🌀 **Layer 2** option opens up on that biome's card at the Wilderness Gate — a harder second pass through the same biome.
+- Favored species spawn even more often, the biome's own mechanic gets denser (more heat vents in the Foundry, a tighter fading-signal radius on the Ghost Server), and a new ⚡ **power surge** hazard shows up that no Layer 1 map has.
+- Layer 2 has its own, much stronger boss under a new title, and its own defeat tracking separate from Layer 1 — beating it doesn't unlock a new biome, but it does pay out bigger Bits and XP.
+- Layer 2's layout is derived from the same seed you use for Layer 1, so favoriting a seed favorites both.
+
 ### Daily Ops and the Wanted Board
 - **Login streak:** claim a reward each day on a 7-day cycle. Each finished cycle adds a 25% Bits bonus, up to +100%. One missed day is forgiven, and a long break earns a welcome-back gift.
 - **Daily quests:** three new quests every day, based on what you've unlocked. Clear all three for a bonus cache.

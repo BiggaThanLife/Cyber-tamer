@@ -257,9 +257,14 @@
     });
     return out;
   }
-  function encounterPool(biome){
+  // `layer` only ever ADDS extra weight on top of the original favored+favored+roamers shape
+  // (default layer 1 reproduces the exact legacy pool), so it never touches biome 0-3's base
+  // odds or anomalyPool's reuse of this function.
+  function encounterPool(biome, layer){
     const fav = favoredFor(biome);
-    return fav.concat(fav).concat(lineIds.filter(id => EVOLUTION_LINES[id][0].roamer));
+    let pool = fav.concat(fav);
+    if(layer === 2) pool = pool.concat(fav); // Layer 2: favored species show up even more often
+    return pool.concat(lineIds.filter(id => EVOLUTION_LINES[id][0].roamer));
   }
   // Seeded anomalies use the ORIGINAL pool shape (legacy favored head + roamers only).
   // Any change to that array's length or order would silently change what a favorited
@@ -992,22 +997,30 @@
       desc:'Overgrown server farms humming at the edge of town — a gentle introduction to the wild grid.',
       tiles:{ open:{glyph:'·',bg:'#0d2a17',col:'#3a7a4d'}, blockA:{glyph:'▲',bg:'#2a2318',col:'#a6853f',name:'mountain crag'}, blockB:{glyph:'≈',bg:'#0c2733',col:'#3ad6d1',name:'river current'} },
       favored:['terrabit','sylvyx','ferrocog'],
-      bossSpecies:'terrabit', bossLevel:14, bossMult:1.3, bossTitle:'The Crag Warden' },
+      bossSpecies:'terrabit', bossLevel:14, bossMult:1.3, bossTitle:'The Crag Warden',
+      layer2:{ levelOffset:8, bossLevel:34, bossMult:1.55, bossTitle:'The Crag Warden, Rebuilt',
+        desc:'The same server farms, gutted and rebuilt tougher after your first pass through. Nothing here forgives a mistake twice.' } },
     { id:'wastes', name:'Sunbaked Wastes', accentColor:'var(--amber)',
       desc:'Cracked solar-panel dunes ripple with heat shimmer. Data mirages flicker on the horizon.',
       tiles:{ open:{glyph:'·',bg:'#2a1c0a',col:'#c98f3f'}, blockA:{glyph:'▲',bg:'#3a2410',col:'#e0a94f',name:'sand dune'}, blockB:{glyph:'☼',bg:'#4a1a08',col:'#ff6b3a',name:'scorched vent'} },
       favored:['pyrelix','volteon','glitchling'],
-      bossSpecies:'pyrelix', bossLevel:20, bossMult:1.35, bossTitle:'The Cinder Sovereign' },
+      bossSpecies:'pyrelix', bossLevel:20, bossMult:1.35, bossTitle:'The Cinder Sovereign',
+      layer2:{ levelOffset:10, bossLevel:40, bossMult:1.6, bossTitle:'The Cinder Sovereign, Reforged',
+        desc:'The dunes have baked harder since your last visit. The heat shimmer hides more than mirages now.' } },
     { id:'tundra', name:'Frostbyte Tundra', accentColor:'var(--cyan)',
       desc:'A frozen expanse of dead circuitry. The cold slows even the fastest packets.',
       tiles:{ open:{glyph:'·',bg:'#0a1f28',col:'#5fb8d6'}, blockA:{glyph:'▲',bg:'#132c38',col:'#a9dbee',name:'ice ridge'}, blockB:{glyph:'❄',bg:'#0a2530',col:'#c8f0ff',name:'frozen lake'} },
       favored:['hydrune','ferrocog','nyxbyte'],
-      bossSpecies:'hydrune', bossLevel:26, bossMult:1.4, bossTitle:'The Glacial Tyrant' },
+      bossSpecies:'hydrune', bossLevel:26, bossMult:1.4, bossTitle:'The Glacial Tyrant',
+      layer2:{ levelOffset:12, bossLevel:46, bossMult:1.65, bossTitle:'The Glacial Tyrant, Unbound',
+        desc:'Something under the ice has thawed just enough to move again. The cold here bites harder than it did before.' } },
     { id:'undergrid', name:'The Undergrid', accentColor:'var(--violet)',
       desc:'A corrupted core layer beneath the network. Reality flickers between passes.',
       tiles:{ open:{glyph:'·',bg:'#1a0c22',col:'#b07fff'}, blockA:{glyph:'▓',bg:'#26102e',col:'#ff6bd6',name:'firewall shard'}, blockB:{glyph:'≡',bg:'#160a1e',col:'#8f4dff',name:'datastream surge'} },
       favored:['nyxbyte','glitchling','volteon'],
-      bossSpecies:'nyxbyte', bossLevel:32, bossMult:1.5, bossTitle:'The Kernel Corruptor' },
+      bossSpecies:'nyxbyte', bossLevel:32, bossMult:1.5, bossTitle:'The Kernel Corruptor',
+      layer2:{ levelOffset:14, bossLevel:52, bossMult:1.75, bossTitle:'The Kernel Corruptor, Recompiled',
+        desc:'The core has patched its own wounds. Reality flickers faster here, and less of it holds still.' } },
     { id:'foundry', name:'Overclocked Foundry', accentColor:'var(--crimson)',
       desc:'A furnace-district of runaway processors. The floor glows, and the vents never sleep.',
       mechanic:'♨ Heat vents scorch your partner when stepped on. Fire types are immune, Metal/Earth resist, Water/Nature suffer extra. Vents never faint you (they stop at 1 HP).',
@@ -1015,15 +1028,27 @@
               hazard:{glyph:'♨',bg:'#4a1405',col:'#ff9a3d',name:'heat vent'} },
       favored:[], mapSize:15, levelOffset:6, anomalyIncludesHabitat:true,
       hazard:{ density:0.11, dmgPct:0.07, typeMult:{Fire:0, Metal:0.5, Earth:0.5, Water:1.5, Nature:1.5} },
-      bossSpecies:'ferrocog', bossLevel:40, bossLevelOffset:2, bossMult:1.4, bossTitle:'The Forgemaster' },
+      bossSpecies:'ferrocog', bossLevel:40, bossLevelOffset:2, bossMult:1.4, bossTitle:'The Forgemaster',
+      layer2:{ levelOffset:16, bossLevel:60, bossLevelOffset:4, bossMult:1.65, bossTitle:'The Forgemaster, Overclocked',
+        desc:'Every processor here is running past spec. The vents never stopped burning after last time — if anything, there are more of them now.',
+        hazard:{ density:0.18, dmgPct:0.07, typeMult:{Fire:0, Metal:0.5, Earth:0.5, Water:1.5, Nature:1.5} } } },
     { id:'ghostserver', name:'The Ghost Server', accentColor:'var(--violet)',
       desc:'An abandoned host that half-remembers itself. The map forgets you the moment you look away.',
       mechanic:'👁 Fading signal: you only see 2 tiles around you and explored ground is forgotten. A ghost signal hints at where the boss lurks.',
       tiles:{ open:{glyph:'·',bg:'#080a14',col:'#3d4a86'}, blockA:{glyph:'▒',bg:'#0d1020',col:'#5a6bb8',name:'null-pointer wall'}, blockB:{glyph:'░',bg:'#0a0c18',col:'#7f8fd6',name:'static fog bank'} },
       favored:[], mapSize:15, levelOffset:8, anomalyIncludesHabitat:true,
       fadeFog:{ radius:2 }, bossSignal:true,
-      bossSpecies:'glitchling', bossLevel:48, bossLevelOffset:4, bossMult:1.5, bossTitle:'The Ghost Admin' },
+      bossSpecies:'glitchling', bossLevel:48, bossLevelOffset:4, bossMult:1.5, bossTitle:'The Ghost Admin',
+      layer2:{ levelOffset:18, bossLevel:68, bossLevelOffset:6, bossMult:1.75, bossTitle:'The Ghost Admin, Reawakened',
+        desc:'It remembers you this time. The signal fades faster here, and whatever\'s left of the Admin is angrier for having been beaten once.',
+        fadeFog:{ radius:1 } } },
   ];
+  // Merges a biome's layer2 overrides over its base definition. Layer 1 (or a biome with no
+  // layer2 data) returns the base object untouched — no new fields, no behavior change.
+  function layerBiomeDef(biome, layer){
+    if(layer !== 2 || !biome.layer2) return biome;
+    return Object.assign({}, biome, biome.layer2);
+  }
   function isPassableRole(role){ return role !== 'blockA' && role !== 'blockB'; }
 
   /* ---------------------------------------------------------
@@ -1320,6 +1345,7 @@
       trainAttempt: null,
       unlockedBiomeIndex: 0,
       bossDefeated: BIOMES.map(()=>false),
+      layer2Defeated: BIOMES.map(()=>false),
       ticks: 0,
       wanted: [],
       savedSeeds: [],
@@ -1559,9 +1585,15 @@
   // state is always fresh regardless of seed, so revisiting a favorite seed
   // still feels like exploring it, not resuming a save.
   function generateWildMap(biomeIndex, sizeOverride, seed, opts){
-    const size = sizeOverride || BIOMES[biomeIndex].mapSize || (9 + biomeIndex*2);
+    const layer = (opts && opts.layer === 2) ? 2 : 1;
+    const layerBiome = layerBiomeDef(BIOMES[biomeIndex], layer);
+    const size = sizeOverride || layerBiome.mapSize || (9 + biomeIndex*2);
     const useSeed = (typeof seed === 'number' && isFinite(seed)) ? (seed>>>0) : Math.floor(Math.random()*4294967296);
-    const rng = mulberry32(useSeed);
+    // Layer 2's actual layout is derived from the entered/favorited seed number, same pattern as
+    // every other derived-PRNG feature — so favoriting a seed favorites both layers at once, but
+    // Layer 2 is never just a re-skin of the exact same grid.
+    const mapSeed = layer === 2 ? (useSeed ^ 0x5bd1e995) >>> 0 : useSeed;
+    const rng = mulberry32(mapSeed);
     const cx = Math.floor(size/2), cy = Math.floor(size/2);
     const grid = [];
     for(let y=0;y<size;y++){
@@ -1625,22 +1657,23 @@
       }
     }
 
-    if(!state.bossDefeated[biomeIndex]){
+    const bossAlreadyDefeated = layer === 2 ? state.layer2Defeated[biomeIndex] : state.bossDefeated[biomeIndex];
+    if(!bossAlreadyDefeated){
       const bc = takeCell();
       if(bc) grid[bc[1]][bc[0]] = { role:'boss', opened:false };
     }
 
     // Biome mechanics and daily extras use their OWN derived PRNGs, placed after everything
     // above, so biomes without them generate exactly the same layouts as before.
-    const biomeDef = BIOMES[biomeIndex];
+    const biomeDef = layerBiome;
     if(biomeDef.hazard){
-      const hr = mulberry32((useSeed ^ 0x9e3779b9) >>> 0);
+      const hr = mulberry32((mapSeed ^ 0x9e3779b9) >>> 0);
       for(let y=0;y<size;y++) for(let x=0;x<size;x++){
         if(grid[y][x].role === 'open' && hr() < biomeDef.hazard.density) grid[y][x] = { role:'hazard', opened:false };
       }
     }
     if(opts && opts.daily){
-      const cr = mulberry32((useSeed ^ 0x51ed270b) >>> 0);
+      const cr = mulberry32((mapSeed ^ 0x51ed270b) >>> 0);
       const cheb = (x,y) => Math.max(Math.abs(x-cx), Math.abs(y-cy));
       const minD = Math.max(3, Math.floor(size/3));
       let cand = [];
@@ -1653,7 +1686,7 @@
     // (favorited seeds keep their existing chests/vault/shrine/anomaly/boss exactly where they
     // were; this only ever claims a still-'open' cell, added on top).
     {
-      const lr = mulberry32((useSeed ^ 0x27220a95) >>> 0);
+      const lr = mulberry32((mapSeed ^ 0x27220a95) >>> 0);
       if(lr() < 0.4){
         const cand = [];
         for(let y=0;y<size;y++) for(let x=0;x<size;x++) if(grid[y][x].role === 'open') cand.push([x,y]);
@@ -1666,7 +1699,7 @@
     // rather than claiming open ground. A favorited seed without the tool sees no difference at
     // all (still just a wall); with the tool it's strictly a new option, never new blockage.
     {
-      const rr = mulberry32((useSeed ^ 0x3c6ef372) >>> 0);
+      const rr = mulberry32((mapSeed ^ 0x3c6ef372) >>> 0);
       if(rr() < 0.35){
         const cand = [];
         for(let y=0;y<size;y++) for(let x=0;x<size;x++) if(grid[y][x].role === 'blockA' || grid[y][x].role === 'blockB') cand.push([x,y]);
@@ -1674,9 +1707,19 @@
       }
     }
 
+    // Power Surge — Layer 2 only, on top of whatever hazard the biome already has (Foundry keeps
+    // its heat vents AND gets surges). Its own derived PRNG placed last, so Layer 1 maps and
+    // biomes without a layer2 entry never see it.
+    if(layer === 2){
+      const sr = mulberry32((mapSeed ^ 0x1e35a7bd) >>> 0);
+      for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+        if(grid[y][x].role === 'open' && sr() < 0.07) grid[y][x] = { role:'surge', opened:false };
+      }
+    }
+
     const fog = grid.map(row => row.map(()=>false));
     revealFog(fog, cx, cy, size, 1);
-    return { size, grid, fog, px:cx, py:cy, steps:0, biomeIndex, hasKey:false, keyPairPresent:hasKeyPair, seed:useSeed,
+    return { size, grid, fog, px:cx, py:cy, steps:0, biomeIndex, layer, hasKey:false, keyPairPresent:hasKeyPair, seed:useSeed,
              daily: !!(opts && opts.daily), dailyDay: (opts && opts.daily && opts.day) || null };
   }
 
@@ -1698,8 +1741,8 @@
   // one-shot-per-visit, position-fixed) become genuine "hunting spots" a
   // favorited seed can guarantee. Level still scales off your current
   // partner's level each visit, since that's difficulty, not identity.
-  function anomalySeedRng(mapSeed, x, y){
-    return mulberry32(strToSeed(`${mapSeed}_anomaly_${x}_${y}`));
+  function anomalySeedRng(mapSeed, x, y, layer){
+    return mulberry32(strToSeed(`${mapSeed}_anomaly_${x}_${y}${layer===2?'_l2':''}`));
   }
 
   function isSeedFavorited(seed, biomeIndex){
@@ -2552,15 +2595,25 @@
                     </div>`).join('')}
                 </div>
               ` : ''}
+              ${defeated ? `
+                <div style="margin-top:10px; border-top:1px solid var(--glass-border); padding-top:8px;">
+                  <div style="font-size:10px; color:var(--crimson);">🌀 Layer 2 ${state.layer2Defeated[i] ? '<span class="badge" style="color:var(--phosphor);border-color:var(--phosphor)">BOSS DEFEATED</span>' : '<span class="badge" style="color:var(--crimson);border-color:var(--crimson)">BOSS AWAITS</span>'}</div>
+                  <div style="font-size:9.5px; color:var(--ink-dim); margin-top:4px;">${(b.layer2 && b.layer2.desc) || 'A harder pass through this biome.'}</div>
+                  <div style="display:flex; gap:6px; margin-top:8px;">
+                    <button class="btn btn-crimson" style="flex:1; padding:6px; font-size:10px;" data-enter-l2="${i}">🎲 New Map</button>
+                    <button class="btn" style="flex:1; padding:6px; font-size:10px;" data-enter-seed-l2="${i}">✎ Enter Seed</button>
+                  </div>
+                </div>
+              ` : ''}
             ` : ''}
           </div>`;
         }).join('')}
       </div>
     `;
-    const enterBiome = (idx, seed) => {
+    const enterBiome = (idx, seed, layer) => {
       const biome = BIOMES[idx];
-      playTransition(`Entering<br>${biome.name}...`, biome.accentColor, ()=>{
-        state.wild = generateWildMap(idx, undefined, seed);
+      playTransition(`Entering<br>${biome.name}${layer===2?' — Layer 2':''}...`, biome.accentColor, ()=>{
+        state.wild = generateWildMap(idx, undefined, seed, layer===2 ? {layer:2} : undefined);
         recordVisitedSeed(idx, state.wild.seed);
         state.screen = 'wild';
         render();
@@ -2572,6 +2625,12 @@
         enterBiome(idx);
       });
     });
+    screenEl.querySelectorAll('[data-enter-l2]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const idx = parseInt(btn.getAttribute('data-enter-l2'),10);
+        enterBiome(idx, undefined, 2);
+      });
+    });
     screenEl.querySelectorAll('[data-enter-seed]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const idx = parseInt(btn.getAttribute('data-enter-seed'),10);
@@ -2581,6 +2640,18 @@
           const seed = parseInt(trimmed, 10);
           if(!isFinite(seed) || isNaN(seed)){ showAlertModal("That's not a valid seed number."); return; }
           enterBiome(idx, seed >>> 0);
+        });
+      });
+    });
+    screenEl.querySelectorAll('[data-enter-seed-l2]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const idx = parseInt(btn.getAttribute('data-enter-seed-l2'),10);
+        showPromptModal('Enter a seed number to travel to that exact Layer 2 sector layout:', '', (raw)=>{
+          const trimmed = (raw||'').trim();
+          if(trimmed === '') return; // cancelled/empty
+          const seed = parseInt(trimmed, 10);
+          if(!isFinite(seed) || isNaN(seed)){ showAlertModal("That's not a valid seed number."); return; }
+          enterBiome(idx, seed >>> 0, 2);
         });
       });
     });
@@ -2622,7 +2693,7 @@
   --------------------------------------------------------- */
   function renderWild(screenEl, controlsEl){
     const w = state.wild;
-    const biome = BIOMES[w.biomeIndex];
+    const biome = layerBiomeDef(BIOMES[w.biomeIndex], w.layer||1);
     applyFog(w, biome);
     const cell = 26;
     // Camera-centered viewport: a fixed-size window always centered on the
@@ -2662,6 +2733,7 @@
           else if(c.role==='cache'){ bg='#0a2418'; glyph= c.opened?'·':'✪'; col='#7dffb0'; }
           else if(c.role==='locked'){ bg= c.opened?'#0a2418':'#1a1424'; glyph= c.opened?'·':'🧩'; col= c.opened?'#4be37a':'#c093ff'; }
           else if(c.role==='restricted'){ bg= c.opened?biome.tiles.open.bg:'#241010'; glyph= c.opened?'·':'⛔'; col= c.opened?biome.tiles.open.col:'#ff6b4a'; }
+          else if(c.role==='surge'){ bg='#241a05'; glyph='⚡'; col='#ffe14d'; }
         }
         const isPlayer = (vx===VIEW_RADIUS && vy===VIEW_RADIUS);
         grid += `<div class="tile"${isPlayer ? ' id="pl-tile"' : ''} style="background:${bg};color:${col};">${isPlayer ? '<span style="color:var(--phosphor);text-shadow:0 0 6px var(--phosphor);">◉</span>' : glyph}</div>`;
@@ -2671,15 +2743,16 @@
     const seedStr = String(w.seed);
     const isFav = state.savedSeeds.some(s => s.seed === w.seed && s.biomeIndex === w.biomeIndex);
     screenEl.innerHTML = `
-      ${screenTitle(`${biome.name.toUpperCase()} — FOG SECTOR`, biome.accentColor)}
+      ${screenTitle(`${biome.name.toUpperCase()}${w.layer===2?' — LAYER 2':''} — FOG SECTOR`, biome.accentColor)}
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:9.5px; color:var(--ink-dim);">
-        <span>Steps ${w.steps} · Ticks ${state.ticks||0}${!state.bossDefeated[w.biomeIndex] ? ' · ☠' : ''}</span>
+        <span>Steps ${w.steps} · Ticks ${state.ticks||0}${!(w.layer===2?state.layer2Defeated:state.bossDefeated)[w.biomeIndex] ? ' · ☠' : ''}</span>
         <button class="btn" id="legend-toggle" style="padding:2px 6px; font-size:9px;">${wildLegendOpen?'▲ Hide':'❓ Legend'}</button>
       </div>
+      ${w.layer===2 ? `<div style="font-size:9px; color:var(--crimson); margin-bottom:4px;">🌀 Layer 2 — remixed spawns, denser hazards, and a stronger boss.</div>` : ''}
       ${biome.mechanic ? `<div style="font-size:9px; color:${biome.accentColor}; margin-bottom:4px;">${biome.mechanic.split('.')[0]}.</div>` : ''}
       ${(biome.bossSignal || hasTool('packetTracer')) ? `<div style="font-size:10px; color:var(--violet); margin-bottom:4px;">${bossSignalText(w, biome)}</div>` : ''}
       ${w.daily && state.daily && !state.daily.sector.claimed ? `<div style="font-size:9.5px; color:#7dffb0; margin-bottom:4px;">✪ Daily Sector — find the cache for today's bonus.</div>` : ''}
-      ${wildLegendOpen ? `<div style="font-size:9px; color:var(--ink-dim); margin-bottom:6px; background:rgba(255,255,255,.03); border-radius:6px; padding:4px 6px;">⛩ gate exits · ✦ shrine · ⚷ key / ▣ vault · ✕ anomaly · ☠ boss lurks nearby · ♨ heat vent · ✪ daily cache · 🧩 locked node (needs a Decrypter) · ⛔ restricted zone (needs a Firewall Breaker)</div>` : ''}
+      ${wildLegendOpen ? `<div style="font-size:9px; color:var(--ink-dim); margin-bottom:6px; background:rgba(255,255,255,.03); border-radius:6px; padding:4px 6px;">⛩ gate exits · ✦ shrine · ⚷ key / ▣ vault · ✕ anomaly · ☠ boss lurks nearby · ♨ heat vent · ✪ daily cache · 🧩 locked node (needs a Decrypter) · ⛔ restricted zone (needs a Firewall Breaker) · ⚡ power surge (Layer 2 only)</div>` : ''}
       ${grid}
       <div style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:6px; font-size:9px; color:var(--ink-dim);">
         <span>Seed <span class="pixel-font" style="color:var(--phosphor);">${seedStr}</span></span>
@@ -2758,7 +2831,7 @@
 
   function moveWild(dx,dy){
     const w = state.wild;
-    const biome = BIOMES[w.biomeIndex];
+    const biome = layerBiomeDef(BIOMES[w.biomeIndex], w.layer||1);
     const nx = w.px+dx, ny = w.py+dy;
     if(nx<0||ny<0||nx>=w.size||ny>=w.size) return;
     const cell = w.grid[ny][nx];
@@ -2833,14 +2906,14 @@
     }
     if(cell.role === 'anomaly' && !cell.opened){
       cell.opened = true;
-      startAnomalyEncounter(w.biomeIndex, w.seed, nx, ny);
+      startAnomalyEncounter(w.biomeIndex, w.seed, nx, ny, w.layer||1);
       return;
     }
     if(cell.role === 'gate'){
       state.screen='town'; logMsg('Returned to Neon Haven.'); render(); return;
     }
     if(cell.role === 'boss'){
-      startBossEncounter(w.biomeIndex);
+      startBossEncounter(w.biomeIndex, w.layer||1);
       return;
     }
     if(cell.role === 'cache' && !cell.opened){
@@ -2872,6 +2945,14 @@
       }
       render(); return;
     }
+    if(cell.role === 'surge'){
+      fx({k:'hazard'});
+      const dmg = Math.max(1, Math.round(p.maxHp * 0.09));
+      const dealt = Math.min(dmg, Math.max(0, p.hp - 1)); // surges never faint you
+      p.hp -= dealt;
+      logMsg(`⚡ A power surge arcs through the grid, hitting ${getForm(p).name} for ${dealt} damage. HP ${p.hp}/${p.maxHp}.`);
+      render(); return;
+    }
     if(p.hunger <= 0){
       logMsg(`${getForm(p).name} is starving and too weak to explore further!`);
       state.screen='town'; render(); return;
@@ -2889,8 +2970,8 @@
 
   function startEncounter(){
     const w = state.wild;
-    const biome = BIOMES[w.biomeIndex];
-    const pool = encounterPool(biome);
+    const biome = layerBiomeDef(BIOMES[w.biomeIndex], w.layer||1);
+    const pool = encounterPool(biome, w.layer||1);
     const lineId = pool[Math.floor(Math.random()*pool.length)];
     const p = getActive();
     const lvl = Math.max(1, p.level + biomeLevelOffset(biome, w.biomeIndex) + Math.floor(Math.random()*3) - 1);
@@ -2924,9 +3005,9 @@
     });
   }
 
-  function startAnomalyEncounter(biomeIndex, mapSeed, x, y){
-    const biome = BIOMES[biomeIndex];
-    const rng = anomalySeedRng(mapSeed, x, y);
+  function startAnomalyEncounter(biomeIndex, mapSeed, x, y, layer){
+    const biome = layerBiomeDef(BIOMES[biomeIndex], layer||1);
+    const rng = anomalySeedRng(mapSeed, x, y, layer||1);
     const pool = anomalyPool(biome);
     const lineId = pool[Math.floor(rng()*pool.length)];
     const ivs = {
@@ -2976,12 +3057,12 @@
     return boss;
   }
 
-  function startBossEncounter(biomeIndex){
-    const biome = BIOMES[biomeIndex];
+  function startBossEncounter(biomeIndex, layer){
+    const biome = layerBiomeDef(BIOMES[biomeIndex], layer||1);
     const boss = createBoss(biome);
     dexMarkSeen(boss.speciesId, boss.stage);
     playTransition(`⚠<br>${boss.bossTitle}<br>rises to block your path!`, 'var(--crimson)', ()=>{
-      state.battle = { enemy: boss, over:false, isBoss:true, biomeIndex, bossVictory:false, catchAttempted:false, source:'wild' };
+      state.battle = { enemy: boss, over:false, isBoss:true, biomeIndex, layer: layer||1, bossVictory:false, catchAttempted:false, source:'wild' };
       state.screen = 'battle';
       logMsg(`⚠ ${boss.bossTitle} rises to block your path!`);
       render();
@@ -3231,16 +3312,21 @@
 
     if(b.enemy.hp <= 0){
       if(b.isBoss){
-        const bits = bitsBoost(150 + b.biomeIndex*80);
+        const isL2 = b.layer === 2;
+        const bits = bitsBoost((isL2 ? 260 : 150) + b.biomeIndex*80);
         state.bits += bits;
-        gainXp(p, 80 + b.enemy.level*8);
-        state.bossDefeated[b.biomeIndex] = true;
+        gainXp(p, (isL2 ? 140 : 80) + b.enemy.level*8);
         questEvent('win', 1, { type: getForm(b.enemy).type });
-        const nextIdx = b.biomeIndex + 1;
         let unlockMsg = '';
-        if(nextIdx < BIOMES.length && state.unlockedBiomeIndex < nextIdx){
-          state.unlockedBiomeIndex = nextIdx;
-          unlockMsg = ` The path to ${BIOMES[nextIdx].name} has opened!`;
+        if(isL2){
+          state.layer2Defeated[b.biomeIndex] = true;
+        } else {
+          state.bossDefeated[b.biomeIndex] = true;
+          const nextIdx = b.biomeIndex + 1;
+          if(nextIdx < BIOMES.length && state.unlockedBiomeIndex < nextIdx){
+            state.unlockedBiomeIndex = nextIdx;
+            unlockMsg = ` The path to ${BIOMES[nextIdx].name} has opened!`;
+          }
         }
         fx({k:'faint'});
         logMsg(`${b.enemy.bossTitle} was defeated! +◈${bits} Bits.${unlockMsg}`);
@@ -3328,6 +3414,7 @@
       { h:'Locked Nodes', b:'A 🧩 tile you find while exploring — a sealed data cache you can\'t open without a <b>Decrypter</b> (a one-time Explorer Tool, bought once in the Shop\'s Tools tab). With one, stepping onto the node opens a <b>Data Breach</b>: a match-3 grid where swapping tiles into a run of 3+ clears them, and any match next to a 🛡 Firewall damages it. Breach every Firewall before you run out of moves to win Bits and a capture program. A 4-match creates a Data Packet (clears its row or column when matched again) and a 5-match creates an Exploit (clears the area around it) — bigger boards, more tile types and more Firewalls in later biomes make it genuinely harder, not just shorter. Running out of moves just re-locks the node for another try, no other cost.' },
       { h:'Restricted Zones', b:'A rare ⛔ tile that blocks the way outright, like a wall, until you own a <b>Firewall Breaker</b>. With one, walking into it forces the path open for good — a one-time reward, and everything past it is reachable from then on. Old maps and favorited seeds are never blocked by one you don\'t own; it only ever opens up new ground.' },
       { h:'Other Explorer Tools', b:'<b>Packet Tracer</b> shows the boss\'s direction and distance on any map, not just the Ghost Server. <b>Port Scanner</b> shows Locked Nodes through the fog before you\'ve walked near them. Both are one-time purchases in the Shop\'s Tools tab, same as the Decrypter and Firewall Breaker.' },
+      { h:'Layer 2', b:'Once you\'ve beaten a biome\'s boss, a 🌀 <b>Layer 2</b> option opens up on that biome\'s card at the Wilderness Gate — a harder remix of the same biome, with favored species spawning even more often, a denser version of the biome\'s own mechanic, a new ⚡ power surge hazard exclusive to Layer 2, and a much stronger boss with its own title. Layer 2\'s layout is tied to the seed you enter, same as Layer 1, so favoriting a seed favorites both.' },
     ]},
     { id:'battle', icon:'⚔', title:'Battles & Catching', color:'var(--crimson)', blurb:'Moves, types, fleeing and capturing.', cards:[
       { h:'How a turn works', b:'Pick a move, it hits, then the enemy hits back. Every partner has two universal moves and learns type moves as they level. Move buttons show ▲ if the move is strong against this enemy and ▼ if it is weak.' },
@@ -5727,6 +5814,12 @@
       while(s.bossDefeated.length < BIOMES.length) s.bossDefeated.push(false);
       s.bossDefeated.length = BIOMES.length;
     }
+    if(!Array.isArray(s.layer2Defeated)) s.layer2Defeated = BIOMES.map(()=>false);
+    else {
+      while(s.layer2Defeated.length < BIOMES.length) s.layer2Defeated.push(false);
+      s.layer2Defeated.length = BIOMES.length;
+    }
+    if(s.wild && typeof s.wild.layer !== 'number') s.wild.layer = 1;
     const miningUnlockedFor = s.legacyUnlockAll || s.bossDefeated.filter(Boolean).length >= 2;
     if(s.screen === 'mine' && !miningUnlockedFor) s.screen = 'town';
     // Biomes were added after some saves were made: if a boss is already down, the next biome must be open.
@@ -6200,6 +6293,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.16', date:'2026-09-22', notes:[
+      'New Explorer Tools in the Shop: Packet Tracer (shows the boss signal\'s direction and distance on any map, not just the Ghost Server), Port Scanner (reveals Locked Nodes through the fog before you\'ve walked near them), and Firewall Breaker (forces open rare ⛔ Restricted Zones for a one-time reward, opening a new path for good).',
+      'New map feature: Restricted Zones, a rare blocked tile that needs a Firewall Breaker to pass. Old maps and favorited seeds are never blocked by a tool you don\'t own — it only ever opens up new ground.',
+    ]},
     { version:'25.15', date:'2026-09-22', notes:[
       'Small fix: the Decrypter tool now has its own icon (a key) instead of sharing a shield symbol with the Firewall tiles in Data Breach.',
     ]},
@@ -6257,11 +6354,11 @@
     ]},
   ];
   const BUILD = {
-    version: '25.16',
+    version: '25.17',
     date: '2026-09-22',
     notes: [
-      'New Explorer Tools in the Shop: Packet Tracer (shows the boss signal\'s direction and distance on any map, not just the Ghost Server), Port Scanner (reveals Locked Nodes through the fog before you\'ve walked near them), and Firewall Breaker (forces open rare ⛔ Restricted Zones for a one-time reward, opening a new path for good).',
-      'New map feature: Restricted Zones, a rare blocked tile that needs a Firewall Breaker to pass. Old maps and favorited seeds are never blocked by a tool you don\'t own — it only ever opens up new ground.',
+      'New: Layer 2. Once you\'ve beaten a biome\'s boss, a 🌀 Layer 2 option opens on that biome\'s card at the Wilderness Gate — a harder remix with favored species spawning even more often, a denser version of the biome\'s own mechanic, a new ⚡ power surge hazard exclusive to Layer 2, and a much stronger boss under a new title.',
+      'Layer 2\'s layout is derived from the same seed you enter for Layer 1, so favoriting a seed favorites both layers.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
