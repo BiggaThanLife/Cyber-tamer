@@ -1,8 +1,8 @@
 {
-  "version": "25.21",
+  "version": "25.22",
   "date": "2026-09-22",
   "notes": [
-    "Fixed/improved: running out of Hunger while exploring now clearly says you're heading back to Neon Haven, not just that your partner is too weak to continue.",
-    "New: the Hunger and Energy bars shake once they drop to 20% or below, so there's a visible warning before Hunger actually runs out and sends you home."
+    "Improved: running out of Hunger while exploring now shows a popup explaining what happened, on top of the log message.",
+    "Improved: the Hunger/Energy low-resource warning is now a red pulsing glow on the bar (plus the label itself turning red), instead of a subtle shake that was easy to miss."
   ]
 }

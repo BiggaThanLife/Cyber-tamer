@@ -89,7 +89,7 @@ Some tiles block your way.
 - Feed with **Prime Meat** from the Inventory (+40 Hunger). **Rest Partner** in town gives +35 Energy for a little Hunger.
 - **Play** is a short timing game that earns small amounts of Bits and XP. Every try costs Energy and Hunger, hit or miss, and only a few tries fit in a row before your partner needs a break. Exploring shortens the break.
 - Jobs and Training need a minimum amount of Energy.
-- Either bar shakes once it drops to 20% or below, so you get a warning before Hunger actually runs out and sends you home.
+- Either bar glows red once it drops to 20% or below, so you get a warning before Hunger actually runs out and sends you home. If Hunger does hit 0, a popup explains what happened, on top of the log message.
 
 ### Stats
 | Stat | What it does |
