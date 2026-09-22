@@ -1,7 +1,8 @@
 {
-  "version": "25.12",
+  "version": "25.14",
   "date": "2026-09-22",
   "notes": [
-    "Fixed: locking a monster in the Network Registry now shows a clear LOCKED/UNLOCKED label, not just a small icon — the name row was also overlapping when a lock badge got added, so that badge was removed in favor of the label on the button itself."
+    "Data Sorting is gone, replaced by Data Breach: a match-3 minigame. Swap tiles to line up 3+, take down Firewall tiles caught next to a match, and breach every Firewall before you run out of moves. Match-4 clears a row/column; match-5 clears the surrounding area.",
+    "Later biomes use a bigger mix of tile types and more Firewalls, not just fewer moves."
   ]
 }

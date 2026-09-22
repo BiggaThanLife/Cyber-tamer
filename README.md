@@ -132,8 +132,11 @@ Unlocks after you defeat **two** biome bosses.
 ### Locked Nodes and Explorer Tools
 - While exploring you may find a 🧩 **Locked Node** — a sealed data cache you can't open without the right tool.
 - **Decrypter:** a one-time Explorer Tool bought once in the Shop's Tools tab (◈500). It's a permanent unlock, not a consumable.
-- With a Decrypter, stepping onto a Locked Node opens a **Data Sorting** puzzle: move data chunks (Binary, Hex, Packets, Malware, and more) between containers, one at a time, until each container holds only one type.
-- Solving it pays Bits and a capture program. Running out of moves just re-locks the node — no other penalty, and you can try again any time. **Re-shuffle** gives a fresh layout, and **Abandon** leaves it for later.
+- With a Decrypter, stepping onto a Locked Node opens a **Data Breach** — a match-3 grid. Swap two adjacent tiles to line up 3 or more of the same type (Data, Code, Packets, Keys, Encryption, Protocols); matches clear, tiles cascade down, and empty spots refill.
+- 🛡 **Firewall** tiles sit on some cells and take damage from any match cleared next to them — breach every Firewall on the board before you run out of moves to win.
+- A 4-match creates a **Data Packet** that clears its whole row or column; a 5-match creates an **Exploit** that clears the area around it.
+- Later biomes use a bigger board, more tile types and more Firewalls, and give fewer moves — the challenge comes from all of those together, not just a shrinking move count.
+- Solving it pays Bits and a capture program. Running out of moves just re-locks the node — no other penalty, and you can try again any time. **Abandon** leaves it for later.
 
 ### Daily Ops and the Wanted Board
 - **Login streak:** claim a reward each day on a 7-day cycle. Each finished cycle adds a 25% Bits bonus, up to +100%. One missed day is forgiven, and a long break earns a welcome-back gift.
