@@ -357,6 +357,7 @@
       ivs: enemy.ivs, name: enemy.nickname || getForm(enemy).name,
       addedTick: state.ticks || 0,
       marked: !!enemy.marked,
+      personality: enemy.personality,
     };
     if(state.wanted.length >= WANTED_CAP) state.wanted.shift();
     state.wanted.push(entry);
@@ -1082,10 +1083,11 @@
     const ratio = m.maxHp ? (m.hp / m.maxHp) : 1;
     const drv = m.driveBonus || {hp:0,str:0,def:0,spd:0};
     const mm = moduleStatMult(m);
-    m.maxHp = s.maxHp + bonus.hp + gear.hp + (drv.hp||0);
-    m.str = Math.round((s.str + bonus.str + (train.str||0) + gear.str + (drv.str||0)) * mm.str);
-    m.def = Math.round((s.def + bonus.def + (train.def||0) + gear.def + (drv.def||0)) * mm.def);
-    m.spd = Math.round((s.spd + bonus.spd + (train.spd||0) + gear.spd + (drv.spd||0)) * mm.spd);
+    const pm = personalityStatMult(m);
+    m.maxHp = Math.round((s.maxHp + bonus.hp + gear.hp + (drv.hp||0)) * pm.hp);
+    m.str = Math.round((s.str + bonus.str + (train.str||0) + gear.str + (drv.str||0)) * mm.str * pm.str);
+    m.def = Math.round((s.def + bonus.def + (train.def||0) + gear.def + (drv.def||0)) * mm.def * pm.def);
+    m.spd = Math.round((s.spd + bonus.spd + (train.spd||0) + gear.spd + (drv.spd||0)) * mm.spd * pm.spd);
     m.hp = healToFull ? m.maxHp : Math.min(m.maxHp, Math.max(1, Math.round(m.maxHp*ratio)));
   }
   function gearStatTotals(m){
@@ -1121,6 +1123,41 @@
   const MARKED_CHANCE = 1/128; // odds a newly-created monster is a rare "marked" variant
   function rollIv(){ return IV_MIN + Math.random()*(IV_MAX-IV_MIN); }
   function rollIvSet(){ return { hp: rollIv(), str: rollIv(), def: rollIv(), spd: rollIv() }; }
+
+  // Personality: rolled once at creation, like IVs — hidden depth, not a player choice. Half the
+  // pool trades one stat for another (min-maxers have a reason to hunt for the "right" roll on a
+  // favorite species); the other half is a non-combat passive so it still matters to a player who
+  // isn't optimizing damage. Kept modest on purpose, same tuning philosophy as dodge chance being
+  // capped 3%-35% rather than swingy.
+  const PERSONALITIES = {
+    aggressive: { name:'Aggressive', desc:'Hits harder, but leaves itself open.', statMult:{hp:1, str:1.10, def:0.92, spd:1} },
+    guarded:    { name:'Guarded',    desc:'Built to take a hit.',                 statMult:{hp:1, str:0.92, def:1.10, spd:1} },
+    swift:      { name:'Swift',      desc:'Quick on its feet, but fragile.',      statMult:{hp:0.92, str:1, def:1, spd:1.10} },
+    sturdy:     { name:'Sturdy',     desc:'Tanky, but not fast.',                 statMult:{hp:1.10, str:1, def:1, spd:0.92} },
+    reckless:   { name:'Reckless',   desc:'All offense, no caution.',             statMult:{hp:1, str:1.06, def:0.90, spd:1.06} },
+    calm:       { name:'Calm',       desc:'Composed and defensive.',              statMult:{hp:1, str:0.90, def:1.06, spd:1.06} },
+    focused:    { name:'Focused',    desc:'Reads a fight a beat ahead of everyone else.', statMult:{hp:1,str:1,def:1,spd:1}, dodgeBonus:0.05, fleeBonus:0.05 },
+    adaptive:   { name:'Adaptive',   desc:'Wastes nothing out in the field.',     statMult:{hp:1,str:1,def:1,spd:1}, hungerEnergyMult:0.85 },
+  };
+  const PERSONALITY_IDS = Object.keys(PERSONALITIES);
+  function rollPersonality(rng){ const r = rng || Math.random; return PERSONALITY_IDS[Math.floor(r()*PERSONALITY_IDS.length)]; }
+  function personalityDef(m){ return PERSONALITIES[m.personality] || null; }
+  function personalityStatMult(m){ const p = personalityDef(m); return (p && p.statMult) || {hp:1,str:1,def:1,spd:1}; }
+  // Human-readable summary of what a personality actually does, for the Inspect screen.
+  function personalityEffectText(m){
+    const p = personalityDef(m);
+    if(!p) return '';
+    const parts = [];
+    const labels = {hp:'HP', str:'STR', def:'DEF', spd:'SPD'};
+    Object.keys(labels).forEach(k => {
+      const mult = p.statMult && p.statMult[k];
+      if(mult && mult !== 1) parts.push(`${labels[k]} ${mult>1?'+':''}${Math.round((mult-1)*100)}%`);
+    });
+    if(p.dodgeBonus) parts.push(`+${Math.round(p.dodgeBonus*100)}% dodge`);
+    if(p.fleeBonus) parts.push(`+${Math.round(p.fleeBonus*100)}% flee chance`);
+    if(p.hungerEnergyMult) parts.push(`${Math.round((1-p.hungerEnergyMult)*100)}% less Hunger/Energy drain while exploring`);
+    return parts.join(' · ');
+  }
   function ivPotential(ivs){
     if(!ivs) return 0.5;
     const avg = (ivs.hp+ivs.str+ivs.def+ivs.spd)/4;
@@ -1313,6 +1350,7 @@
       module: null,
       driveBonus: {hp:0,str:0,def:0,spd:0},
       locked: false,
+      personality: rollPersonality(),
     };
     recalcStats(m, true);
     updateMoveUnlocks(m);
@@ -2863,8 +2901,9 @@
     advanceTick();
 
     const p = getActive();
-    p.hunger = Math.max(0, p.hunger - (hasModule(p,'nutrientCell') ? 1 : 2));
-    p.energy = Math.max(0, p.energy - 1);
+    const adaptiveMult = (personalityDef(p) && personalityDef(p).hungerEnergyMult) || 1;
+    p.hunger = Math.max(0, p.hunger - (hasModule(p,'nutrientCell') ? 1 : 2) * adaptiveMult);
+    p.energy = Math.max(0, p.energy - 1 * adaptiveMult);
     gainXp(p, 1);
 
     if(cell.role === 'chest' && !cell.opened){
@@ -2990,6 +3029,7 @@
     const enemy = newMonster(entry.speciesId, entry.gen, entry.level, entry.ivs);
     enemy.stage = Math.min(entry.stage, EVOLUTION_LINES[entry.speciesId].length);
     enemy.marked = !!entry.marked; // preserve the original individual's marked status
+    if(entry.personality && PERSONALITIES[entry.personality]) enemy.personality = entry.personality;
     recalcStats(enemy, true);
     updateMoveUnlocks(enemy);
     enemy.isWanted = true;
@@ -3017,10 +3057,13 @@
       spd: IV_MIN + rng()*(IV_MAX-IV_MIN),
     };
     const marked = rng() < MARKED_CHANCE;
+    const personality = rollPersonality(rng); // appended after marked — never reorders the existing draws
     const p = getActive();
     const lvl = Math.max(1, p.level + biomeLevelOffset(biome, biomeIndex) + 2 + Math.floor(Math.random()*3)); // difficulty, not identity — stays unseeded
     const enemy = newMonster(lineId, 1, lvl, ivs);
     enemy.marked = marked;
+    enemy.personality = personality;
+    recalcStats(enemy, true); // personality was rolled after newMonster's own internal roll — recompute before the anomaly buffs below
     enemy.maxHp = Math.round(enemy.maxHp*1.25); enemy.hp = enemy.maxHp;
     enemy.str = Math.round(enemy.str*1.2);
     enemy.def = Math.round(enemy.def*1.2);
@@ -3347,13 +3390,15 @@
   // SPD's combat role: a faster partner is more likely to slip an incoming
   // counterattack entirely, and more likely to successfully flee. Kept modest
   // (3%-35%) so it's a real edge rather than a coinflip that overrides HP/DEF.
-  function dodgeChance(defenderSpd, attackerSpd){
+  function dodgeChance(defenderSpd, attackerSpd, defenderMon){
     const ratio = defenderSpd / Math.max(1, attackerSpd);
-    return Math.max(0.03, Math.min(0.35, 0.12 * ratio));
+    const bonus = (defenderMon && personalityDef(defenderMon) && personalityDef(defenderMon).dodgeBonus) || 0;
+    return Math.max(0.03, Math.min(0.35, 0.12 * ratio + bonus));
   }
   function fleeChance(p, enemy){
     const ratio = p.spd / Math.max(1, enemy.spd);
-    return Math.max(0.2, Math.min(0.9, 0.5 + (ratio-1)*0.25));
+    const bonus = (personalityDef(p) && personalityDef(p).fleeBonus) || 0;
+    return Math.max(0.2, Math.min(0.9, 0.5 + (ratio-1)*0.25 + bonus));
   }
 
   function enemyTurn(){
@@ -3361,7 +3406,7 @@
     const p = getActive();
     if(b.over) return;
     if(b.shield){ b.shield = false; fx({k:'shield'}); logMsg('The Firewall absorbed the enemy\'s attack!'); return; }
-    if(Math.random() < dodgeChance(p.spd, b.enemy.spd)){
+    if(Math.random() < dodgeChance(p.spd, b.enemy.spd, p)){
       fx({k:'dodge'});
       logMsg(`${getForm(p).name} dodged the incoming strike!`);
       return;
@@ -3439,6 +3484,7 @@
       { h:'Perfect streak', b:'Play, Job Board and Training Ground all use the same timing bar. Tapping in the bright green zone is a <b>Perfect</b> hit, which celebrates on the spot and extends a shared streak across all three. Miss the green zone and the streak resets. Beating your best streak ever logs a 🏆 in the Log.' },
       { h:'Levels and evolution', b:'Partners gain XP from exploring and battles. Many species evolve into a stronger form at a set level. The Dex shows each line\'s stages.' },
       { h:'IVs and Potential', b:'Every monster has hidden ±15% variance on each stat, fixed for life at capture or hatch. It\'s shown as a Potential star rating (☆ to ★★★★★). Breeding can pass IVs down, sometimes with a mutation.' },
+      { h:'Personality', b:'Every monster also rolls one of 8 personalities at capture or hatch, fixed for life — shown on its Inspect screen. Half are stat trade-offs (like Aggressive: +STR, -DEF); the other half are passive perks that don\'t touch stats at all (Focused adds dodge and flee chance, Adaptive cuts Hunger/Energy drain while exploring). Splicing two parents in the Splice Lab gives the hybrid a coin-flip chance at either parent\'s personality.' },
     ]},
     { id:'growth', icon:'💪', title:'Growing Stronger', color:'var(--violet)', blurb:'Crests, training, breeding, modules and gear.', cards:[
       { h:'Evolution Crests', b:'Bought in the Shop (or grown on the farm). They apply instantly and boost all four stats a little. Capped at <b>3 per monster</b>.' },
@@ -3743,6 +3789,11 @@
         <div style="font-size:10px; color:var(--ink-dim); line-height:1.6;">HP ${m.hp}/${m.maxHp} · STR ${m.str} · DEF ${m.def} · SPD ${m.spd}</div>
         <div style="font-size:9.5px; color:var(--ink-dim); margin-top:4px;">XP ${m.xp}/${xpToNext(m.level)} · Crests used ${m.crestCount||0}/3</div>
       </div>
+      ${personalityDef(m) ? `<div class="card" style="margin-bottom:8px;">
+        <div style="color:var(--phosphor); margin-bottom:4px;">Personality — ${personalityDef(m).name}</div>
+        <div style="font-size:9.5px; color:var(--ink-dim);">${personalityDef(m).desc}</div>
+        <div style="font-size:9px; color:var(--ink-dim); margin-top:4px;">${personalityEffectText(m)}</div>
+      </div>` : ''}
       <div class="card" style="margin-bottom:8px;">
         <div style="color:var(--amber); margin-bottom:6px;">Individual Values <span style="font-size:9px; color:var(--ink-dim); font-weight:normal;">— ${potentialStars(m.ivs)} overall, standout ${(ivBestStat(m.ivs)||'hp').toUpperCase()}</span></div>
         ${ivRows}
@@ -3802,6 +3853,7 @@
         <div style="font-size:9.5px; color:var(--amber); margin-top:2px;">
           Potential: ${potentialStars(m.ivs)} <span style="color:var(--ink-dim);">· Standout: ${(ivBestStat(m.ivs)||'hp').toUpperCase()}</span>
         </div>
+        ${personalityDef(m) ? `<div style="font-size:9.5px; color:var(--ink-dim); margin-top:2px;">Personality: <span style="color:var(--phosphor);">${personalityDef(m).name}</span></div>` : ''}
         <div style="font-size:9.5px; color:var(--ink-dim); margin-top:2px;">
           Crests used: ${m.crestCount||0}/3${(m.jobCooldown||0)>0 ? ` · Job cooldown: ${m.jobCooldown} ticks` : ''}${(m.trainCooldown||0)>0 ? ` · Training cooldown: ${m.trainCooldown} ticks` : ''}
         </div>
@@ -5233,6 +5285,8 @@
     const childSpecies = Math.random()<0.5 ? a.speciesId : b.speciesId;
     const gen = Math.max(a.gen,b.gen)+1;
     const child = newMonster(childSpecies, gen, 1, inheritIvs(a,b));
+    child.personality = Math.random()<0.5 ? a.personality : b.personality;
+    recalcStats(child, true);
     state.storage.push(child);
     dexMarkCaught(child);
     logMsg(`A hybrid was spliced: ${getForm(child).name} (Gen ${gen}, Potential ${potentialStars(child.ivs)})!`);
@@ -5650,6 +5704,7 @@
     TRAIN_STATS.forEach(k => { if(typeof m.trainBonus[k] !== 'number') m.trainBonus[k] = 0; });
     if(typeof m.trainCooldown !== 'number') m.trainCooldown = 0;
     if(typeof m.marked !== 'boolean') m.marked = false;
+    if(!m.personality || !PERSONALITIES[m.personality]){ m.personality = rollPersonality(); recalcStats(m, false); }
     if(!Array.isArray(m.gearSlots)) m.gearSlots = Array(GEAR_SLOT_COUNT).fill(null);
     while(m.gearSlots.length < GEAR_SLOT_COUNT) m.gearSlots.push(null);
     m.gearSlots = m.gearSlots.slice(0, GEAR_SLOT_COUNT).map(g => (g && GEAR_ITEMS[g]) ? g : null);
@@ -6299,6 +6354,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.18', date:'2026-09-22', notes:[
+      'New: fainting now costs your partner 10% of their progress toward the next level, on top of retreating to town at 20% HP. This can never cost you a level you already have — only how close you are to the next one.',
+    ]},
     { version:'25.17', date:'2026-09-22', notes:[
       'New: Layer 2. Once you\'ve beaten a biome\'s boss, a 🌀 Layer 2 option opens on that biome\'s card at the Wilderness Gate — a harder remix with favored species spawning even more often, a denser version of the biome\'s own mechanic, a new ⚡ power surge hazard exclusive to Layer 2, and a much stronger boss under a new title.',
       'Layer 2\'s layout is derived from the same seed you enter for Layer 1, so favoriting a seed favorites both layers.',
@@ -6364,10 +6422,11 @@
     ]},
   ];
   const BUILD = {
-    version: '25.18',
+    version: '25.19',
     date: '2026-09-22',
     notes: [
-      'New: fainting now costs your partner 10% of their progress toward the next level, on top of retreating to town at 20% HP. This can never cost you a level you already have — only how close you are to the next one.',
+      'New: Personality. Every monster now rolls one of 8 personalities at capture or hatch, fixed for life and shown on its Inspect screen. Half are stat trade-offs (Aggressive, Guarded, Swift, Sturdy, Reckless, Calm); the other half are passive perks that don\'t touch stats (Focused adds dodge/flee chance, Adaptive cuts Hunger/Energy drain while exploring).',
+      'Splicing two parents in the Splice Lab gives the hybrid a coin-flip chance at either parent\'s personality.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

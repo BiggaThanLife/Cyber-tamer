@@ -1,7 +1,8 @@
 {
-  "version": "25.18",
+  "version": "25.19",
   "date": "2026-09-22",
   "notes": [
-    "New: fainting now costs your partner 10% of their progress toward the next level, on top of retreating to town at 20% HP. This can never cost you a level you already have — only how close you are to the next one."
+    "New: Personality. Every monster now rolls one of 8 personalities at capture or hatch, fixed for life and shown on its Inspect screen. Half are stat trade-offs (Aggressive, Guarded, Swift, Sturdy, Reckless, Calm); the other half are passive perks that don't touch stats (Focused adds dodge/flee chance, Adaptive cuts Hunger/Energy drain while exploring).",
+    "Splicing two parents in the Splice Lab gives the hybrid a coin-flip chance at either parent's personality."
   ]
 }

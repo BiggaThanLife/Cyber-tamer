@@ -100,6 +100,8 @@ Some tiles block your way.
 
 Every monster also has hidden **IVs**, ±15% variance on each stat, fixed for life when it's caught or hatched. They show up as a **Potential** star rating (☆ to ★★★★★). Breeding can pass IVs down, sometimes with a mutation.
 
+Every monster also rolls one of 8 **personalities** at capture or hatch, fixed for life and shown on its Inspect screen. Half trade one stat for another (Aggressive, Guarded, Swift, Sturdy, Reckless, Calm); the other half are passive perks that don't touch stats — Focused adds dodge and flee chance, Adaptive cuts Hunger/Energy drain while exploring. It's hidden until you check Inspect, same as IVs. Splicing two parents gives the hybrid a coin-flip chance at either parent's personality.
+
 Monsters gain XP from exploring and battles. Every species has a second, stronger form, reached at level 10.
 
 ### Growing stronger
