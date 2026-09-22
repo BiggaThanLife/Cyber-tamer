@@ -73,6 +73,7 @@ Some tiles block your way.
 - **Use Medicine** restores HP to full mid-fight. **Flee** depends on your SPD against the enemy's and always stays between 20% and 90%.
 - A faster partner can also **dodge** counterattacks completely.
 - A running log of the fight sits under the monsters.
+- Hits, dodges, catches, level-ups and evolutions are animated. If that bothers you or slows your phone, set **System → Motion** to Reduced. It follows your device's reduce-motion setting by default.
 - If your partner faints, you retreat to town with 20% HP.
 
 ### Catching monsters

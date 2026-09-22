@@ -1,9 +1,11 @@
 {
-  "version": "25.1",
+  "version": "25.2",
   "date": "2026-09-21",
   "notes": [
     "Play now costs Energy and Hunger on every try, hit or miss, and only allows a few tries in a row before a short break. It no longer refills Hunger or Energy.",
     "New: the game tells you when an update is available, and shows what changed after you update.",
-    "The title screen now shows the version number."
+    "The title screen now shows the version number.",
+    "New animations: hits, damage numbers, sliding HP bars, dodges, entrances, a Trap Sphere throw and catch reveal, level-up bursts, counting Bits, and a full-screen evolution sequence.",
+    "New Motion setting under System (Full or Reduced). It follows your device's reduce-motion setting by default."
   ]
 }

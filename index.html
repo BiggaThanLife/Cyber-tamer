@@ -103,6 +103,10 @@
   }
   .barwrap{ background:#0a1f14; border:1px solid #163b26; border-radius:5px; height:8px; overflow:hidden; }
   .barfill{ height:100%; transition: width .3s ease; }
+  .hpslide{ transition: width .55s ease; }
+  @keyframes mon-bob{ 0%{ transform:translateY(0); } 100%{ transform:translateY(-3px); } }
+  .mon-bob{ animation: mon-bob 1.4s ease-in-out infinite alternate; }
+  .motion-reduced *, .motion-reduced *::before, .motion-reduced *::after{ animation:none !important; transition:none !important; }
   .card{
     border:1px solid var(--glass-border); border-radius:8px; padding:8px 10px;
     background: rgba(75,227,122,0.04);
@@ -703,11 +707,11 @@
 
     return canvas.toDataURL();
   }
-  function spriteImgHtml(m, sizePx){
+  function spriteImgHtml(m, sizePx, cls){
     const form = getForm(m);
     const url = spriteDataUrl(m, form, m.cosmetic);
     const glowColor = m.marked ? '#fff44d' : form.color;
-    return `<img src="${url}" width="${sizePx}" height="${sizePx}" style="width:${sizePx}px;height:${sizePx}px;image-rendering:pixelated;filter:drop-shadow(0 0 ${m.marked?8:5}px ${glowColor}${m.marked?'cc':'66'});vertical-align:middle;" alt="${form.name}">`;
+    return `<img src="${url}" width="${sizePx}" height="${sizePx}" style="width:${sizePx}px;height:${sizePx}px;image-rendering:pixelated;filter:drop-shadow(0 0 ${m.marked?8:5}px ${glowColor}${m.marked?'cc':'66'});vertical-align:middle;"${cls ? ` class="${cls}"` : ''} alt="${form.name}">`;
   }
 
   const SHOP_ITEMS = [
@@ -1185,10 +1189,12 @@
       const next = line[m.stage];
       if(next.levelReq && m.level >= next.levelReq){
         const oldName = m.nickname || getForm(m).name;
+        const before = { ...m }, oldForm = getForm(m);
         m.stage++;
         recalcStats(m, true);
         updateMoveUnlocks(m);
         logMsg(`${oldName} evolved into ${getForm(m).name}!`);
+        queueEvolution(m, before, oldForm);
       }
     }
   }
@@ -1213,6 +1219,7 @@
       recalcStats(m, false);
       m.hp = Math.min(m.maxHp, m.hp + Math.round(m.maxHp*0.15));
       logMsg(`${m.nickname||getForm(m).name} grew to level ${m.level}!`);
+      if(m.uid === state.activeId) fx({k:'levelup', lv:m.level});
       updateMoveUnlocks(m);
       checkEvolution(m);
     }
@@ -1756,6 +1763,7 @@
         }, 300);
       }
       lastRenderedScreen = state.screen;
+      afterRenderFx(screenChanged, screenEl);
     }catch(err){
       console.error('Render error:', err);
       renderFatalError(err);
@@ -1949,11 +1957,13 @@
       <div class="card" style="margin-bottom:8px; font-size:11px; color:var(--ink-dim); line-height:1.6;">
         Export your save to a file you can keep as a backup or move to a different browser or device.
         Importing a file will overwrite your current progress on this device.
+        <br><br>Motion controls animations. It follows your device's reduce-motion setting until you change it here.
       </div>
     `;
     const buttons = [
       {label:'⇧ Export Save File', cls:'btn-cyan', fn:exportSave},
       {label:'⇩ Import Save File', cls:'', fn:triggerInGameImport},
+      {label:`🎞 Motion: ${motionOn() ? 'Full' : 'Reduced'}`, cls:'', fn:()=>{ setMotionMode(motionOn() ? 'reduced' : 'full'); render(); }},
       {label:'← Back to Town', cls:'btn-primary', fn:()=>{ state.screen='town'; render(); }},
       {label:'⏻ Return to Title', cls:'btn-crimson', fn:()=>{ appMode='boot'; lastRenderedScreen=null; render(); }},
     ];
@@ -1996,10 +2006,10 @@
     const bar = (val, color) => `<div class="barwrap"><div class="barfill" style="width:${Math.max(0,Math.min(100,val))}%;background:${color}"></div></div>`;
     document.getElementById('statusbar').innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <div style="color:${sp.color}; display:flex; align-items:center; gap:5px;" class="glow">${spriteImgHtml(p,20)} ${p.nickname || sp.name} <span class="badge">Gen ${p.gen} · Lv${p.level}</span></div>
+        <div style="color:${sp.color}; display:flex; align-items:center; gap:5px;" class="glow">${spriteImgHtml(p,20,'mon-bob')} ${p.nickname || sp.name} <span class="badge">Gen ${p.gen} · Lv${p.level}</span></div>
         <div style="display:flex; align-items:center; gap:8px;">
           <button class="btn" id="log-open" title="Open the log" style="padding:2px 7px; font-size:10px; min-height:0 !important; position:relative;">📜 Log${logSeq>logSeenSeq?'<span style="position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--amber);"></span>':''}</button>
-          <div style="color:var(--amber)" class="glow">◈ ${state.bits} Bits</div>
+          <div id="bits-val" style="color:var(--amber)" class="glow">◈ ${(motionOn() && shownBits !== null && shownBits !== state.bits) ? shownBits : state.bits} Bits</div>
         </div>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; font-size:9.5px; color:var(--ink-dim); margin-bottom:5px;">
@@ -2009,6 +2019,9 @@
       </div>
       <div style="font-size:9px; color:var(--ink-dim);">XP ${p.xp}/${xpToNext(p.level)}${bar(100*p.xp/xpToNext(p.level), 'var(--violet)')}</div>`;
     document.getElementById('log-open').addEventListener('click', openLogModal);
+    const bv = document.getElementById('bits-val');
+    if(bv && motionOn() && shownBits !== null && shownBits !== state.bits) countUpBits(bv, shownBits, state.bits);
+    shownBits = state.bits;
   }
 
   function screenTitle(text, color){
@@ -2567,7 +2580,7 @@
           else if(c.role==='cache'){ bg='#0a2418'; glyph= c.opened?'·':'✪'; col='#7dffb0'; }
         }
         const isPlayer = (vx===VIEW_RADIUS && vy===VIEW_RADIUS);
-        grid += `<div class="tile" style="background:${bg};color:${col};">${isPlayer ? '<span style="color:var(--phosphor);text-shadow:0 0 6px var(--phosphor);">◉</span>' : glyph}</div>`;
+        grid += `<div class="tile"${isPlayer ? ' id="pl-tile"' : ''} style="background:${bg};color:${col};">${isPlayer ? '<span style="color:var(--phosphor);text-shadow:0 0 6px var(--phosphor);">◉</span>' : glyph}</div>`;
       }
     }
     grid += '</div>';
@@ -2670,6 +2683,7 @@
     if(!isPassableRole(cell.role)){
       const tileInfo = cell.role==='blockA' ? biome.tiles.blockA : biome.tiles.blockB;
       logMsg(`A ${tileInfo.name} blocks the way.`);
+      fx({k:'bump'});
       render(); return;
     }
 
@@ -2686,6 +2700,7 @@
 
     if(cell.role === 'chest' && !cell.opened){
       cell.opened = true;
+      fx({k:'mapLoot'});
       questEvent('chest', 1);
       const roll = Math.random();
       if(roll < 0.5){ const bits = 10+w.biomeIndex*8+Math.floor(Math.random()*30); state.bits += bits; logMsg(`Found a chest with ◈${bits} Bits!`); }
@@ -2694,6 +2709,7 @@
     }
     if(cell.role === 'shrine' && !cell.opened){
       cell.opened = true;
+      fx({k:'mapLoot'});
       const bits = 20 + w.biomeIndex*10;
       state.bits += bits;
       gainXp(p, 8);
@@ -2702,6 +2718,7 @@
     }
     if(cell.role === 'key' && !cell.opened){
       cell.opened = true;
+      fx({k:'mapLoot'});
       w.hasKey = true;
       logMsg('Found a rusted key. Something nearby must be locked...');
       render(); return;
@@ -2710,6 +2727,7 @@
       if(cell.opened){ render(); return; }
       if(!w.hasKey){ logMsg('A sealed vault. It looks like it needs a key.'); render(); return; }
       cell.opened = true;
+      fx({k:'mapLoot'});
       questEvent('chest', 1);
       const bits = 40 + w.biomeIndex*15;
       state.bits += bits;
@@ -2731,10 +2749,12 @@
     }
     if(cell.role === 'cache' && !cell.opened){
       cell.opened = true;
+      fx({k:'mapLoot'});
       claimDailyCache(w);
       render(); return;
     }
     if(cell.role === 'hazard' && biome.hazard){
+      fx({k:'hazard'});
       const mult = biome.hazard.typeMult[getForm(p).type];
       const m = (mult === undefined) ? 1 : mult;
       if(m === 0){ logMsg(`${getForm(p).name} strides through the ${biome.tiles.hazard.name} untouched — Fire types are immune.`); }
@@ -2870,7 +2890,10 @@
     const p = getActive();
     const psp = getForm(p);
     const esp = getForm(b.enemy);
-    const bar = (val,max,color) => `<div class="barwrap"><div class="barfill" style="width:${100*val/max}%;background:${color}"></div></div>`;
+    const sameBattle = battleHpMemo.b === b;
+    const hpFrom = (motionOn() && sameBattle) ? { e: battleHpMemo.e, p: battleHpMemo.p } : { e: b.enemy.hp, p: p.hp };
+    const bar = (val,max,color,from) => `<div class="barwrap"><div class="barfill hpslide" data-to="${100*val/max}" style="width:${100*Math.min(from,max)/max}%;background:${color}"></div></div>`;
+    battleHpMemo = { b, e: b.enemy.hp, p: p.hp };
     const catchChance = estimateCatchChance(b.enemy);
     if(!Array.isArray(b.log)) b.log = state.log.slice(0,1);
     const battleLines = b.log;
@@ -2881,17 +2904,17 @@
       ${(!b.isBoss && b.enemy.isWanted) ? `<div class="card" style="border-color:var(--amber); margin-bottom:8px; text-align:center; font-size:10.5px; color:var(--amber);">The one that got away — easier to bring in this time.</div>` : ''}
       ${(!b.isBoss && !b.enemy.isWanted && b.enemy.isAnomaly) ? `<div class="card" style="border-color:var(--violet); margin-bottom:8px; text-align:center; font-size:10.5px; color:var(--violet);">A charged, unstable reading — tougher, but worth chasing.</div>` : ''}
       <div style="display:flex; justify-content:space-between; gap:10px;">
-        <div class="card" style="flex:1; text-align:center;">
-          ${spriteImgHtml(b.enemy, b.isBoss?60:48)}
+        <div class="card" id="bt-enemy" style="flex:1; text-align:center;">
+          ${spriteImgHtml(b.enemy, b.isBoss?60:48, 'mon-bob')}
           <div style="color:${esp.color}; margin-top:4px;">${esp.name} <span class="badge">Lv${b.enemy.level}</span>${b.enemy.marked?' <span class="badge" style="color:#fff44d;border-color:#fff44d;">✦</span>':''}</div>
           <div style="font-size:9.5px; color:var(--ink-dim); margin-top:4px;">HP ${b.enemy.hp}/${b.enemy.maxHp}</div>
-          ${bar(b.enemy.hp,b.enemy.maxHp,'var(--crimson)')}
+          ${bar(b.enemy.hp,b.enemy.maxHp,'var(--crimson)',hpFrom.e)}
         </div>
-        <div class="card" style="flex:1; text-align:center;">
-          ${spriteImgHtml(p, 48)}
+        <div class="card" id="bt-player" style="flex:1; text-align:center;">
+          ${spriteImgHtml(p, 48, 'mon-bob')}
           <div style="color:${psp.color}; margin-top:4px;">${p.nickname||psp.name} <span class="badge">Lv${p.level}</span>${p.marked?' <span class="badge" style="color:#fff44d;border-color:#fff44d;">✦</span>':''}</div>
           <div style="font-size:9.5px; color:var(--ink-dim); margin-top:4px;">HP ${p.hp}/${p.maxHp}</div>
-          ${bar(p.hp,p.maxHp,'var(--phosphor)')}
+          ${bar(p.hp,p.maxHp,'var(--phosphor)',hpFrom.p)}
         </div>
       </div>
       <div id="battle-log" style="margin-top:10px; font-size:10.5px; line-height:1.4; color:var(--ink-dim); height:${b.isBoss?100:130}px; overflow-y:auto; background:rgba(255,255,255,.03); border-radius:6px; padding:5px 8px;">${battleLines.map((l,i)=>`<div style="${i===battleLines.length-1?'color:var(--ink);':'opacity:.75;'}">${i===battleLines.length-1?'▸ ':'· '}${l}</div>`).join('')}</div>
@@ -2902,6 +2925,9 @@
 
     const blog = screenEl.querySelector('#battle-log');
     if(blog) blog.scrollTop = blog.scrollHeight;
+    setTimeout(() => {
+      screenEl.querySelectorAll('.barfill[data-to]').forEach(el => { el.style.width = el.getAttribute('data-to') + '%'; });
+    }, 40);
 
     if(b.over){
       if(b.offerWanted){
@@ -2983,10 +3009,15 @@
     }
   }
 
-  function battleAction(action, moveId){
+  function battleAction(action, moveId, skipAnim){
     const b = state.battle;
     const p = getActive();
     if(b.over) return;
+    // Throw animation first; the catch itself is only resolved once it finishes.
+    if(action === 'catch' && !skipAnim && !b.isBoss && state.inventory.trapSphere > 0 && motionOn()){
+      playThrow(() => { if(state.battle === b && !b.over) battleAction('catch', moveId, true); });
+      return;
+    }
 
     if(action === 'flee'){
       if(Math.random() < fleeChance(p, b.enemy)){ logMsg('You escaped safely.'); markBattleOver(b); }
@@ -3000,12 +3031,14 @@
       const mult = typeMultiplier(mv.type, getForm(b.enemy).type);
       const dmg = Math.max(1, Math.round(p.str * mv.power * mult * (1 + Math.random()*0.25) - b.enemy.def*0.5));
       b.enemy.hp = Math.max(0, b.enemy.hp - dmg);
+      fx({k:'hit', on:'enemy', dmg, mult});
       logMsg(`${mv.name} hit for ${dmg} damage.${mult>1 ? ' Super effective!' : (mult<1 ? ' Not very effective...' : '')}`);
     }
     else if(action === 'medicine'){
       if(state.inventory.medicine <= 0){ logMsg('No Medicine left — visit the shop.'); render(); return; }
       if(p.hp >= p.maxHp){ logMsg(`${getForm(p).name} is already at full HP.`); render(); return; }
       state.inventory.medicine--;
+      fx({k:'heal', amt:p.maxHp - p.hp});
       p.hp = p.maxHp;
       logMsg(`Used Medicine — ${getForm(p).name}'s HP fully restored.`);
     }
@@ -3016,16 +3049,19 @@
         if(p.hp >= p.maxHp){ logMsg(`${getForm(p).name} is already at full HP.`); render(); return; }
         inv.nanoPatch--;
         const heal = Math.max(1, Math.round(p.maxHp * 0.30));
+        fx({k:'heal', amt:Math.min(heal, p.maxHp - p.hp)});
         p.hp = Math.min(p.maxHp, p.hp + heal);
         logMsg(`Nano Patch restored ${heal} HP.`);
       } else if(id === 'overloadChip'){
         inv.overloadChip--;
         const dmg = Math.max(1, Math.round(p.str * 2.2 * (1 + Math.random()*0.25) - b.enemy.def*0.5));
         b.enemy.hp = Math.max(0, b.enemy.hp - dmg);
+        fx({k:'hit', on:'enemy', dmg, mult:1, big:true});
         logMsg(`Overload Chip discharged for ${dmg} damage!`);
       } else if(id === 'firewallChip'){
         inv.firewallChip--;
         b.shield = true;
+        fx({k:'shield'});
         logMsg('A Firewall flares up around your partner.');
       } else { render(); return; }
     }
@@ -3050,8 +3086,10 @@
         state.bits += bits;
         logMsg((b.enemy.marked ? '✦ MARKED! ' : '') + (wasWanted ? `You finally caught ${getForm(b.enemy).name} — the one that got away! +${bits} Bits.` : `Captured ${getForm(b.enemy).name}! +${bits} Bits. Added to Storage Box.`));
         gainXp(p, Math.round((6 + b.enemy.level*3) * (b.enemy.isAnomaly ? 1.5 : 1)));
+        fx({k:'caught'});
         b.over = true; render(); return;
       } else {
+        fx({k:'escape'});
         logMsg('The Trap Sphere shattered — capture failed!');
       }
     }
@@ -3069,11 +3107,13 @@
           state.unlockedBiomeIndex = nextIdx;
           unlockMsg = ` The path to ${BIOMES[nextIdx].name} has opened!`;
         }
+        fx({k:'faint'});
         logMsg(`${b.enemy.bossTitle} was defeated! +◈${bits} Bits.${unlockMsg}`);
         b.over = true; b.bossVictory = true; render(); return;
       }
       const bits = bitsBoost(Math.round((8 + b.enemy.level*3) * (b.enemy.isAnomaly ? 1.8 : 1)));
       state.bits += bits;
+      fx({k:'faint'});
       logMsg(`${getForm(b.enemy).name} was defeated! +${bits} Bits.`);
       questEvent('win', 1, { type: getForm(b.enemy).type });
       gainXp(p, Math.round((12 + b.enemy.level*6) * (b.enemy.isAnomaly ? 1.5 : 1)));
@@ -3099,8 +3139,9 @@
     const b = state.battle;
     const p = getActive();
     if(b.over) return;
-    if(b.shield){ b.shield = false; logMsg('The Firewall absorbed the enemy\'s attack!'); return; }
+    if(b.shield){ b.shield = false; fx({k:'shield'}); logMsg('The Firewall absorbed the enemy\'s attack!'); return; }
     if(Math.random() < dodgeChance(p.spd, b.enemy.spd)){
+      fx({k:'dodge'});
       logMsg(`${getForm(p).name} dodged the incoming strike!`);
       return;
     }
@@ -3112,6 +3153,7 @@
       logMsg(`${getForm(p).name}'s Safety Buffer absorbed the killing blow!`);
     }
     p.hp = Math.max(0, p.hp - dmg);
+    fx({k:'hit', on:'player', dmg, mult});
     logMsg(`${getForm(b.enemy).name} struck back for ${dmg} damage.${mult>1 ? ' Super effective!' : (mult<1 ? ' Not very effective...' : '')}`);
     if(p.hp <= 0){
       logMsg(`${getForm(p).name} fainted! You retreat to Neon Haven.`);
@@ -3137,6 +3179,7 @@
       { h:'Your partner', b:'One monster is your <b>active partner</b> — the one who explores and fights. Everyone else waits in the Storage Box. Swap partners there any time.' },
       { h:'The town menu', b:'Buttons are grouped in pairs: <b>Gate / Mine</b> to go out, <b>Wanted / Daily</b> for goals, <b>Jobs / Farm</b> to earn, <b>Training / Breeding</b> to grow, <b>Play / Rest</b> to care, <b>Storage / Inventory / Shop</b> to manage, then Dex, Help and System. A 🔒 means it isn\'t unlocked yet — tap it to see how.' },
       { h:'The 📜 Log', b:'The Log button at the top of every screen shows your recent messages, newest first. A small amber dot means something new happened. In battle, a running log of that fight sits under the monsters.' },
+      { h:'Motion', b:'Battles, catches, level-ups and evolutions are animated. If motion bothers you or your phone struggles, open <b>System</b> and switch <b>Motion</b> to Reduced. It follows your device\'s reduce-motion setting until you change it.' },
       { h:'Saving', b:'The game saves automatically to this device. Under <b>System</b> you can export your save to a file (a backup, or to move devices) and import it again. Importing overwrites your current progress.' },
     ]},
     { id:'explore', icon:'⛩', title:'Exploring the Wilderness', color:'var(--cyan)', blurb:'Maps, fog, tiles, chests and biomes.', cards:[
@@ -4235,7 +4278,7 @@
           else{ const info = ROLE_GLYPH[c.role] || ROLE_GLYPH.empty; bg=info.bg; glyph=info.glyph; col=info.col; }
         }
         const isPlayer = (vx===VIEW_RADIUS && vy===VIEW_RADIUS);
-        grid += `<div class="tile" style="background:${bg};color:${col};">${isPlayer ? '<span style="color:var(--amber);text-shadow:0 0 6px var(--amber);">◉</span>' : glyph}</div>`;
+        grid += `<div class="tile"${isPlayer ? ' id="pl-tile"' : ''} style="background:${bg};color:${col};">${isPlayer ? '<span style="color:var(--amber);text-shadow:0 0 6px var(--amber);">◉</span>' : glyph}</div>`;
       }
     }
     grid += '</div>';
@@ -4998,6 +5041,336 @@
   }
 
 
+
+  /* ---------------------------------------------------------
+     MOTION + FX
+     Every effect here is cosmetic: game state is always updated first and rendered
+     immediately, and effects play on top of the fresh DOM. (The one deliberate delay
+     is the Trap Sphere throw, which runs BEFORE the catch is resolved, so nothing is
+     decided until it ends.) Motion follows the device's reduce-motion setting unless the
+     player picks Full/Reduced under System. Reduced mode plays no animations at all.
+  --------------------------------------------------------- */
+  const MOTION_KEY = 'cybertamer_motion';
+  function motionMode(){
+    try{ const v = localStorage.getItem(MOTION_KEY); if(v === 'full' || v === 'reduced') return v; }catch(e){}
+    return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'reduced' : 'full';
+  }
+  function motionOn(){ return motionMode() === 'full'; }
+  function applyMotionMode(){ document.documentElement.classList.toggle('motion-reduced', !motionOn()); }
+  function setMotionMode(mode){ try{ localStorage.setItem(MOTION_KEY, mode); }catch(e){} applyMotionMode(); }
+
+  function animate(el, frames, opts){
+    if(!el || !motionOn() || !el.animate) return null;
+    try{ return el.animate(frames, opts); }catch(e){ return null; }
+  }
+  function centerOf(el){ const r = el.getBoundingClientRect(); return { x: r.left + r.width/2, y: r.top + r.height/2, r }; }
+  function floatText(host, text, color, size){
+    if(!host || !motionOn() || !document.body.contains(host)) return;
+    const c = centerOf(host);
+    const s = document.createElement('div');
+    s.textContent = text;
+    s.style.cssText = `position:fixed; left:${c.x}px; top:${c.r.top + c.r.height*0.3}px; z-index:920; pointer-events:none; font-weight:700; font-size:${size||16}px; color:${color}; text-shadow:0 0 8px ${color}, 0 2px 0 #000; white-space:nowrap;`;
+    document.body.appendChild(s);
+    const a = animate(s, [
+      { transform:'translate(-50%,0) scale(.6)', opacity:0 },
+      { transform:'translate(-50%,-14px) scale(1.15)', opacity:1, offset:.2 },
+      { transform:'translate(-50%,-48px) scale(1)', opacity:0 }
+    ], { duration: 900, easing:'ease-out' });
+    if(a) a.onfinish = () => s.remove();
+    setTimeout(() => s.remove(), 1600);
+  }
+  function burst(host, color, n, spread){
+    if(!host || !motionOn() || !document.body.contains(host)) return;
+    const c = centerOf(host);
+    n = Math.min(n || 10, 18);
+    for(let i = 0; i < n; i++){
+      const p = document.createElement('div');
+      const size = 3 + Math.floor(Math.random()*3);
+      p.style.cssText = `position:fixed; left:${c.x}px; top:${c.y}px; width:${size}px; height:${size}px; background:${color}; box-shadow:0 0 6px ${color}; z-index:915; pointer-events:none;`;
+      document.body.appendChild(p);
+      const ang = Math.random()*Math.PI*2, dist = (spread || 46) * (0.5 + Math.random()*0.8);
+      const a = animate(p, [
+        { transform:'translate(-50%,-50%) scale(1)', opacity:1 },
+        { transform:`translate(calc(-50% + ${Math.cos(ang)*dist}px), calc(-50% + ${Math.sin(ang)*dist}px)) scale(.2)`, opacity:0 }
+      ], { duration: 450 + Math.random()*350, easing:'ease-out' });
+      if(a) a.onfinish = () => p.remove();
+      setTimeout(() => p.remove(), 1300);
+    }
+  }
+  function flashEl(el, filterPeak, ms){
+    animate(el, [{ filter:'brightness(1)' }, { filter: filterPeak || 'brightness(2.2) saturate(1.4)', offset:.35 }, { filter:'brightness(1)' }], { duration: ms || 300 });
+  }
+  function shakeEl(el, px, ms){
+    px = px || 6;
+    animate(el, [
+      { transform:'translateX(0)' }, { transform:`translateX(${-px}px)` }, { transform:`translateX(${px}px)` },
+      { transform:`translateX(${-px*0.6}px)` }, { transform:`translateX(${px*0.6}px)` }, { transform:'translateX(0)' }
+    ], { duration: ms || 320, easing:'ease-out' });
+  }
+
+  // Effects requested by game logic; played right after the next render.
+  let fxQueue = [];
+  function fx(ev){ if(motionOn()) fxQueue.push(ev); }
+  let battleEntered = null;
+  let battleHpMemo = { b:null, e:0, p:0 };
+  let shownBits = null;
+
+  function playFx(ev){
+    const E = document.getElementById('bt-enemy'), P = document.getElementById('bt-player');
+    const screenEl = document.getElementById('screen');
+    switch(ev.k){
+      case 'hit': {
+        const toEnemy = ev.on === 'enemy';
+        const target = toEnemy ? E : P, attacker = toEnemy ? P : E;
+        if(!target) break;
+        animate(attacker, [{ transform:'translateX(0)' }, { transform:`translateX(${toEnemy ? -16 : 16}px)`, offset:.4 }, { transform:'translateX(0)' }], { duration: 260, easing:'ease-out' });
+        setTimeout(() => {
+          shakeEl(target, ev.mult > 1 ? 9 : 6, 340);
+          flashEl(target, toEnemy ? 'brightness(2.2) saturate(1.4)' : 'brightness(1.8) sepia(1) saturate(6) hue-rotate(-30deg)');
+          const col = ev.mult > 1 ? '#ffd93d' : (ev.mult < 1 ? '#8aa79a' : (toEnemy ? '#ffffff' : '#ff6b6b'));
+          floatText(target, `${ev.big ? '💥 ' : ''}-${ev.dmg}${ev.mult > 1 ? '!' : ''}`, col, ev.mult > 1 || ev.big ? 22 : (ev.mult < 1 ? 13 : 17));
+          burst(target, col, ev.mult > 1 || ev.big ? 14 : 7, ev.mult > 1 ? 56 : 38);
+          if(ev.mult > 1 || ev.big) shakeEl(screenEl, 4, 280);
+        }, 120);
+        break;
+      }
+      case 'dodge':
+        animate(P, [{ transform:'translate(0,0)' }, { transform:'translate(14px,-6px)', offset:.35 }, { transform:'translate(0,0)' }], { duration: 380, easing:'ease-out' });
+        floatText(P, 'DODGE', '#3ad6d1', 15);
+        break;
+      case 'shield':
+        flashEl(P, 'brightness(1.6) hue-rotate(150deg)', 420);
+        floatText(P, 'BLOCKED', '#3ad6d1', 15);
+        burst(P, '#3ad6d1', 10, 44);
+        break;
+      case 'heal':
+        floatText(P, `+${ev.amt}`, '#4be37a', 19);
+        burst(P, '#4be37a', 10, 40);
+        break;
+      case 'faint':
+        animate(E, [{ transform:'translateY(0)', opacity:1, filter:'grayscale(0)' }, { transform:'translateY(14px)', opacity:.18, filter:'grayscale(1)' }], { duration: 650, easing:'ease-in', fill:'forwards' });
+        break;
+      case 'caught':
+        animate(E, [{ transform:'scale(.2)', opacity:0 }, { transform:'scale(1.12)', opacity:1, offset:.6 }, { transform:'scale(1)', opacity:1 }], { duration: 480, easing:'ease-out' });
+        floatText(E, 'CAUGHT!', '#ffd93d', 22);
+        burst(E, '#ffd93d', 18, 64);
+        break;
+      case 'escape':
+        animate(E, [{ transform:'scale(.2)', opacity:0 }, { transform:'scale(1.1)', opacity:1, offset:.6 }, { transform:'scale(1)', opacity:1 }], { duration: 360, easing:'ease-out' });
+        floatText(E, 'BROKE FREE!', '#ff6b6b', 16);
+        burst(E, '#ff6b6b', 10, 48);
+        break;
+      case 'levelup': {
+        const host = document.getElementById('statusbar');
+        floatText(host, `LEVEL UP! Lv${ev.lv}`, '#ffd93d', 18);
+        burst(host, '#ffd93d', 16, 70);
+        break;
+      }
+      case 'mapLoot': { const t = document.getElementById('pl-tile'); burst(t, '#ffd93d', 12, 40); flashEl(t, 'brightness(2.5)', 360); break; }
+      case 'bump': shakeEl(screenEl, 5, 240); break;
+      case 'hazard':
+        animate(screenEl, [{ boxShadow:'inset 0 0 0 0 rgba(255,80,60,0)' }, { boxShadow:'inset 0 0 44px 8px rgba(255,80,60,.6)', offset:.3 }, { boxShadow:'inset 0 0 0 0 rgba(255,80,60,0)' }], { duration: 520 });
+        break;
+    }
+  }
+  function runFx(){
+    const q = fxQueue; fxQueue = [];
+    if(!q.length || !motionOn()) return;
+    q.forEach((ev, i) => setTimeout(() => { try{ playFx(ev); }catch(e){} }, i * 240));
+  }
+
+  // Trap Sphere throw. Plays BEFORE the catch is resolved so the outcome is a surprise,
+  // then hands off to the real battle logic. Controls are locked while it plays.
+  function playThrow(done){
+    const E = document.getElementById('bt-enemy'), P = document.getElementById('bt-player'), ctl = document.getElementById('controls');
+    if(!E || !P || !motionOn()){ done(); return; }
+    let finished = false;
+    const finish = () => { if(finished) return; finished = true; try{ ball.remove(); }catch(e){} if(ctl) ctl.style.pointerEvents = ''; done(); };
+    if(ctl) ctl.style.pointerEvents = 'none';
+    const a = centerOf(P), b = centerOf(E);
+    const sx = a.x, sy = a.y - 14, ex = b.x, ey = b.y - 8;
+    const ball = document.createElement('div');
+    ball.style.cssText = 'position:fixed; left:0; top:0; width:16px; height:16px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff, #4be37a 40%, #0b6b34); box-shadow:0 0 12px #4be37a; z-index:930; pointer-events:none;';
+    document.body.appendChild(ball);
+    setTimeout(finish, 3200); // never leave the controls locked
+    const top = Math.min(sy, ey) - 60;
+    const fly = animate(ball, [
+      { transform:`translate(${sx-8}px, ${sy-8}px) rotate(0deg)` },
+      { transform:`translate(${(sx+ex)/2-8}px, ${top}px) rotate(360deg)`, offset:.5 },
+      { transform:`translate(${ex-8}px, ${ey-8}px) rotate(720deg)` }
+    ], { duration: 520, easing:'ease-in-out', fill:'forwards' });
+    if(!fly){ finish(); return; }
+    fly.onfinish = () => {
+      animate(E, [{ transform:'scale(1)', opacity:1, filter:'brightness(1)' }, { transform:'scale(.15)', opacity:0, filter:'brightness(3)' }], { duration: 260, fill:'forwards' });
+      burst(E, '#4be37a', 8, 36);
+      const land = animate(ball, [{ transform:`translate(${ex-8}px, ${ey-8}px)` }, { transform:`translate(${ex-8}px, ${ey+18}px)` }], { duration: 220, easing:'ease-in', fill:'forwards' });
+      const wobble = () => {
+        const w = animate(ball, [0, -1, 0, 1, 0, -1, 0].map((s, i) => ({ transform:`translate(${ex-8}px, ${ey+18}px) rotate(${s*28}deg)`, offset: i/6 })), { duration: 900, fill:'forwards' });
+        if(w) w.onfinish = () => { burst(ball, '#ffffff', 8, 30); setTimeout(finish, 120); }; else finish();
+      };
+      if(land) land.onfinish = wobble; else wobble();
+    };
+  }
+
+  function countUpBits(el, from, to){
+    const start = performance.now(), dur = 450;
+    const step = (ts) => {
+      if(!document.body.contains(el)) return;
+      const t = Math.min(1, (ts - start) / dur);
+      el.textContent = `◈ ${Math.round(from + (to - from) * t)} Bits`;
+      if(t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+    setTimeout(() => { if(document.body.contains(el)) el.textContent = `◈ ${to} Bits`; }, dur + 150); // in case frames are throttled
+  }
+
+  // Full-screen evolution sequence. Queued by checkEvolution; plays after the next render.
+  let evoQueue = [], evoActive = false;
+  function queueEvolution(m, before, oldForm){
+    if(appMode !== 'game') return;
+    try{
+      const nf = getForm(m);
+      evoQueue.push({
+        oldName: before.nickname || oldForm.name, newName: nf.name, color: nf.color,
+        oldUrl: spriteDataUrl(before, oldForm, before.cosmetic), newUrl: spriteDataUrl(m, nf, m.cosmetic),
+      });
+    }catch(e){ console.warn('evolution overlay', e); }
+  }
+  function playNextEvolution(){
+    if(evoActive || !evoQueue.length) return;
+    const ev = evoQueue.shift();
+    evoActive = true;
+    const full = motionOn();
+    const ov = document.createElement('div');
+    ov.id = 'evo-overlay';
+    ov.style.cssText = 'position:fixed; inset:0; z-index:950; display:flex; flex-direction:column; align-items:center; justify-content:center; background:radial-gradient(ellipse at 50% 45%, #0b2a1a 0%, #020a06 72%); color:#dff7e6; text-align:center; padding:24px; cursor:pointer;';
+    const imgCss = `position:absolute; left:0; top:0; width:200px; height:200px; image-rendering:pixelated;`;
+    ov.innerHTML = `
+      <div id="evo-rays" style="position:absolute; left:50%; top:42%; width:150vmax; height:150vmax; margin:-75vmax 0 0 -75vmax; background:repeating-conic-gradient(${ev.color}30 0deg 6deg, transparent 6deg 18deg); border-radius:50%; pointer-events:none; opacity:0;"></div>
+      <div id="evo-stage" style="position:relative; width:200px; height:200px;">
+        <img id="evo-old" src="${ev.oldUrl}" alt="" style="${imgCss} filter:drop-shadow(0 0 16px ${ev.color});">
+        <img id="evo-new" src="${ev.newUrl}" alt="" style="${imgCss} filter:drop-shadow(0 0 22px ${ev.color}); opacity:0;">
+      </div>
+      <div id="evo-title" class="pixel-font glow" style="margin-top:26px; font-size:13px; line-height:1.8; color:${ev.color}; max-width:300px; min-height:48px;"></div>
+      <div id="evo-hint" style="margin-top:14px; font-size:11px; color:#86ad96; opacity:0;">Tap to continue</div>
+      <div id="evo-flash" style="position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none;"></div>`;
+    document.body.appendChild(ov);
+    const $ = (id) => ov.querySelector('#' + id);
+    const oldImg = $('evo-old'), newImg = $('evo-new'), title = $('evo-title'), hint = $('evo-hint'), rays = $('evo-rays'), stage = $('evo-stage'), flash = $('evo-flash');
+    const timers = [];
+    const at = (ms, fn) => timers.push(setTimeout(() => { if(document.body.contains(ov)) fn(); }, ms));
+    const shown = Date.now();
+    let done = false;
+    const esc = escapeHtml;
+    const finalTitle = `${esc(ev.oldName)} evolved into ${esc(ev.newName)}!`;
+    const showFinal = () => {
+      done = true;
+      timers.forEach(clearTimeout);
+      ov.getAnimations && ov.getAnimations({ subtree:true }).forEach(a => a.cancel());
+      oldImg.style.opacity = '0';
+      newImg.style.opacity = '1'; newImg.style.filter = `drop-shadow(0 0 22px ${ev.color})`; newImg.style.transform = 'none';
+      flash.style.opacity = '0';
+      rays.style.opacity = full ? '.5' : '.25';
+      title.innerHTML = finalTitle; title.style.opacity = '1';
+      hint.style.opacity = '1';
+      if(full) animate(rays, [{ transform:'rotate(0deg)' }, { transform:'rotate(360deg)' }], { duration: 24000, iterations: Infinity });
+    };
+    const close = () => {
+      const a = animate(ov, [{ opacity:1 }, { opacity:0 }], { duration: 250, fill:'forwards' });
+      const end = () => { ov.remove(); evoActive = false; playNextEvolution(); };
+      if(a) a.onfinish = end; else end();
+      setTimeout(() => { if(document.body.contains(ov)) end(); }, 600);
+    };
+    ov.addEventListener('click', () => {
+      if(Date.now() - shown < 500) return;        // ignore the tap that caused the level-up
+      if(done) close(); else showFinal();          // first tap skips ahead, second dismisses
+    });
+    if(!full){ showFinal(); return; }
+
+    // ---- full sequence (~3.4s) ----
+    animate(ov, [{ opacity:0 }, { opacity:1 }], { duration: 300 });
+    title.innerHTML = `${esc(ev.oldName)} is evolving...`;
+    title.style.opacity = '1'; rays.style.opacity = '.5';   // final values set inline too, so a throttled animation can never leave them hidden
+    animate(title, [{ opacity:0 }, { opacity:1 }], { duration: 400 });
+    animate(rays, [{ opacity:0 }, { opacity:.5 }], { duration: 900 });
+    animate(rays, [{ transform:'rotate(0deg)' }, { transform:'rotate(360deg)' }], { duration: 14000, iterations: Infinity });
+    animate(oldImg, [{ transform:'scale(1)' }, { transform:'scale(1.06)' }, { transform:'scale(1)' }], { duration: 700, iterations: 3, easing:'ease-in-out' });
+    // energy gathers toward the sprite
+    at(300, () => {
+      const c = centerOf(stage);
+      for(let i = 0; i < 20; i++){
+        const p = document.createElement('div');
+        const ang = Math.random()*Math.PI*2, r = 140 + Math.random()*110;
+        p.style.cssText = `position:fixed; left:${c.x + Math.cos(ang)*r}px; top:${c.y + Math.sin(ang)*r}px; width:4px; height:4px; background:${ev.color}; box-shadow:0 0 8px ${ev.color}; z-index:951; pointer-events:none; opacity:0;`;
+        document.body.appendChild(p);
+        const a = animate(p, [{ transform:'translate(-50%,-50%)', opacity:0 }, { opacity:1, offset:.3 }, { transform:`translate(calc(-50% + ${-Math.cos(ang)*r}px), calc(-50% + ${-Math.sin(ang)*r}px))`, opacity:0 }], { duration: 900 + Math.random()*500, delay: Math.random()*600, easing:'ease-in' });
+        if(a) a.onfinish = () => p.remove();
+        setTimeout(() => p.remove(), 2400);
+      }
+    });
+    // the old form whites out and shudders
+    at(1600, () => {
+      animate(oldImg, [
+        { filter:`drop-shadow(0 0 16px ${ev.color})`, transform:'scale(1) translateX(0)' },
+        { filter:'brightness(0) invert(1) drop-shadow(0 0 30px #fff)', transform:'scale(1.2) translateX(-5px)', offset:.3 },
+        { filter:'brightness(0) invert(1) drop-shadow(0 0 30px #fff)', transform:'scale(1.3) translateX(5px)', offset:.6 },
+        { filter:'brightness(0) invert(1) drop-shadow(0 0 40px #fff)', transform:'scale(1.4) translateX(0)' }
+      ], { duration: 800, fill:'forwards' });
+    });
+    // flash, swap, shockwave
+    at(2400, () => {
+      animate(flash, [{ opacity:0 }, { opacity:1, offset:.25 }, { opacity:0 }], { duration: 600 });
+    });
+    at(2550, () => {
+      oldImg.style.opacity = '0';
+      newImg.style.opacity = '1';
+      newImg.style.filter = `drop-shadow(0 0 22px ${ev.color})`;
+      animate(newImg, [
+        { transform:'scale(.55)', filter:'brightness(0) invert(1) drop-shadow(0 0 30px #fff)' },
+        { transform:'scale(1.25)', filter:'brightness(0) invert(1) drop-shadow(0 0 30px #fff)', offset:.45 },
+        { transform:'scale(1)', filter:`drop-shadow(0 0 22px ${ev.color})` }
+      ], { duration: 650, easing:'ease-out' });
+      const c = centerOf(stage);
+      for(let k = 0; k < 2; k++){
+        const ring = document.createElement('div');
+        ring.style.cssText = `position:fixed; left:${c.x}px; top:${c.y}px; width:120px; height:120px; margin:-60px 0 0 -60px; border:3px solid ${ev.color}; border-radius:50%; z-index:951; pointer-events:none; box-shadow:0 0 14px ${ev.color};`;
+        document.body.appendChild(ring);
+        const a = animate(ring, [{ transform:'scale(.3)', opacity:.9 }, { transform:'scale(3.4)', opacity:0 }], { duration: 900, delay: k*180, easing:'ease-out' });
+        if(a) a.onfinish = () => ring.remove();
+        setTimeout(() => ring.remove(), 1500);
+      }
+      burst(stage, ev.color, 18, 130);
+      burst(stage, '#ffffff', 10, 90);
+    });
+    at(3000, () => {
+      title.innerHTML = finalTitle;
+      animate(title, [{ opacity:0, transform:'scale(.8)' }, { opacity:1, transform:'scale(1)' }], { duration: 450, easing:'ease-out' });
+    });
+    at(3500, () => { done = true; hint.style.opacity = '1'; animate(hint, [{ opacity:0 }, { opacity:1 }], { duration: 400 }); });
+  }
+
+  function afterRenderFx(screenChanged, screenEl){
+    if(appMode !== 'game') return;
+    try{
+      if(motionOn()){
+        if(screenChanged && state.screen !== 'battle'){
+          animate(screenEl, [{ opacity:0, transform:'translateY(6px)' }, { opacity:1, transform:'none' }], { duration: 220, easing:'ease-out' });
+        } else if(!screenChanged && (state.screen === 'wild' || state.screen === 'mine')){
+          animate(document.getElementById('pl-tile'), [{ transform:'scale(1.5)' }, { transform:'scale(1)' }], { duration: 160, easing:'ease-out' });
+        }
+        if(state.screen === 'battle' && state.battle && battleEntered !== state.battle){
+          battleEntered = state.battle;
+          const E = document.getElementById('bt-enemy'), P = document.getElementById('bt-player');
+          animate(E, [{ transform:'translateX(-36px)', opacity:0 }, { transform:'translateX(0)', opacity:1 }], { duration: 420, easing:'ease-out' });
+          animate(P, [{ transform:'translateX(36px)', opacity:0 }, { transform:'translateX(0)', opacity:1 }], { duration: 420, easing:'ease-out' });
+          flashEl(E, 'brightness(2.4) hue-rotate(40deg)', 500);
+        }
+      }
+      runFx();
+      playNextEvolution();
+    }catch(e){ console.warn('fx error', e); }
+  }
+
   /* ---------------------------------------------------------
      BUILD + UPDATE NOTICES
      BUILD is the single source of truth for the version. `tools/sync_version.py`
@@ -5006,12 +5379,14 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const BUILD = {
-    version: '25.1',
+    version: '25.2',
     date: '2026-09-21',
     notes: [
       'Play now costs Energy and Hunger on every try, hit or miss, and only allows a few tries in a row before a short break. It no longer refills Hunger or Energy.',
       'New: the game tells you when an update is available, and shows what changed after you update.',
       'The title screen now shows the version number.',
+      'New animations: hits, damage numbers, sliding HP bars, dodges, entrances, a Trap Sphere throw and catch reveal, level-up bursts, counting Bits, and a full-screen evolution sequence.',
+      'New Motion setting under System (Full or Reduced). It follows your device\'s reduce-motion setting by default.',
     ],
   };
   const SEEN_BUILD_KEY = 'cybertamer_seen_build';
@@ -5104,6 +5479,7 @@
     }catch(err){
       console.error('Init error:', err);
     }
+    applyMotionMode();
     render();
     startUpdateWatcher();
   }
