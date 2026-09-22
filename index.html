@@ -106,6 +106,8 @@
   .hpslide{ transition: width .55s ease; }
   @keyframes mon-bob{ 0%{ transform:translateY(0); } 100%{ transform:translateY(-3px); } }
   .mon-bob{ animation: mon-bob 1.4s ease-in-out infinite alternate; }
+  @keyframes bar-shake{ 0%,100%{ transform:translateX(0); } 20%{ transform:translateX(-2px); } 40%{ transform:translateX(2px); } 60%{ transform:translateX(-1px); } 80%{ transform:translateX(1px); } }
+  .barwrap.bar-low{ animation: bar-shake 1.8s ease-in-out infinite; }
   .motion-reduced *, .motion-reduced *::before, .motion-reduced *::after{ animation:none !important; transition:none !important; }
   .card{
     border:1px solid var(--glass-border); border-radius:8px; padding:8px 10px;
@@ -2198,7 +2200,7 @@
   function renderStatusbar(){
     const p = getActive();
     const sp = getForm(p);
-    const bar = (val, color) => `<div class="barwrap"><div class="barfill" style="width:${Math.max(0,Math.min(100,val))}%;background:${color}"></div></div>`;
+    const bar = (val, color, low) => `<div class="barwrap${low?' bar-low':''}"><div class="barfill" style="width:${Math.max(0,Math.min(100,val))}%;background:${color}"></div></div>`;
     document.getElementById('statusbar').innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <div style="color:${sp.color}; display:flex; align-items:center; gap:5px;" class="glow">${spriteImgHtml(p,20,'mon-bob')} ${p.nickname || sp.name} <span class="badge">Gen ${p.gen} · Lv${p.level}</span></div>
@@ -2209,8 +2211,8 @@
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; font-size:9.5px; color:var(--ink-dim); margin-bottom:5px;">
         <div>HP ${p.hp}/${p.maxHp}${bar(100*p.hp/p.maxHp, 'var(--crimson)')}</div>
-        <div>HUNGER${bar(p.hunger, 'var(--amber)')}</div>
-        <div>ENERGY${bar(p.energy, 'var(--cyan)')}</div>
+        <div>HUNGER${bar(p.hunger, 'var(--amber)', p.hunger > 0 && p.hunger <= 20)}</div>
+        <div>ENERGY${bar(p.energy, 'var(--cyan)', p.energy > 0 && p.energy <= 20)}</div>
       </div>
       <div style="font-size:9px; color:var(--ink-dim);">XP ${p.xp}/${xpToNext(p.level)}${bar(100*p.xp/xpToNext(p.level), 'var(--violet)')}</div>`;
     document.getElementById('log-open').addEventListener('click', openLogModal);
@@ -3045,7 +3047,7 @@
       render(); return;
     }
     if(p.hunger <= 0){
-      logMsg(`${getForm(p).name} is starving and too weak to explore further!`);
+      logMsg(`${getForm(p).name} is starving and too weak to explore further! You head back to Neon Haven.`);
       state.screen='town'; render(); return;
     }
     if(cell.role === 'open' && Math.random() < encounterChance(p)){
@@ -3533,7 +3535,7 @@
       { h:'STR — Strength', b:'Powers the damage of every move you use, before type effectiveness and the target\'s DEF.' },
       { h:'DEF — Defense', b:'Reduces damage taken from enemy attacks.' },
       { h:'SPD — Speed', b:'Improves your chance to dodge counterattacks and to flee successfully.' },
-      { h:'Hunger and Energy', b:'Exploring drains both. Feed a partner with <b>Prime Meat</b> from the Inventory (+40 Hunger), or use <b>Rest Partner</b> in town (+35 Energy, a little Hunger lost). <b>Play</b> is a short timing game that earns small Bits and XP, but every try costs Energy and Hunger (hit or miss) and only a few tries fit before your partner needs a break — explore to recover. Jobs and Training need a minimum Energy too.' },
+      { h:'Hunger and Energy', b:'Exploring drains both. Feed a partner with <b>Prime Meat</b> from the Inventory (+40 Hunger), or use <b>Rest Partner</b> in town (+35 Energy, a little Hunger lost). <b>Play</b> is a short timing game that earns small Bits and XP, but every try costs Energy and Hunger (hit or miss) and only a few tries fit before your partner needs a break — explore to recover. Jobs and Training need a minimum Energy too. Either bar shakes once it drops to 20% or below, so you get a warning before Hunger actually runs out and sends you home.' },
       { h:'Perfect streak', b:'Play, Job Board and Training Ground all use the same timing bar. Tapping in the bright green zone is a <b>Perfect</b> hit, which celebrates on the spot and extends a shared streak across all three. Miss the green zone and the streak resets. Beating your best streak ever logs a 🏆 in the Log.' },
       { h:'Levels and evolution', b:'Partners gain XP from exploring and battles. Many species evolve into a stronger form at a set level. The Dex shows each line\'s stages.' },
       { h:'IVs and Potential', b:'Every monster has hidden ±15% variance on each stat, fixed for life at capture or hatch. It\'s shown as a Potential star rating (☆ to ★★★★★). Breeding can pass IVs down, sometimes with a mutation.' },
@@ -6407,6 +6409,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.20', date:'2026-09-22', notes:[
+      'New: Field Barriers. A rare map tile that blocks the way unless your active partner\'s type matches (Fire, Water, Earth, Electric, Nature, Void, Metal or Glitch) — cross it with the right type fielded and it opens for good, paying Bits and a capture program. No Shop tool unlocks these; you need to have actually caught, and be fielding, that type.',
+      'A map can have several Field Barriers of different types, so fully looting one may mean swapping partners more than once.',
+    ]},
     { version:'25.19', date:'2026-09-22', notes:[
       'New: Personality. Every monster now rolls one of 8 personalities at capture or hatch, fixed for life and shown on its Inspect screen. Half are stat trade-offs (Aggressive, Guarded, Swift, Sturdy, Reckless, Calm); the other half are passive perks that don\'t touch stats (Focused adds dodge/flee chance, Adaptive cuts Hunger/Energy drain while exploring).',
       'Splicing two parents in the Splice Lab gives the hybrid a coin-flip chance at either parent\'s personality.',
@@ -6479,11 +6485,11 @@
     ]},
   ];
   const BUILD = {
-    version: '25.20',
+    version: '25.21',
     date: '2026-09-22',
     notes: [
-      'New: Field Barriers. A rare map tile that blocks the way unless your active partner\'s type matches (Fire, Water, Earth, Electric, Nature, Void, Metal or Glitch) — cross it with the right type fielded and it opens for good, paying Bits and a capture program. No Shop tool unlocks these; you need to have actually caught, and be fielding, that type.',
-      'A map can have several Field Barriers of different types, so fully looting one may mean swapping partners more than once.',
+      'Fixed/improved: running out of Hunger while exploring now clearly says you\'re heading back to Neon Haven, not just that your partner is too weak to continue.',
+      'New: the Hunger and Energy bars shake once they drop to 20% or below, so there\'s a visible warning before Hunger actually runs out and sends you home.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

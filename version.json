@@ -1,8 +1,8 @@
 {
-  "version": "25.20",
+  "version": "25.21",
   "date": "2026-09-22",
   "notes": [
-    "New: Field Barriers. A rare map tile that blocks the way unless your active partner's type matches (Fire, Water, Earth, Electric, Nature, Void, Metal or Glitch) — cross it with the right type fielded and it opens for good, paying Bits and a capture program. No Shop tool unlocks these; you need to have actually caught, and be fielding, that type.",
-    "A map can have several Field Barriers of different types, so fully looting one may mean swapping partners more than once."
+    "Fixed/improved: running out of Hunger while exploring now clearly says you're heading back to Neon Haven, not just that your partner is too weak to continue.",
+    "New: the Hunger and Energy bars shake once they drop to 20% or below, so there's a visible warning before Hunger actually runs out and sends you home."
   ]
 }
