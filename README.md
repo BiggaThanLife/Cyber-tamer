@@ -74,7 +74,7 @@ Some tiles block your way.
 - A faster partner can also **dodge** counterattacks completely.
 - A running log of the fight sits under the monsters.
 - Hits, dodges, catches, level-ups and evolutions are animated. If that bothers you or slows your phone, set **System → Motion** to Reduced. It follows your device's reduce-motion setting by default.
-- If your partner faints, you retreat to town with 20% HP.
+- If your partner faints, you retreat to town with 20% HP and lose 10% of their progress toward the next level. This never costs you a level you already have — it only sets back how close you are to the next one.
 
 ### Catching monsters
 - Encountering a wild monster opens with a quick scan, then the fight. Once it's weakened, run a **capture program** — each one shows its own live odds, starting around 5% and rising steeply as the enemy's HP drops (capped at 95%). Basic Capture.exe is the starting tool; Advanced Capture.exe, Hunter.exe and Containment.exe are pricier and noticeably better.

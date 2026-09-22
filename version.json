@@ -1,8 +1,7 @@
 {
-  "version": "25.17",
+  "version": "25.18",
   "date": "2026-09-22",
   "notes": [
-    "New: Layer 2. Once you've beaten a biome's boss, a 🌀 Layer 2 option opens on that biome's card at the Wilderness Gate — a harder remix with favored species spawning even more often, a denser version of the biome's own mechanic, a new ⚡ power surge hazard exclusive to Layer 2, and a much stronger boss under a new title.",
-    "Layer 2's layout is derived from the same seed you enter for Layer 1, so favoriting a seed favorites both layers."
+    "New: fainting now costs your partner 10% of their progress toward the next level, on top of retreating to town at 20% HP. This can never cost you a level you already have — only how close you are to the next one."
   ]
 }

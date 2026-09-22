@@ -3377,7 +3377,13 @@
     fx({k:'hit', on:'player', dmg, mult});
     logMsg(`${getForm(b.enemy).name} struck back for ${dmg} damage.${mult>1 ? ' Super effective!' : (mult<1 ? ' Not very effective...' : '')}`);
     if(p.hp <= 0){
-      logMsg(`${getForm(p).name} fainted! You retreat to Neon Haven.`);
+      // Faint penalty: lose a slice of progress toward the next level. This only ever touches
+      // m.xp (which is already just progress within the CURRENT level — gainXpCore subtracts
+      // xpToNext on every level-up), so it can reduce how close you are to leveling but can
+      // never drop a level you've already earned.
+      const xpLost = Math.round(p.xp * 0.1);
+      p.xp = Math.max(0, p.xp - xpLost);
+      logMsg(`${getForm(p).name} fainted! You retreat to Neon Haven.${xpLost > 0 ? ` Lost ${xpLost} XP.` : ''}`);
       p.hp = Math.max(1, Math.round(p.maxHp*0.2));
       state.screen = 'town'; state.wild = null;
       if(b.source === 'mine') state.mine = null;
@@ -3422,7 +3428,7 @@
       { h:'Dodging and fleeing', b:'A faster partner (SPD) can dodge counterattacks completely and has better odds of running away with <b>Flee</b>. Flee chance depends on your SPD versus the enemy\'s and never goes below 20% or above 90%.' },
       { h:'Healing and battle items', b:'<b>Use Medicine</b> restores your partner\'s HP to full mid-fight. Battle chips from the Shop (Battle tab) help too: the <b>Overload Chip</b> is a big typeless blast and the <b>Firewall Chip</b> blocks the next enemy attack.' },
       { h:'Acquisition', b:'When you encounter a wild monster, your Cyber Explorer scans it, then you fight it. Once it\'s weakened, run a <b>capture program</b> from the Actions list — <b>Basic Capture.exe</b>, then <b>Advanced Capture.exe</b>, <b>Hunter.exe</b> and <b>Containment.exe</b> as you unlock better ones. Every program button shows its current odds, which rise steeply as the enemy\'s HP drops (capped at 95%). Anomalies are a bit easier (+15%) and Wanted monsters easier still (+20%). A failed run doesn\'t end the fight — the target gets a turn, then try again.' },
-      { h:'When it goes wrong', b:'If your partner faints you retreat to town with 20% HP. If a wild monster escapes, you may be offered to add it to your <b>Wanted Board</b>. Rare glowing <b>✦ Marked</b> monsters (about 1 in 128) are worth catching.' },
+      { h:'When it goes wrong', b:'If your partner faints you retreat to town with 20% HP and lose <b>10% of your progress toward the next level</b> — it can never actually cost you a level you\'ve already earned, just set back how close you are to the next one. If a wild monster escapes, you may be offered to add it to your <b>Wanted Board</b>. Rare glowing <b>✦ Marked</b> monsters (about 1 in 128) are worth catching.' },
     ]},
     { id:'partners', icon:'🧬', title:'Partners & Stats', color:'var(--amber)', blurb:'Stats, IVs, hunger, energy and evolution.', cards:[
       { h:'HP — Hit Points', b:'How much damage your partner can take before fainting.' },
@@ -6293,6 +6299,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.17', date:'2026-09-22', notes:[
+      'New: Layer 2. Once you\'ve beaten a biome\'s boss, a 🌀 Layer 2 option opens on that biome\'s card at the Wilderness Gate — a harder remix with favored species spawning even more often, a denser version of the biome\'s own mechanic, a new ⚡ power surge hazard exclusive to Layer 2, and a much stronger boss under a new title.',
+      'Layer 2\'s layout is derived from the same seed you enter for Layer 1, so favoriting a seed favorites both layers.',
+    ]},
     { version:'25.16', date:'2026-09-22', notes:[
       'New Explorer Tools in the Shop: Packet Tracer (shows the boss signal\'s direction and distance on any map, not just the Ghost Server), Port Scanner (reveals Locked Nodes through the fog before you\'ve walked near them), and Firewall Breaker (forces open rare ⛔ Restricted Zones for a one-time reward, opening a new path for good).',
       'New map feature: Restricted Zones, a rare blocked tile that needs a Firewall Breaker to pass. Old maps and favorited seeds are never blocked by a tool you don\'t own — it only ever opens up new ground.',
@@ -6354,11 +6364,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.17',
+    version: '25.18',
     date: '2026-09-22',
     notes: [
-      'New: Layer 2. Once you\'ve beaten a biome\'s boss, a 🌀 Layer 2 option opens on that biome\'s card at the Wilderness Gate — a harder remix with favored species spawning even more often, a denser version of the biome\'s own mechanic, a new ⚡ power surge hazard exclusive to Layer 2, and a much stronger boss under a new title.',
-      'Layer 2\'s layout is derived from the same seed you enter for Layer 1, so favoriting a seed favorites both layers.',
+      'New: fainting now costs your partner 10% of their progress toward the next level, on top of retreating to town at 20% HP. This can never cost you a level you already have — only how close you are to the next one.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
