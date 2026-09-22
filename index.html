@@ -812,8 +812,17 @@
     { id:'growth',   label:'Growth',   ids:['expCapsule','expCapsuleL','hpDrive','strDrive','defDrive','spdDrive'] },
     { id:'battle',   label:'Battle',   ids:['overloadChip','firewallChip','nanoPatch'] },
     { id:'modules',  label:'Modules',  ids:[] },
+    { id:'tools',    label:'Tools',    ids:[] },
     { id:'cosmetics',label:'Cosmetics',ids:[] },
   ];
+
+  // EXPLORER TOOLS — permanent, one-time unlocks (not consumed) that let your Explorer act on
+  // certain map tiles. v1 has just Decrypter, for Locked Nodes; the dict is built to take more
+  // tools later (e.g. a tool gating a harder node tier) without restructuring anything that uses it.
+  const EXPLORER_TOOLS = {
+    decrypter: { id:'decrypter', name:'Decrypter', icon:'🧩', price:500, desc:'Lets your Explorer crack Locked Nodes found while exploring — sealed data caches that need a Data Sorting puzzle solved to open.' },
+  };
+  function hasTool(id){ return !!(state.tools && state.tools[id]); }
 
   // MODULES — a held slot (1 per partner) for timed or single-use boosters. A timed module burns one
   // tick for every tick of exploring/digging while its holder is your ACTIVE partner (Sync Link is
@@ -1308,6 +1317,8 @@
       tutorialDone: false,
       perfectStreak: 0,
       perfectBest: 0,
+      tools: { decrypter: false },
+      puzzle: null,
     };
   }
 
@@ -1621,6 +1632,18 @@
       if(cand.length){ const [kx,ky] = cand[Math.floor(cr()*cand.length)]; grid[ky][kx] = { role:'cache', opened:false }; }
     }
 
+    // Locked Node — its own derived PRNG, placed last, so it never disturbs the base layout
+    // (favorited seeds keep their existing chests/vault/shrine/anomaly/boss exactly where they
+    // were; this only ever claims a still-'open' cell, added on top).
+    {
+      const lr = mulberry32((useSeed ^ 0x27220a95) >>> 0);
+      if(lr() < 0.4){
+        const cand = [];
+        for(let y=0;y<size;y++) for(let x=0;x<size;x++) if(grid[y][x].role === 'open') cand.push([x,y]);
+        if(cand.length){ const [lx,ly] = cand[Math.floor(lr()*cand.length)]; grid[ly][lx] = { role:'locked', opened:false }; }
+      }
+    }
+
     const fog = grid.map(row => row.map(()=>false));
     revealFog(fog, cx, cy, size, 1);
     return { size, grid, fog, px:cx, py:cy, steps:0, biomeIndex, hasKey:false, keyPairPresent:hasKeyPair, seed:useSeed,
@@ -1765,6 +1788,7 @@
         case 'daily': renderDaily(screenEl, controlsEl); break;
         case 'statsGuide': renderStatsGuide(screenEl, controlsEl); break;
         case 'inspect': renderInspect(screenEl, controlsEl); break;
+        case 'puzzle': renderPuzzle(screenEl, controlsEl); break;
       }
       // A fresh screen always starts scrolled to the top — otherwise it can silently inherit
       // scroll position from whatever the previous (often longer) screen was left at, which
@@ -2599,6 +2623,7 @@
           else if(c.role==='anomaly'){ bg='#1a0c2a'; glyph= c.opened?'·':'✕'; col='#ff4d9e'; }
           else if(c.role==='hazard'){ const ht = biome.tiles.hazard || {bg:'#3a1005',glyph:'♨',col:'#ff9a3d'}; bg=ht.bg; glyph=ht.glyph; col=ht.col; }
           else if(c.role==='cache'){ bg='#0a2418'; glyph= c.opened?'·':'✪'; col='#7dffb0'; }
+          else if(c.role==='locked'){ bg= c.opened?'#0a2418':'#1a1424'; glyph= c.opened?'·':'🧩'; col= c.opened?'#4be37a':'#c093ff'; }
         }
         const isPlayer = (vx===VIEW_RADIUS && vy===VIEW_RADIUS);
         grid += `<div class="tile"${isPlayer ? ' id="pl-tile"' : ''} style="background:${bg};color:${col};">${isPlayer ? '<span style="color:var(--phosphor);text-shadow:0 0 6px var(--phosphor);">◉</span>' : glyph}</div>`;
@@ -2616,7 +2641,7 @@
       ${biome.mechanic ? `<div style="font-size:9px; color:${biome.accentColor}; margin-bottom:4px;">${biome.mechanic.split('.')[0]}.</div>` : ''}
       ${biome.bossSignal ? `<div style="font-size:10px; color:var(--violet); margin-bottom:4px;">${bossSignalText(w)}</div>` : ''}
       ${w.daily && state.daily && !state.daily.sector.claimed ? `<div style="font-size:9.5px; color:#7dffb0; margin-bottom:4px;">✪ Daily Sector — find the cache for today's bonus.</div>` : ''}
-      ${wildLegendOpen ? `<div style="font-size:9px; color:var(--ink-dim); margin-bottom:6px; background:rgba(255,255,255,.03); border-radius:6px; padding:4px 6px;">⛩ gate exits · ✦ shrine · ⚷ key / ▣ vault · ✕ anomaly · ☠ boss lurks nearby · ♨ heat vent · ✪ daily cache</div>` : ''}
+      ${wildLegendOpen ? `<div style="font-size:9px; color:var(--ink-dim); margin-bottom:6px; background:rgba(255,255,255,.03); border-radius:6px; padding:4px 6px;">⛩ gate exits · ✦ shrine · ⚷ key / ▣ vault · ✕ anomaly · ☠ boss lurks nearby · ♨ heat vent · ✪ daily cache · 🧩 locked node (needs a Decrypter)</div>` : ''}
       ${grid}
       <div style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:6px; font-size:9px; color:var(--ink-dim);">
         <span>Seed <span class="pixel-font" style="color:var(--phosphor);">${seedStr}</span></span>
@@ -2770,6 +2795,18 @@
       cell.opened = true;
       fx({k:'mapLoot'});
       claimDailyCache(w);
+      render(); return;
+    }
+    if(cell.role === 'locked' && !cell.opened){
+      if(!hasTool('decrypter')){
+        logMsg('🧩 Locked data node — requires a Decrypter to access. Pick one up in the Shop and come back.');
+        render(); return;
+      }
+      const diff = puzzleDifficultyFor(w.biomeIndex);
+      const puzzle = generateSortPuzzle(diff.typeCount, diff.capacity);
+      state.puzzle = { ...puzzle, biomeIndex: w.biomeIndex, x: nx, y: ny };
+      puzzleSelected = null;
+      state.screen = 'puzzle';
       render(); return;
     }
     if(cell.role === 'hazard' && biome.hazard){
@@ -3237,6 +3274,7 @@
       { h:'Biome bosses', b:'Each biome has a boss. Bosses can\'t be caught — you have to defeat them. Beating boss #1 unlocks the Training Ground, beating two unlocks the Data Mine, and each boss opens the next biome.' },
       { h:'Special biomes', b:'<b>Overclocked Foundry:</b> heat vents hurt your partner (Fire types are immune, Metal and Earth take half, Water and Nature take extra). Vents never faint you. <b>The Ghost Server:</b> fog closes back in behind you, and a hint tells you how close the boss is.' },
       { h:'Wild levels', b:'Wild monsters are stronger than your partner in later biomes — their level is based on your partner\'s level plus a biome bonus, so you can\'t just out-level the danger.' },
+      { h:'Locked Nodes', b:'A 🧩 tile you find while exploring — a sealed data cache you can\'t open without a <b>Decrypter</b> (a one-time Explorer Tool, bought once in the Shop\'s Tools tab). With one, stepping onto the node opens a <b>Data Sorting</b> puzzle: move chunks between containers until each one holds a single type. Solving it pays Bits and a capture program; running out of moves just re-locks the node for another try, no other cost. Abandon or Re-shuffle any time from inside the puzzle.' },
     ]},
     { id:'battle', icon:'⚔', title:'Battles & Catching', color:'var(--crimson)', blurb:'Moves, types, fleeing and capturing.', cards:[
       { h:'How a turn works', b:'Pick a move, it hits, then the enemy hits back. Every partner has two universal moves and learns type moves as they level. Move buttons show ▲ if the move is strong against this enemy and ▼ if it is weak.' },
@@ -4532,6 +4570,170 @@
     }
   }
 
+
+  /* ---------------------------------------------------------
+     DATA SORTING PUZZLE — opens a Locked Node found while exploring.
+     A classic sort-stack puzzle (like ball sort), reskinned as data containers holding typed
+     chunks. Move the top chunk of one container onto another that's empty or top-matches; solve
+     by getting every non-empty container full of one type. Generated by reverse-scrambling a
+     solved state with random LEGAL moves, so every puzzle is guaranteed solvable. Not seeded to
+     the map (only the Locked Node's position on the map is) — the puzzle itself is random per
+     attempt, same as battle stats are.
+  --------------------------------------------------------- */
+  const PUZZLE_CHUNK_TYPES = [
+    { id:'bin',   label:'BIN',   color:'#4be37a' },
+    { id:'hex',   label:'HEX',   color:'#ffd93d' },
+    { id:'pkt',   label:'PKT',   color:'#3ad6d1' },
+    { id:'mal',   label:'MAL',   color:'#ff4d5e' },
+    { id:'img',   label:'IMG',   color:'#ff9df0' },
+    { id:'key',   label:'KEY',   color:'#a06bff' },
+    { id:'file',  label:'FILE',  color:'#ffb347' },
+    { id:'proto', label:'PROTO', color:'#7dc4ff' },
+  ];
+  const PUZZLE_CAPACITY = 3;
+  function puzzleDifficultyFor(biomeIndex){
+    // 3 types for the first two biomes, 4 for the middle two, 5 for the last two.
+    const typeCount = 3 + Math.min(2, Math.floor((biomeIndex||0) / 2));
+    return { typeCount, capacity: PUZZLE_CAPACITY };
+  }
+  function generateSortPuzzle(typeCount, capacity){
+    const pool = PUZZLE_CHUNK_TYPES.slice();
+    shuffleArray(pool, Math.random);
+    const types = pool.slice(0, typeCount).map(t => t.id);
+    // Solved state: one full container per type, plus one empty buffer container.
+    const containers = types.map(t => Array.from({length:capacity}, () => t));
+    containers.push([]);
+    const n = containers.length;
+    const legalMoves = () => {
+      const moves = [];
+      for(let a = 0; a < n; a++){
+        if(!containers[a].length) continue;
+        const top = containers[a][containers[a].length-1];
+        for(let b = 0; b < n; b++){
+          if(a === b || containers[b].length >= capacity) continue;
+          if(containers[b].length === 0 || containers[b][containers[b].length-1] === top) moves.push([a,b]);
+        }
+      }
+      return moves;
+    };
+    const scrambleMoves = 14 + typeCount*3;
+    for(let i = 0; i < scrambleMoves; i++){
+      const moves = legalMoves();
+      if(!moves.length) break;
+      const [a,b] = moves[Math.floor(Math.random()*moves.length)];
+      containers[b].push(containers[a].pop());
+    }
+    // Guard against an unlucky scramble that landed back on (or very near) solved.
+    const purity = containers.filter(c => c.length && (c.length === capacity)).length;
+    if(purity >= typeCount) return generateSortPuzzle(typeCount, capacity);
+    return { types, capacity, containers, moveBudget: scrambleMoves + 12 };
+  }
+  function isPuzzleSolved(p){
+    return p.containers.every(c => c.length === 0 || (c.length === p.capacity && c.every(x => x === c[0])));
+  }
+
+  let puzzleSelected = null; // transient UI state: index of the source container, or null
+  function renderPuzzle(screenEl, controlsEl){
+    const p = state.puzzle;
+    if(!p){ state.screen = 'wild'; render(); return; }
+    const typeOf = id => PUZZLE_CHUNK_TYPES.find(t => t.id === id);
+    const chip = (typeId, isTop, selected) => {
+      const t = typeOf(typeId);
+      return `<div style="height:22px; border-radius:4px; margin-top:2px; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:#04120b; background:${t.color}; ${isTop && selected ? 'outline:2px solid #fff; outline-offset:-2px;' : ''}">${t.label}</div>`;
+    };
+    const containerHtml = p.containers.map((c, i) => {
+      const slots = [];
+      for(let s = 0; s < p.capacity; s++){
+        const chunkId = c[s];
+        slots.push(chunkId ? chip(chunkId, s === c.length-1, puzzleSelected === i) : `<div style="height:22px; border-radius:4px; margin-top:2px; border:1px dashed var(--glass-border);"></div>`);
+      }
+      return `<button data-container="${i}" style="all:unset; cursor:pointer; flex:1; min-width:0; background:${puzzleSelected===i?'rgba(75,227,122,.12)':'rgba(255,255,255,.03)'}; border:1px solid ${puzzleSelected===i?'var(--phosphor)':'var(--glass-border)'}; border-radius:8px; padding:6px; display:flex; flex-direction:column-reverse; gap:0;">${slots.join('')}</button>`;
+    }).join('');
+    screenEl.innerHTML = `
+      ${screenTitle('🧩 DATA SORTING', 'var(--cyan)')}
+      <div style="font-size:10px; color:var(--ink-dim); text-align:center; margin-bottom:10px;">Tap a container, then tap another to move its top chunk. Sort every chunk into a single-type container.</div>
+      <div id="puzzle-grid" style="display:flex; gap:6px; margin-bottom:10px;">${containerHtml}</div>
+      <div style="text-align:center; font-size:9.5px; color:var(--ink-dim);">Moves left: ${p.moveBudget}</div>
+    `;
+    controlsEl.innerHTML = `
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <button class="btn" id="puzzle-reset">🔄 Re-shuffle</button>
+        <button class="btn btn-crimson" id="puzzle-abandon">✕ Abandon</button>
+      </div>`;
+    screenEl.querySelectorAll('[data-container]').forEach(btn => {
+      btn.addEventListener('click', () => onPuzzleTap(parseInt(btn.getAttribute('data-container'), 10)));
+    });
+    controlsEl.querySelector('#puzzle-reset').addEventListener('click', () => {
+      const diff = puzzleDifficultyFor(p.biomeIndex);
+      const fresh = generateSortPuzzle(diff.typeCount, diff.capacity);
+      state.puzzle = { ...p, ...fresh };
+      puzzleSelected = null;
+      logMsg('Data Sorting re-shuffled.');
+      render();
+    });
+    controlsEl.querySelector('#puzzle-abandon').addEventListener('click', () => {
+      state.puzzle = null;
+      puzzleSelected = null;
+      state.screen = 'wild';
+      logMsg('Left the node locked — come back to it any time.');
+      render();
+    });
+  }
+  function onPuzzleTap(i){
+    const p = state.puzzle;
+    if(!p) return;
+    if(puzzleSelected === null){
+      if(p.containers[i].length) puzzleSelected = i;
+      render();
+      return;
+    }
+    if(puzzleSelected === i){ puzzleSelected = null; render(); return; }
+    const a = puzzleSelected, b = i;
+    const from = p.containers[a], to = p.containers[b];
+    const top = from[from.length-1];
+    const legal = from.length > 0 && to.length < p.capacity && (to.length === 0 || to[to.length-1] === top);
+    puzzleSelected = null;
+    if(!legal){
+      fx({k:'puzzleBad'});
+      render();
+      return;
+    }
+    to.push(from.pop());
+    p.moveBudget--;
+    const solved = isPuzzleSolved(p);
+    const outOfMoves = !solved && p.moveBudget <= 0;
+    if(!solved && !outOfMoves) fx({k:'puzzleMove'});
+    render(); // show the final board before the success/fail overlay plays over it
+    if(solved){ finishPuzzle(true); return; }
+    if(outOfMoves){ finishPuzzle(false); return; }
+    render();
+  }
+  function finishPuzzle(success){
+    const p = state.puzzle;
+    if(!p) return;
+    const w = state.wild;
+    if(success){
+      if(w && w.grid[p.y] && w.grid[p.y][p.x]) w.grid[p.y][p.x].opened = true; // solved nodes stay open for good
+      const bits = bitsBoost(40 + p.biomeIndex*18 + p.types.length*12);
+      state.bits += bits;
+      const tierProgram = p.types.length >= 5 ? 'containmentExe' : (p.types.length >= 4 ? 'hunterExe' : 'advancedCapture');
+      state.inventory[tierProgram] = (state.inventory[tierProgram]||0) + 1;
+      const progName = CAPTURE_PROGRAMS[tierProgram].name;
+      logMsg(`🧩 Node decrypted! +◈${bits} Bits and 1 ${progName}.`);
+    } else {
+      logMsg('🧩 Out of moves — the node re-encrypted itself. It stays here if you want another attempt later.');
+    }
+    // Play the overlay directly (not via the fx queue) — the puzzle screen is about to be torn
+    // down, so waiting for the queue's next render() would fire this after #puzzle-grid is gone.
+    try{ playFx({k: success ? 'puzzleSuccess' : 'puzzleFail'}); }catch(e){}
+    setTimeout(() => {
+      state.puzzle = null;
+      puzzleSelected = null;
+      state.screen = 'wild';
+      render();
+    }, motionOn() ? 1100 : 200);
+  }
+
   /* ---------------------------------------------------------
      PLAY MINIGAME
   --------------------------------------------------------- */
@@ -4755,6 +4957,18 @@
             <button class="btn btn-amber" style="padding:6px 10px; font-size:11px; flex-shrink:0;" data-buy-mod="${id}" ${state.bits<d.price?'disabled':''}>Buy</button>
           </div>`; }).join('')}
       </div>`;
+    } else if(tab.id === 'tools'){
+      body = `<div style="font-size:10px; color:var(--ink-dim); margin-bottom:8px;">A one-time upgrade for your Explorer, not a consumable — buy it once and keep it forever.</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${Object.keys(EXPLORER_TOOLS).map(id => { const d = EXPLORER_TOOLS[id]; const owned = hasTool(id);
+          return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div>
+              <div style="color:var(--cyan)">${d.icon} ${d.name} ${owned?'<span class="badge" style="color:var(--phosphor);border-color:var(--phosphor)">OWNED</span>':`<span class="badge">◈${d.price}</span>`}</div>
+              <div style="font-size:9.5px; color:var(--ink-dim);">${d.desc}</div>
+            </div>
+            ${owned ? '' : `<button class="btn btn-cyan" style="padding:6px 10px; font-size:11px; flex-shrink:0;" data-buy-tool="${id}" ${state.bits<d.price?'disabled':''}>Buy</button>`}
+          </div>`; }).join('')}
+      </div>`;
     } else {
       body = `<div style="display:flex; flex-direction:column; gap:8px;">
         ${tab.ids.map(id => {
@@ -4781,6 +4995,16 @@
     screenEl.querySelectorAll('[data-shop-tab]').forEach(btn => btn.addEventListener('click', ()=>{ shopTab = btn.getAttribute('data-shop-tab'); render(); }));
     screenEl.querySelectorAll('[data-buy]').forEach(btn => btn.addEventListener('click', ()=>buyShopItem(btn.getAttribute('data-buy'))));
     screenEl.querySelectorAll('[data-buy-mod]').forEach(btn => btn.addEventListener('click', ()=>buyModule(btn.getAttribute('data-buy-mod'))));
+    screenEl.querySelectorAll('[data-buy-tool]').forEach(btn => btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-buy-tool');
+      const d = EXPLORER_TOOLS[id];
+      if(!d || hasTool(id) || state.bits < d.price) return;
+      state.bits -= d.price;
+      if(!state.tools) state.tools = {};
+      state.tools[id] = true;
+      logMsg(`Acquired the ${d.name}! ${d.desc}`);
+      render();
+    }));
     screenEl.querySelectorAll('[data-buy-cos]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const id = btn.getAttribute('data-buy-cos');
@@ -5068,6 +5292,9 @@
     if(typeof s.tutorialDone !== 'boolean') s.tutorialDone = true; // saves that predate the tutorial skip it
     if(typeof s.perfectStreak !== 'number' || s.perfectStreak < 0) s.perfectStreak = 0;
     if(typeof s.perfectBest !== 'number' || s.perfectBest < 0) s.perfectBest = 0;
+    if(!s.tools || typeof s.tools !== 'object') s.tools = {};
+    Object.keys(EXPLORER_TOOLS).forEach(k => { if(typeof s.tools[k] !== 'boolean') s.tools[k] = false; });
+    if(s.puzzle && (!Array.isArray(s.puzzle.containers) || typeof s.puzzle.x !== 'number' || typeof s.puzzle.y !== 'number')) s.puzzle = null;
     if(!s.listSort || typeof s.listSort.key !== 'string') s.listSort = { key:'default', dir:'asc' };
     if(!s.dex){
       // Backfill: retroactively populate the Dex from monsters this save
@@ -5321,6 +5548,26 @@
         break;
       }
       case 'bump': shakeEl(screenEl, 5, 240); break;
+      case 'puzzleMove': { const g = document.getElementById('puzzle-grid'); if(g) flashEl(g, 'brightness(1.15)', 160); break; }
+      case 'puzzleBad': { const g = document.getElementById('puzzle-grid'); if(g) shakeEl(g, 5, 220); break; }
+      case 'puzzleSuccess': {
+        const g = document.getElementById('puzzle-grid');
+        if(g){
+          floatText(g, 'DECRYPTED!', '#4be37a', 22);
+          burst(g, '#4be37a', 22, 80);
+          flashEl(g, 'brightness(1.9)', 500);
+        }
+        break;
+      }
+      case 'puzzleFail': {
+        const g = document.getElementById('puzzle-grid');
+        if(g){
+          floatText(g, 'SYNC LOST', '#ff4d5e', 20);
+          shakeEl(g, 8, 400);
+          flashEl(g, 'brightness(1.6) sepia(1) saturate(6) hue-rotate(-30deg)', 500);
+        }
+        break;
+      }
       case 'hazard':
         animate(screenEl, [{ boxShadow:'inset 0 0 0 0 rgba(255,80,60,0)' }, { boxShadow:'inset 0 0 44px 8px rgba(255,80,60,.6)', offset:.3 }, { boxShadow:'inset 0 0 0 0 rgba(255,80,60,0)' }], { duration: 520 });
         break;
@@ -5579,11 +5826,11 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const BUILD = {
-    version: '25.6',
+    version: '25.7',
     date: '2026-09-21',
     notes: [
-      'Ripe crops no longer wither. Harvest them whenever you get back — a long exploring trip never costs you a crop.',
-      'New: Play, Job Board and Training Ground now share a Perfect streak — a bright-zone hit celebrates on the spot, and beating your best streak logs a 🏆 callout.',
+      'New: Locked Nodes — sealed data caches you may find while exploring. Buy a Decrypter once in the Shop\'s new Tools tab, then solve a Data Sorting puzzle to open one for Bits and a capture program.',
+      'Data Sorting is a stack-sorting puzzle: move typed data chunks between containers until each one holds a single type. Running out of moves just re-locks the node for another try.',
     ],
   };
   const SEEN_BUILD_KEY = 'cybertamer_seen_build';

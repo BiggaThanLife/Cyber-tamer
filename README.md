@@ -129,6 +129,12 @@ Unlocks after you defeat **two** biome bosses.
 - You'll find ore, treasure, seed caches (including Deepweed), gear components and ambush monsters. The 📡 line tells you if a cache or component is within a few tiles, and in which direction.
 - **Disconnect** pauses your dive and keeps all progress. **Abandon** throws the dive away but keeps your depth record.
 
+### Locked Nodes and Explorer Tools
+- While exploring you may find a 🧩 **Locked Node** — a sealed data cache you can't open without the right tool.
+- **Decrypter:** a one-time Explorer Tool bought once in the Shop's Tools tab (◈500). It's a permanent unlock, not a consumable.
+- With a Decrypter, stepping onto a Locked Node opens a **Data Sorting** puzzle: move data chunks (Binary, Hex, Packets, Malware, and more) between containers, one at a time, until each container holds only one type.
+- Solving it pays Bits and a capture program. Running out of moves just re-locks the node — no other penalty, and you can try again any time. **Re-shuffle** gives a fresh layout, and **Abandon** leaves it for later.
+
 ### Daily Ops and the Wanted Board
 - **Login streak:** claim a reward each day on a 7-day cycle. Each finished cycle adds a 25% Bits bonus, up to +100%. One missed day is forgiven, and a long break earns a welcome-back gift.
 - **Daily quests:** three new quests every day, based on what you've unlocked. Clear all three for a bonus cache.

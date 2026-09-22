@@ -1,8 +1,8 @@
 {
-  "version": "25.6",
+  "version": "25.7",
   "date": "2026-09-21",
   "notes": [
-    "Ripe crops no longer wither. Harvest them whenever you get back — a long exploring trip never costs you a crop.",
-    "New: Play, Job Board and Training Ground now share a Perfect streak — a bright-zone hit celebrates on the spot, and beating your best streak logs a 🏆 callout."
+    "New: Locked Nodes — sealed data caches you may find while exploring. Buy a Decrypter once in the Shop's new Tools tab, then solve a Data Sorting puzzle to open one for Bits and a capture program.",
+    "Data Sorting is a stack-sorting puzzle: move typed data chunks between containers until each one holds a single type. Running out of moves just re-locks the node for another try."
   ]
 }
