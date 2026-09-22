@@ -29,7 +29,7 @@ Stuck at any point? Open **Help** from the town menu. It has the same informatio
 Explore, catch monsters, grow your partner stronger, and defeat each biome's boss. Beating a boss unlocks the next biome.
 
 ### Your partner
-One monster is your **active partner**, the one who explores and fights. The rest wait in the **Network Registry**, where you can swap partners, sort lists and sell spares. Your active partner and your last monster can't be sold.
+One monster is your **active partner**, the one who explores and fights. The rest wait in the **Network Registry**, where you can swap partners, sort lists and sell spares. Your active partner and your last monster can't be sold. Tap the 🔓/🔒 icon on any card (or on its Inspect screen) to lock a monster you never want to sell by mistake — a locked monster's Sell button is disabled until you unlock it again.
 
 ### The town menu
 The buttons are grouped in pairs:

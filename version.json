@@ -1,7 +1,7 @@
 {
-  "version": "25.9",
-  "date": "2026-09-21",
+  "version": "25.10",
+  "date": "2026-09-22",
   "notes": [
-    "Fixed: the Perfect streak celebration wasn't showing on Job Board or Training Ground — both used to jump back to their list the instant you tapped, before the animation had anywhere to play. They now show the result on the same screen (frozen marker, streak, reward), with a button to head back when you're ready."
+    "You can now lock a monster in the Network Registry — tap the 🔓/🔒 icon on its card or Inspect screen to protect it from being sold by mistake, with a little animation on the lock itself."
   ]
 }

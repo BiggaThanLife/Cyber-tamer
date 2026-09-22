@@ -388,12 +388,25 @@
     if(idx < 0) return;
     const m = state.storage[idx];
     if(m.uid === state.activeId || state.storage.length <= 1) return;
+    if(m.locked){ logMsg(`${getForm(m).name} is locked — unlock it first if you really want to sell it.`); render(); return; }
     const price = sellPrice(m);
     state.bits += price;
     if(m.module){ invModules().push(m.module); m.module = null; } // held module goes back to the bag
     state.storage.splice(idx,1);
     sellConfirmUid = null;
     logMsg(`Sold ${getForm(m).name} for ◈${price} Bits.`);
+    render();
+  }
+
+  // Locking a monster just guards the Sell button (sellMonster refuses locked monsters too, as a
+  // second line of defense) — nothing else about it changes. The padlock animates on the tapped
+  // icon itself (data-lock="<uid>" identifies it after re-render, in both Storage and Inspect).
+  function toggleLock(uid){
+    const m = state.storage.find(x => x.uid === uid);
+    if(!m) return;
+    m.locked = !m.locked;
+    logMsg(m.locked ? `🔒 ${getForm(m).name} locked — protected from being sold.` : `🔓 ${getForm(m).name} unlocked.`);
+    fx({k:'lockToggle', uid, locked:m.locked});
     render();
   }
 
@@ -1271,6 +1284,7 @@
       gearSlots: [null, null],
       module: null,
       driveBonus: {hp:0,str:0,def:0,spd:0},
+      locked: false,
     };
     recalcStats(m, true);
     updateMoveUnlocks(m);
@@ -3325,6 +3339,7 @@
       { h:'The Dex', b:'Meeting a species logs it; catching or hatching one reveals it fully. Filter by caught, missing or type. Some lines have more than two stages.' },
       { h:'Milestones', b:'Reach collection goals in the Dex (like catching half the lines) and claim a reward.' },
       { h:'Storage and sorting', b:'The Network Registry, Job Board, Training and Splice Lab lists all pin your active partner first and share one sort setting (level, stats, potential and more). Tap the direction button to flip ascending/descending. The Network Registry also shows your total monster count, and each card has a 🔍 Inspect button for the full profile: exact IVs, moves and everything held.' },
+      { h:'Locking a monster', b:'Tap the 🔓/🔒 icon on a Network Registry card, or on its Inspect screen, to lock it. A locked monster\'s Sell button is disabled, so you can\'t sell it by mistake — tap the icon again to unlock it. Locking doesn\'t affect anything else about the monster.' },
     ]},
   ];
   let helpSection = null; // transient UI state, not persisted
@@ -3513,6 +3528,9 @@
     screenEl.querySelectorAll('[data-inspect]').forEach(btn=>{
       btn.addEventListener('click', ()=>{ inspectUid = btn.getAttribute('data-inspect'); state.screen='inspect'; render(); });
     });
+    screenEl.querySelectorAll('[data-lock]').forEach(btn=>{
+      btn.addEventListener('click', ()=>toggleLock(btn.getAttribute('data-lock')));
+    });
     screenEl.querySelectorAll('[data-sell]').forEach(btn=>{
       btn.addEventListener('click', ()=>{ sellConfirmUid = btn.getAttribute('data-sell'); render(); });
     });
@@ -3582,10 +3600,11 @@
     const dexEntry = state.dex && state.dex[m.speciesId];
     screenEl.innerHTML = `
       ${screenTitle('🔍 INSPECT', sp.color)}
-      <div class="card" style="text-align:center; margin-bottom:8px;">
+      <div class="card" style="text-align:center; margin-bottom:8px; position:relative;">
+        <button data-lock="${m.uid}" title="${m.locked?'Unlock':'Lock (protects from selling)'}" style="all:unset; cursor:pointer; position:absolute; top:8px; right:10px; font-size:18px;">${m.locked?'🔒':'🔓'}</button>
         ${spriteImgHtml(m, 72)}
         <div style="color:${sp.color}; margin-top:6px; font-size:13px;">${m.nickname||sp.name} <span class="badge">Gen ${m.gen} · Lv${m.level}</span></div>
-        <div style="font-size:9.5px; color:var(--ink-dim); margin-top:2px;">${sp.type} type · Stage ${m.stage}/${line.length}${nextReq?` · Evolves at Lv${nextReq}`:' · Final form'}${isActive?' · <span style="color:var(--phosphor);">Active partner</span>':''}${m.marked?' · <span style="color:#fff44d;">✦ Marked</span>':''}</div>
+        <div style="font-size:9.5px; color:var(--ink-dim); margin-top:2px;">${sp.type} type · Stage ${m.stage}/${line.length}${nextReq?` · Evolves at Lv${nextReq}`:' · Final form'}${isActive?' · <span style="color:var(--phosphor);">Active partner</span>':''}${m.marked?' · <span style="color:#fff44d;">✦ Marked</span>':''}${m.locked?' · <span style="color:var(--crimson);">🔒 Locked</span>':''}</div>
       </div>
       <div class="card" style="margin-bottom:8px;">
         <div style="color:var(--phosphor); margin-bottom:6px;">Stats</div>
@@ -3614,6 +3633,9 @@
     `;
     controlsEl.innerHTML = `<button class="btn" id="back" style="width:100%;">← Back to Storage</button>`;
     controlsEl.querySelector('#back').addEventListener('click', ()=>{ state.screen='storage'; render(); });
+    screenEl.querySelectorAll('[data-lock]').forEach(btn=>{
+      btn.addEventListener('click', ()=>toggleLock(btn.getAttribute('data-lock')));
+    });
   }
 
   function monsterCard(m, opts){
@@ -3622,19 +3644,21 @@
     const isActive = m.uid === state.activeId;
     const line = EVOLUTION_LINES[m.speciesId];
     const nextReq = m.stage < line.length ? line[m.stage].levelReq : null;
-    const canSell = opts.showSell && !isActive && state.storage.length > 1;
+    const canSell = opts.showSell && !isActive && state.storage.length > 1 && !m.locked;
     const confirming = opts.showSell && sellConfirmUid === m.uid;
     let sellBlockReason = '';
     if(opts.showSell && !canSell){
       if(isActive) sellBlockReason = ' (active partner)';
       else if(state.storage.length<=1) sellBlockReason = ' (last partner)';
+      else if(m.locked) sellBlockReason = ' (locked)';
     }
     const equippedId = m.cosmetic || 'none';
     return `
       <div class="card">
         <div style="display:flex; align-items:center; gap:6px; color:${sp.color}; min-width:0;">
           ${spriteImgHtml(m, 36)}
-          <div style="min-width:0;">${m.nickname||sp.name} <span class="badge">Gen ${m.gen} · Lv${m.level}</span> ${isActive?'<span class="badge" style="color:var(--phosphor);border-color:var(--phosphor)">ACTIVE</span>':''} ${m.marked?'<span class="badge" style="color:#fff44d;border-color:#fff44d;">✦ MARKED</span>':''}</div>
+          <div style="min-width:0; flex:1;">${m.nickname||sp.name} <span class="badge">Gen ${m.gen} · Lv${m.level}</span> ${isActive?'<span class="badge" style="color:var(--phosphor);border-color:var(--phosphor)">ACTIVE</span>':''} ${m.marked?'<span class="badge" style="color:#fff44d;border-color:#fff44d;">✦ MARKED</span>':''}</div>
+          <button data-lock="${m.uid}" title="${m.locked?'Unlock':'Lock (protects from selling)'}" style="all:unset; cursor:pointer; flex-shrink:0; font-size:16px; padding:2px 4px;">${m.locked?'🔒':'🔓'}</button>
         </div>
         <div style="display:grid; grid-template-columns:${isActive?'1fr':'1fr 1fr'}; gap:6px; margin-top:6px;">
           <button class="btn btn-cyan" style="padding:5px 8px; font-size:10px;" data-inspect="${m.uid}">🔍 Inspect</button>
@@ -5314,6 +5338,7 @@
   }
 
   function migrateMonster(m){
+    if(typeof m.locked !== 'boolean') m.locked = false;
     if(m.stage === undefined || m.stage === null) m.stage = 1;
     if(!Array.isArray(m.movesKnown)) m.movesKnown = ['strike','pressurePoint'];
     if(!m.crestBonus) m.crestBonus = {hp:0,str:0,def:0,spd:0};
@@ -5690,6 +5715,21 @@
         break;
       }
       case 'bump': shakeEl(screenEl, 5, 240); break;
+      case 'lockToggle': {
+        const el = document.querySelector(`[data-lock="${ev.uid}"]`);
+        if(el){
+          const color = ev.locked ? '#ff4d5e' : '#4be37a';
+          animate(el, [
+            { transform:'scale(1) rotate(0deg)' },
+            { transform:'scale(1.6) rotate(-10deg)', offset:.35 },
+            { transform:'scale(1.6) rotate(10deg)', offset:.7 },
+            { transform:'scale(1) rotate(0deg)' }
+          ], { duration:420, easing:'ease-out' });
+          flashEl(el, 'brightness(1.8)', 300);
+          burst(el, color, 10, 30);
+        }
+        break;
+      }
       case 'puzzleMove': { const g = document.getElementById('puzzle-grid'); if(g) flashEl(g, 'brightness(1.15)', 160); break; }
       case 'puzzleBad': { const g = document.getElementById('puzzle-grid'); if(g) shakeEl(g, 5, 220); break; }
       case 'puzzleSuccess': {
@@ -5968,10 +6008,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const BUILD = {
-    version: '25.9',
-    date: '2026-09-21',
+    version: '25.10',
+    date: '2026-09-22',
     notes: [
-      'Fixed: the Perfect streak celebration wasn\'t showing on Job Board or Training Ground — both used to jump back to their list the instant you tapped, before the animation had anywhere to play. They now show the result on the same screen (frozen marker, streak, reward), with a button to head back when you\'re ready.',
+      'You can now lock a monster in the Network Registry — tap the 🔓/🔒 icon on its card or Inspect screen to protect it from being sold by mistake, with a little animation on the lock itself.',
     ],
   };
   const SEEN_BUILD_KEY = 'cybertamer_seen_build';
