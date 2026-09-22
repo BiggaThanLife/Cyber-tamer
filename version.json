@@ -1,7 +1,7 @@
 {
-  "version": "25.10",
+  "version": "25.11",
   "date": "2026-09-22",
   "notes": [
-    "You can now lock a monster in the Network Registry — tap the 🔓/🔒 icon on its card or Inspect screen to protect it from being sold by mistake, with a little animation on the lock itself."
+    "New: System > Update Notes shows the full history of past updates, with the date and version of each."
   ]
 }

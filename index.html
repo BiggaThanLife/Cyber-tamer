@@ -1798,6 +1798,7 @@
         case 'jobAttempt': renderJobAttempt(screenEl, controlsEl); break;
         case 'wanted': renderWanted(screenEl, controlsEl); break;
         case 'system': renderSystemMenu(screenEl, controlsEl); break;
+        case 'changelog': renderChangelog(screenEl, controlsEl); break;
         case 'dex': renderDex(screenEl, controlsEl); break;
         case 'daily': renderDaily(screenEl, controlsEl); break;
         case 'statsGuide': renderStatsGuide(screenEl, controlsEl); break;
@@ -2023,6 +2024,7 @@
       {label:'⇧ Export Save File', cls:'btn-cyan', fn:exportSave},
       {label:'⇩ Import Save File', cls:'', fn:triggerInGameImport},
       {label:`🎞 Motion: ${motionOn() ? 'Full' : 'Reduced'}`, cls:'', fn:()=>{ setMotionMode(motionOn() ? 'reduced' : 'full'); render(); }},
+      {label:'🗓 Update Notes', cls:'', fn:()=>{ state.screen='changelog'; render(); }},
       {label:'← Back to Town', cls:'btn-primary', fn:()=>{ state.screen='town'; render(); }},
       {label:'⏻ Return to Title', cls:'btn-crimson', fn:()=>{ appMode='boot'; lastRenderedScreen=null; render(); }},
     ];
@@ -3280,6 +3282,7 @@
       { h:'The 📜 Log', b:'The Log button at the top of every screen shows your recent messages, newest first. A small amber dot means something new happened. In battle, a running log of that fight sits under the monsters.' },
       { h:'Motion', b:'Battles, catches, level-ups and evolutions are animated. If motion bothers you or your phone struggles, open <b>System</b> and switch <b>Motion</b> to Reduced. It follows your device\'s reduce-motion setting until you change it.' },
       { h:'Saving', b:'The game saves automatically to this device. Under <b>System</b> you can export your save to a file (a backup, or to move devices) and import it again. Importing overwrites your current progress.' },
+      { h:'Update Notes', b:'Under <b>System</b>, <b>🗓 Update Notes</b> lists every update ever pushed to this game, newest first, each with its version number and the date it went out.' },
     ]},
     { id:'explore', icon:'⛩', title:'Exploring the Wilderness', color:'var(--cyan)', blurb:'Maps, fog, tiles, chests and biomes.', cards:[
       { h:'Moving', b:'Use the arrow pad to step around the map. Each step costs <b>1 Energy</b> and <b>2 Hunger</b> and gives your partner <b>1 XP</b>. A step onto open ground has about a 20% chance of starting a wild encounter. If Hunger hits 0 your partner is too weak to explore and you return to town.' },
@@ -6001,19 +6004,91 @@
   }
 
   /* ---------------------------------------------------------
-     BUILD + UPDATE NOTICES
-     BUILD is the single source of truth for the version. `tools/sync_version.py`
-     copies it into version.json (the tiny file the game polls). To ship an update:
-     bump BUILD.version, add notes, run the script, then commit both files.
+     BUILD + UPDATE NOTICES + CHANGELOG
+     BUILD is the single source of truth for the CURRENT version. `tools/sync_version.py`
+     copies it into version.json (the tiny file the game polls). CHANGELOG_HISTORY holds every
+     PAST release (newest first) so players can browse it from System > Update Notes
+     (renderChangelog) — `fullChangelog()` just prepends the live BUILD to it at render time, so
+     the current release is never duplicated by hand.
+     To ship an update: move the outgoing BUILD into CHANGELOG_HISTORY (unshift it on), then set
+     BUILD to the new version/date/notes, run `python tools/sync_version.py`, commit both files.
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
+  const CHANGELOG_HISTORY = [
+    { version:'25.10', date:'2026-09-22', notes:[
+      'You can now lock a monster in the Network Registry — tap the 🔓/🔒 icon on its card or Inspect screen to protect it from being sold by mistake, with a little animation on the lock itself.',
+    ]},
+    { version:'25.9', date:'2026-09-21', notes:[
+      'Fixed: the Perfect streak celebration wasn\'t showing on Job Board or Training Ground — both used to jump back to their list the instant you tapped, before the animation had anywhere to play. They now show the result on the same screen (frozen marker, streak, reward), with a button to head back when you\'re ready.',
+    ]},
+    { version:'25.8', date:'2026-09-21', notes:[
+      'Breeding Lab is now the Splice Lab. Splicing two monsters shows a full-screen reveal of the new hybrid, then opens straight to its Inspect screen.',
+    ]},
+    { version:'25.7', date:'2026-09-21', notes:[
+      'New: Locked Nodes — sealed data caches you may find while exploring. Buy a Decrypter once in the Shop\'s new Tools tab, then solve a Data Sorting puzzle to open one for Bits and a capture program.',
+      'Data Sorting is a stack-sorting puzzle: move typed data chunks between containers until each one holds a single type. Running out of moves just re-locks the node for another try.',
+    ]},
+    { version:'25.6', date:'2026-09-21', notes:[
+      'Ripe crops no longer wither. Harvest them whenever you get back — a long exploring trip never costs you a crop.',
+      'New: Play, Job Board and Training Ground now share a Perfect streak — a bright-zone hit celebrates on the spot, and beating your best streak logs a 🏆 callout.',
+    ]},
+    { version:'25.5', date:'2026-09-21', notes:[
+      'Fixed: opening a screen (like Inspect) from partway down a long list no longer inherits that scroll position — every screen now opens at the top.',
+      'Fixed: the Inspect and Set Active buttons on a Network Registry card no longer squeeze the name/level onto a cramped, wrapping line.',
+    ]},
+    { version:'25.4', date:'2026-09-21', notes:[
+      'New: a Network Registry Inspect screen for each monster, with exact IVs, full move list and everything held.',
+      'The Network Registry (formerly the Storage Box) now shows your total monster count.',
+      'Capture rework: catching a monster now runs a capture program (Basic Capture.exe, and the pricier Advanced/Hunter/Containment.exe) from the battle screen, with its own CAPTURE.EXE animation. Trap Spheres were converted 1:1 into Basic Capture.exe runs.',
+      'Wild encounters open with a quick scan beat before the fight.',
+    ]},
+    { version:'25.2', date:'2026-09-21', notes:[
+      'Play now costs Energy and Hunger on every try, hit or miss, and only allows a few tries in a row before a short break. It no longer refills Hunger or Energy.',
+      'New: the game tells you when an update is available, and shows what changed after you update.',
+      'The title screen now shows the version number.',
+      'New animations: hits, damage numbers, sliding HP bars, dodges, entrances, a Trap Sphere throw and catch reveal, level-up bursts, counting Bits, and a full-screen evolution sequence.',
+      'New Motion setting under System (Full or Reduced). It follows your device\'s reduce-motion setting by default.',
+    ]},
+    { version:'25.1', date:'2026-09-21', notes:[
+      'Play now costs Energy and Hunger on every try, hit or miss, and only allows a few tries in a row before a short break. It no longer refills Hunger or Energy.',
+      'New: the game tells you when an update is available, and shows what changed after you update.',
+      'The title screen now shows the version number.',
+    ]},
+  ];
   const BUILD = {
-    version: '25.10',
+    version: '25.11',
     date: '2026-09-22',
     notes: [
-      'You can now lock a monster in the Network Registry — tap the 🔓/🔒 icon on its card or Inspect screen to protect it from being sold by mistake, with a little animation on the lock itself.',
+      'New: System > Update Notes shows the full history of past updates, with the date and version of each.',
     ],
   };
+  function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
+  function formatChangelogDate(d){
+    const parts = String(d).split('-').map(Number);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    if(parts.length !== 3 || !months[parts[1]-1]) return d;
+    return `${months[parts[1]-1]} ${parts[2]}, ${parts[0]}`;
+  }
+  function renderChangelog(screenEl, controlsEl){
+    const entries = fullChangelog();
+    screenEl.innerHTML = `
+      ${screenTitle('🗓 UPDATE NOTES', 'var(--cyan)')}
+      <div style="font-size:10px; color:var(--ink-dim); margin-bottom:10px;">Every update pushed to this game, newest first.</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${entries.map(e => `<div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+            <span class="pixel-font glow" style="color:var(--phosphor); font-size:10.5px;">v${escapeHtml(e.version)}</span>
+            <span style="font-size:9.5px; color:var(--ink-dim);">${escapeHtml(formatChangelogDate(e.date))}</span>
+          </div>
+          <div style="font-size:10px; color:var(--ink-dim); line-height:1.6;">
+            ${e.notes.map(n => `· ${escapeHtml(n)}`).join('<br>')}
+          </div>
+        </div>`).join('')}
+      </div>
+    `;
+    controlsEl.innerHTML = `<button class="btn" id="back" style="width:100%;">← Back to System</button>`;
+    controlsEl.querySelector('#back').addEventListener('click', ()=>{ state.screen='system'; render(); });
+  }
   const SEEN_BUILD_KEY = 'cybertamer_seen_build';
   function versionParts(v){ return String(v).split('.').map(n => parseInt(n, 10) || 0); }
   function isNewerVersion(remote, local){

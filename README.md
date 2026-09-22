@@ -309,6 +309,7 @@ Buy seeds, plant them in pods, and charge them to start growing. Crops grow as y
 - The game **saves automatically** to your browser on your own device. There are no accounts and no servers, and nothing is sent anywhere.
 - Your save belongs to **one browser on one device, at one web address**. It doesn't follow you to another phone, another browser or a different link.
 - Browsers can clear this kind of storage, especially if you clear site data, use a private window, or (on iPhones) don't visit for a long time. **Back up your save now and then:** System → **Export Save File**. To restore it or move to another device, use System → **Import Save File**. Importing replaces your current progress.
+- **Update Notes:** System → **🗓 Update Notes** lists every update ever pushed to the game, newest first, with the version and date of each.
 
 ## Playing on a phone
 - Open the link in your phone's browser.
