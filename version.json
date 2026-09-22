@@ -1,7 +1,7 @@
 {
-  "version": "25.8",
+  "version": "25.9",
   "date": "2026-09-21",
   "notes": [
-    "Breeding Lab is now the Splice Lab. Splicing two monsters shows a full-screen reveal of the new hybrid, then opens straight to its Inspect screen."
+    "Fixed: the Perfect streak celebration wasn't showing on Job Board or Training Ground — both used to jump back to their list the instant you tapped, before the animation had anywhere to play. They now show the result on the same screen (frozen marker, streak, reward), with a button to head back when you're ready."
   ]
 }

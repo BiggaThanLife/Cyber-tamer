@@ -3846,6 +3846,22 @@
     if(!m || !meta){ state.trainAttempt = null; state.screen = 'training'; render(); return; }
     const sp = getForm(m);
 
+    // After a tap, stay on this screen showing the frozen result (mountTimingResult) instead of
+    // jumping straight back to Training Ground — that used to tear down #tg-track before the
+    // queued Perfect-streak animation ever got to play on it.
+    if(att.result){
+      mountTimingResult(screenEl, controlsEl, {
+        title: `${meta.icon} ${meta.name.toUpperCase()} TRAINING`,
+        accent: meta.color,
+        headerHtml: `<div style="text-align:center; margin-bottom:10px;">${spriteImgHtml(m,56)}<div style="color:${sp.color}; margin-top:4px;">${m.nickname||sp.name} is training</div></div>`,
+        pct: att.result.pct, greatHalf: 8, goodHalf: 22,
+        resultHtml: att.result.msg,
+        continueLabel: '← Back to Ground',
+        onContinue: ()=>{ state.trainAttempt = null; state.screen = 'training'; render(); },
+      });
+      return;
+    }
+
     mountTimingGame(screenEl, controlsEl, {
       title: `${meta.icon} ${meta.name.toUpperCase()} TRAINING`,
       accent: meta.color,
@@ -3875,8 +3891,7 @@
         const tierMsg = tier==='GREAT' ? 'Excellent form!' : (tier==='GOOD' ? 'Solid effort.' : 'Lost focus.');
         const gainMsg = actualGain>0 ? `+${actualGain} ${meta.name}` : 'no gain — already maxed';
         logMsg(`${tierMsg} ${getForm(m).name}'s training: ${gainMsg} — ${m.trainCooldown} ticks to recover.`);
-        state.trainAttempt = null;
-        state.screen = 'training';
+        att.result = { pct, msg: `${tierMsg}<br>${gainMsg} · ${m.trainCooldown} ticks to recover.` };
         render();
       }
     });
@@ -4554,6 +4569,26 @@
     requestAnimationFrame(tick);
   }
 
+  // A frozen "result" screen for one-shot timing minigames (Job Board, Training Ground) — shown
+  // instead of immediately leaving the screen after a tap. Job/Training used to switch screen
+  // right in onTap, which tore down #tg-track (the Perfect-streak fx's anchor) before the queued
+  // animation ever got to play; this keeps the same track/marker in place, frozen at the tapped
+  // spot, with the result and a Continue button, so the celebration actually has somewhere to land.
+  // cfg: {title, accent, headerHtml, pct, greatHalf, goodHalf, resultHtml, continueLabel, onContinue}
+  function mountTimingResult(screenEl, controlsEl, cfg){
+    screenEl.innerHTML = `
+      ${screenTitle(cfg.title, cfg.accent)}
+      ${cfg.headerHtml || ''}
+      <div id="tg-track" style="position:relative; height:36px; border-radius:8px; overflow:hidden; border:1px solid var(--glass-border); margin-bottom:6px; background:${trackGradient(cfg.greatHalf, cfg.goodHalf)};">
+        <div id="tg-marker" style="position:absolute; top:-4px; left:${cfg.pct}%; width:3px; height:44px; background:var(--phosphor); box-shadow:0 0 8px var(--phosphor); transform:translateX(-50%);"></div>
+      </div>
+      <div style="text-align:center; font-size:9px; color:var(--ink-dim); margin-bottom:8px;">Perfect streak: ${state.perfectStreak||0}${state.perfectBest?` · Best: ${state.perfectBest}`:''}</div>
+      <div style="text-align:center; font-size:11px; color:var(--ink); min-height:34px; line-height:1.5;">${cfg.resultHtml}</div>
+    `;
+    controlsEl.innerHTML = `<button class="btn btn-primary" id="tg-continue" style="width:100%;">${cfg.continueLabel || 'Continue'}</button>`;
+    controlsEl.querySelector('#tg-continue').addEventListener('click', cfg.onContinue);
+  }
+
   // Perfect-streak tracking, shared by every GREAT/GOOD/MISS timing minigame (Play, Job Board,
   // Training Ground). A GREAT extends the streak and celebrates on the spot; anything else ends
   // it. Crossing the previous best logs a callout once, right when it happens.
@@ -4793,6 +4828,21 @@
     const greatHalf = Math.min(20, 6 + statVal*0.35);
     const goodHalf = greatHalf + 14;
 
+    // See the matching comment in renderTrainAttempt: stay on this screen after a tap so
+    // #tg-track is still there when the queued Perfect-streak animation plays.
+    if(att.result){
+      mountTimingResult(screenEl, controlsEl, {
+        title: `${job.icon} ${job.name.toUpperCase()}`,
+        accent: job.color,
+        headerHtml: `<div style="text-align:center; margin-bottom:10px;">${spriteImgHtml(m,56)}<div style="color:${sp.color}; margin-top:4px;">${m.nickname||sp.name} is on the job</div></div>`,
+        pct: att.result.pct, greatHalf, goodHalf,
+        resultHtml: att.result.msg,
+        continueLabel: '← Back to Board',
+        onContinue: ()=>{ state.jobAttempt = null; state.screen = 'jobs'; render(); },
+      });
+      return;
+    }
+
     mountTimingGame(screenEl, controlsEl, {
       title: `${job.icon} ${job.name.toUpperCase()}`,
       accent: job.color,
@@ -4817,8 +4867,7 @@
         if(xp) gainXp(m, xp);
         const tierMsg = tier==='GREAT' ? 'Excellent work!' : (tier==='GOOD' ? 'Solid effort.' : 'Fumbled the attempt.');
         logMsg(`${tierMsg} ${getForm(m).name} earned ◈${bits} Bits at ${job.name} — ${m.jobCooldown} ticks to recover.`);
-        state.jobAttempt = null;
-        state.screen = 'jobs';
+        att.result = { pct, msg: `${tierMsg}<br>Earned ◈${bits} Bits · ${m.jobCooldown} ticks to recover.` };
         render();
       }
     });
@@ -5919,10 +5968,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const BUILD = {
-    version: '25.8',
+    version: '25.9',
     date: '2026-09-21',
     notes: [
-      'Breeding Lab is now the Splice Lab. Splicing two monsters shows a full-screen reveal of the new hybrid, then opens straight to its Inspect screen.',
+      'Fixed: the Perfect streak celebration wasn\'t showing on Job Board or Training Ground — both used to jump back to their list the instant you tapped, before the animation had anywhere to play. They now show the result on the same screen (frozen marker, streak, reward), with a button to head back when you\'re ready.',
     ],
   };
   const SEEN_BUILD_KEY = 'cybertamer_seen_build';
