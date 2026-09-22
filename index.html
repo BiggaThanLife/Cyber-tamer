@@ -715,7 +715,10 @@
   }
 
   const SHOP_ITEMS = [
-    {id:'trapSphere', name:'Trap Sphere',   price:20,  desc:'Weakened foes are far easier to net.'},
+    {id:'basicCapture',      name:'Basic Capture.exe',      price:20,  desc:'Standard acquisition script. Works, but a foe with fight left resists it.'},
+    {id:'advancedCapture',   name:'Advanced Capture.exe',   price:60,  desc:'A tighter compression routine — clearly better odds than Basic.'},
+    {id:'hunterExe',         name:'Hunter.exe',             price:160, desc:'Aggressive acquisition heuristics. Strong odds even against sturdy targets.'},
+    {id:'containmentExe',    name:'Containment.exe',        price:420, desc:'Full containment suite. About as close to a guarantee as it gets.'},
     {id:'primeMeat',  name:'Prime Meat',    price:15,  desc:'Fills hunger, restores a little energy.'},
     {id:'medicine',   name:'Medicine',      price:25,  desc:'Restores HP to full instantly.'},
     {id:'evoCrest',   name:'Evolution Crest', price:100, desc:'Permanently hardens a partner\'s stats.'},
@@ -756,6 +759,17 @@
     thermalCore:    { id:'thermalCore',    name:'Thermal Core',     icon:'🔥', color:'var(--crimson)',  grantMove:'thermal_burst',      desc:'Grants Thermal Burst, a Fire attack, to any partner regardless of species.' },
     frostCore:      { id:'frostCore',      name:'Frost Core',       icon:'❄',  color:'var(--cyan)',     grantMove:'frost_lance',        desc:'Grants Frost Lance, a Water attack, to any partner regardless of species.' },
   };
+  // CAPTURE PROGRAMS — acquisition tools, one run per attempt (replaces the old single Trap Sphere item).
+  // `mult` scales estimateCatchChance(); tiers exist so better ones can be added later without touching
+  // the underlying formula. Inventory keys match these ids directly (state.inventory.basicCapture etc).
+  const CAPTURE_PROGRAMS = {
+    basicCapture:    { id:'basicCapture',    name:'Basic Capture.exe',    tier:1, mult:1.0, icon:'📡' },
+    advancedCapture: { id:'advancedCapture', name:'Advanced Capture.exe', tier:2, mult:1.3, icon:'💾' },
+    hunterExe:       { id:'hunterExe',       name:'Hunter.exe',           tier:3, mult:1.6, icon:'🎯' },
+    containmentExe:  { id:'containmentExe',  name:'Containment.exe',      tier:4, mult:2.0, icon:'🔒' },
+  };
+  const CAPTURE_PROGRAM_IDS = ['basicCapture','advancedCapture','hunterExe','containmentExe'];
+
   const GEAR_SLOT_COUNT = 2;
   const GEAR_SELL = { coreBattery:60, servoBooster:75, reinforcedPlate:75, overclockChip:90, balancedCore:100, thermalCore:140, frostCore:140 };
   function gearSellPrice(id){ return GEAR_SELL[id] != null ? GEAR_SELL[id] : 50; }
@@ -794,7 +808,7 @@
     firewallChip: { name:'Firewall Chip',  icon:'🧱', price:45,  group:'Battle Chips', usable:false, desc:'Battle chip: absorbs the enemy\'s next attack completely. Single use, from the battle screen.' },
   };
   const SHOP_TABS = [
-    { id:'supplies', label:'Supplies', ids:['trapSphere','primeMeat','medicine','evoCrest','nanoPatch','chargeCell','primeSirloin','rebootKit','podOverclock'] },
+    { id:'supplies', label:'Supplies', ids:['basicCapture','advancedCapture','hunterExe','containmentExe','primeMeat','medicine','evoCrest','nanoPatch','chargeCell','primeSirloin','rebootKit','podOverclock'] },
     { id:'growth',   label:'Growth',   ids:['expCapsule','expCapsuleL','hpDrive','strDrive','defDrive','spdDrive'] },
     { id:'battle',   label:'Battle',   ids:['overloadChip','firewallChip','nanoPatch'] },
     { id:'modules',  label:'Modules',  ids:[] },
@@ -1090,7 +1104,7 @@
       reward: {bits:150, evoCrest:1} },
     { id:'half_dex',         name:'Half the Dex', desc:`Catch half the evolution lines (${Math.ceil(lineIds.length/2)} of ${lineIds.length}).`,
       check: dex => lineIds.filter(id => dexCaughtAny(dex[id])).length >= Math.ceil(lineIds.length/2),
-      reward: {bits:200, trapSphere:3} },
+      reward: {bits:200, basicCapture:3} },
     { id:'full_dex',         name:'Dex Complete', desc:`Catch all ${lineIds.length} evolution lines.`,
       check: dex => lineIds.every(id => dexCaughtAny(dex[id])),
       reward: {bits:400, evoCrest:2} },
@@ -1105,7 +1119,7 @@
     const parts = [];
     if(reward.bits) parts.push(`◈${reward.bits} Bits`);
     if(reward.evoCrest) parts.push(`${reward.evoCrest} Evolution Crest${reward.evoCrest>1?'s':''}`);
-    if(reward.trapSphere) parts.push(`${reward.trapSphere} Trap Sphere${reward.trapSphere>1?'s':''}`);
+    if(reward.basicCapture) parts.push(`${reward.basicCapture} Basic Capture.exe`);
     return parts.join(', ');
   }
   function claimDexMilestone(id){
@@ -1117,7 +1131,7 @@
     state.dexMilestonesClaimed.push(id);
     if(ms.reward.bits) state.bits += ms.reward.bits;
     if(ms.reward.evoCrest) state.inventory.evoCrest = (state.inventory.evoCrest||0) + ms.reward.evoCrest;
-    if(ms.reward.trapSphere) state.inventory.trapSphere = (state.inventory.trapSphere||0) + ms.reward.trapSphere;
+    if(ms.reward.basicCapture) state.inventory.basicCapture = (state.inventory.basicCapture||0) + ms.reward.basicCapture;
     logMsg(`Milestone claimed: ${ms.name} — +${rewardText(ms.reward)}!`);
     render();
   }
@@ -1268,7 +1282,7 @@
       bits: 150,
       activeId: starter.uid,
       storage: [starter],
-      inventory: { trapSphere: 5, primeMeat: 4, medicine: 2, evoCrest: 0, seeds: {bitshoot:2, byteberry:0, cachecrystal:0, crestshard:0, deepweed:0}, gear: {}, modules: [] },
+      inventory: { basicCapture: 5, advancedCapture: 0, hunterExe: 0, containmentExe: 0, primeMeat: 4, medicine: 2, evoCrest: 0, seeds: {bitshoot:2, byteberry:0, cachecrystal:0, crestshard:0, deepweed:0}, gear: {}, modules: [] },
       gearSeen: {},
       mineDepthRecord: 0,
       farm: { tierIndex: 0, pods: Array.from({length:FARM_TIERS[0].podCount}, () => ({cropId:null, state:'empty', growTicks:0, chargedAtTick:0, readyAtTick:0})) },
@@ -1748,6 +1762,7 @@
         case 'dex': renderDex(screenEl, controlsEl); break;
         case 'daily': renderDaily(screenEl, controlsEl); break;
         case 'statsGuide': renderStatsGuide(screenEl, controlsEl); break;
+        case 'inspect': renderInspect(screenEl, controlsEl); break;
       }
       if(screenEl.querySelector('[data-sort-key]')) bindSortBar(screenEl);
       save();
@@ -2101,7 +2116,7 @@
       {label:'🧬 Breeding Lab', cls:'btn-cyan', locked:!breedingUnlocked, lockMsg:'Upgrade your farm to a Server Shack to unlock the Breeding Lab.', fn:()=>{ state.breeding={a:null,b:null}; state.screen='breeding'; render(); }},
       {label:'🎮 Play', cls:'btn-cyan', fn:()=>{ state.screen='play'; render(); }},
       {label:'💤 Rest Partner', cls:'', fn:()=>restPartner()},
-      {label:'📦 Storage Box', cls:'', fn:()=>{ state.screen='storage'; render(); }},
+      {label:'📦 Network Registry', cls:'', fn:()=>{ state.screen='storage'; render(); }},
       {label:'🎒 Inventory', cls:'', fn:()=>{ state.screen='inventory'; render(); }},
       {label:'🛒 Shop', cls:'btn-amber', fn:()=>{ state.screen='shop'; render(); }},
       {label:'📖 Dex', cls:'btn-violet', fn:()=>{ state.screen='dex'; render(); }},
@@ -2172,23 +2187,23 @@
 
   const LOGIN_REWARDS = [
     { day:1, bits:100 },
-    { day:2, bits:50,  trapSphere:2 },
+    { day:2, bits:50,  basicCapture:2 },
     { day:3, bits:150, primeMeat:2 },
     { day:4, bits:100, medicine:2 },
-    { day:5, bits:250, trapSphere:2 },
+    { day:5, bits:250, basicCapture:2 },
     { day:6, bits:150, seeds:{crestshard:1} },
     { day:7, bits:400, evoCrest:1, medicine:2 },
   ];
-  const COMEBACK_REWARD = { bits:150, primeMeat:3, trapSphere:2 };
-  const QUEST_BONUS_REWARD = { bits:150, medicine:1, trapSphere:2 };
+  const COMEBACK_REWARD = { bits:150, primeMeat:3, basicCapture:2 };
+  const QUEST_BONUS_REWARD = { bits:150, medicine:1, basicCapture:2 };
 
   // kind → definition. goal:[min,max]; town:true kinds happen at the base rather than in the wild.
   const QUEST_DEFS = {
     win:     { goal:[4,6],   town:false, reward:{bits:80},                     text:(n)=>`Win ${n} battles` },
     winType: { goal:[2,3],   town:false, reward:{bits:90},                     text:(n,t)=>`Defeat ${n} ${t}-type monsters`, param:true },
-    catch:   { goal:[1,2],   town:false, reward:{bits:60, trapSphere:2},       text:(n)=>`Capture ${n} wild monster${n>1?'s':''}` },
+    catch:   { goal:[1,2],   town:false, reward:{bits:60, basicCapture:2},     text:(n)=>`Capture ${n} wild monster${n>1?'s':''}` },
     step:    { goal:[50,80], town:false, reward:{bits:70},                      text:(n)=>`Explore ${n} tiles of wilderness` },
-    chest:   { goal:[2,3],   town:false, reward:{bits:70, trapSphere:1},       text:(n)=>`Open ${n} chests or vaults` },
+    chest:   { goal:[2,3],   town:false, reward:{bits:70, basicCapture:1},     text:(n)=>`Open ${n} chests or vaults` },
     dig:     { goal:[20,35], town:false, reward:{bits:90},                     text:(n)=>`Dig through ${n} blocks in the Data Mine`, gate:()=>isMiningUnlocked() },
     harvest: { goal:[2,4],   town:true,  reward:{bits:60, primeMeat:1},        text:(n)=>`Harvest ${n} crops at the Server Farm` },
     job:     { goal:[2,3],   town:true,  reward:{bits:60},                      text:(n)=>`Complete ${n} jobs at the Job Board` },
@@ -2200,8 +2215,8 @@
     const parts = [];
     const bits = Math.round((r.bits||0) * (bitsMult||1));
     if(bits){ state.bits += bits; parts.push(`◈${bits}`); }
-    [['trapSphere','Trap Sphere'],['primeMeat','Prime Meat'],['medicine','Medicine'],['evoCrest','Evolution Crest']].forEach(([k,label])=>{
-      if(r[k]){ state.inventory[k] = (state.inventory[k]||0) + r[k]; parts.push(`${r[k]} ${label}${r[k]>1?'s':''}`); }
+    [['basicCapture','Basic Capture.exe'],['advancedCapture','Advanced Capture.exe'],['hunterExe','Hunter.exe'],['containmentExe','Containment.exe'],['primeMeat','Prime Meat'],['medicine','Medicine'],['evoCrest','Evolution Crest']].forEach(([k,label])=>{
+      if(r[k]){ state.inventory[k] = (state.inventory[k]||0) + r[k]; parts.push(`${r[k]} ${label}`); }
     });
     if(r.seeds){
       Object.keys(r.seeds).forEach(sid => {
@@ -2215,7 +2230,7 @@
   function rewardPreview(r, bitsMult){
     const parts = [];
     if(r.bits) parts.push(`◈${Math.round(r.bits*(bitsMult||1))}`);
-    [['trapSphere','Trap Sphere'],['primeMeat','Prime Meat'],['medicine','Medicine'],['evoCrest','Evo Crest']].forEach(([k,label])=>{ if(r[k]) parts.push(`${r[k]} ${label}${r[k]>1?'s':''}`); });
+    [['basicCapture','Basic Capture.exe'],['advancedCapture','Advanced Capture.exe'],['hunterExe','Hunter.exe'],['containmentExe','Containment.exe'],['primeMeat','Prime Meat'],['medicine','Medicine'],['evoCrest','Evo Crest']].forEach(([k,label])=>{ if(r[k]) parts.push(`${r[k]} ${label}`); });
     if(r.seeds) Object.keys(r.seeds).forEach(sid => parts.push(`${r.seeds[sid]} ${(CROPS[sid]&&CROPS[sid].name)||sid} seed`));
     return parts.join(' + ');
   }
@@ -2704,7 +2719,7 @@
       questEvent('chest', 1);
       const roll = Math.random();
       if(roll < 0.5){ const bits = 10+w.biomeIndex*8+Math.floor(Math.random()*30); state.bits += bits; logMsg(`Found a chest with ◈${bits} Bits!`); }
-      else { state.inventory.trapSphere++; logMsg('Found a chest with a Trap Sphere!'); }
+      else { state.inventory.basicCapture++; logMsg('Found a chest with a Basic Capture.exe run!'); }
       render(); return;
     }
     if(cell.role === 'shrine' && !cell.opened){
@@ -2731,8 +2746,8 @@
       questEvent('chest', 1);
       const bits = 40 + w.biomeIndex*15;
       state.bits += bits;
-      state.inventory.trapSphere += 2;
-      logMsg(`The key fits! The vault opens: +◈${bits} Bits and 2 Trap Spheres!`);
+      state.inventory.basicCapture += 2;
+      logMsg(`The key fits! The vault opens: +◈${bits} Bits and 2 Basic Capture.exe runs!`);
       render(); return;
     }
     if(cell.role === 'anomaly' && !cell.opened){
@@ -2791,7 +2806,7 @@
     const enemy = newMonster(lineId, 1, lvl);
     const enemyName = getForm(enemy).name;
     dexMarkSeen(enemy.speciesId, enemy.stage);
-    playTransition(`A wild<br>${enemyName}<br>appeared!`, 'var(--crimson)', ()=>{
+    playScanTransition(`A wild<br>${enemyName}<br>appeared!`, 'var(--crimson)', ()=>{
       state.battle = { enemy, fled:false, over:false, isBoss:false, catchAttempted:false, source:'wild' };
       state.screen = 'battle';
       logMsg(`A wild ${enemyName} appeared!`);
@@ -2810,7 +2825,7 @@
     enemy.nickname = entry.name;
     const enemyName = entry.name;
     dexMarkSeen(enemy.speciesId, enemy.stage);
-    playTransition(`🎯 It's back!<br>${enemyName}<br>the one that got away!`, 'var(--amber)', ()=>{
+    playScanTransition(`🎯 It's back!<br>${enemyName}<br>the one that got away!`, 'var(--amber)', ()=>{
       state.battle = { enemy, fled:false, over:false, isBoss:false, catchAttempted:false, source:'wild' };
       state.screen = 'battle';
       logMsg(`${enemyName} reappears — this could be your chance!`);
@@ -2841,7 +2856,7 @@
     enemy.isAnomaly = true;
     const enemyName = getForm(enemy).name;
     dexMarkSeen(enemy.speciesId, enemy.stage);
-    playTransition(`⚠ Anomaly detected!<br>A charged ${enemyName}<br>flickers into view!`, 'var(--violet)', ()=>{
+    playScanTransition(`⚠ Anomaly detected!<br>A charged ${enemyName}<br>flickers into view!`, 'var(--violet)', ()=>{
       state.battle = { enemy, fled:false, over:false, isBoss:false, catchAttempted:false, source:'wild' };
       state.screen = 'battle';
       logMsg(`A charged ${enemyName} flickers into view — this one looks tougher, but worth it! This exact spot on this seed will always hold this encounter.`);
@@ -2894,7 +2909,6 @@
     const hpFrom = (motionOn() && sameBattle) ? { e: battleHpMemo.e, p: battleHpMemo.p } : { e: b.enemy.hp, p: p.hp };
     const bar = (val,max,color,from) => `<div class="barwrap"><div class="barfill hpslide" data-to="${100*val/max}" style="width:${100*Math.min(from,max)/max}%;background:${color}"></div></div>`;
     battleHpMemo = { b, e: b.enemy.hp, p: p.hp };
-    const catchChance = estimateCatchChance(b.enemy);
     if(!Array.isArray(b.log)) b.log = state.log.slice(0,1);
     const battleLines = b.log;
 
@@ -2919,7 +2933,7 @@
       </div>
       <div id="battle-log" style="margin-top:10px; font-size:10.5px; line-height:1.4; color:var(--ink-dim); height:${b.isBoss?100:130}px; overflow-y:auto; background:rgba(255,255,255,.03); border-radius:6px; padding:5px 8px;">${battleLines.map((l,i)=>`<div style="${i===battleLines.length-1?'color:var(--ink);':'opacity:.75;'}">${i===battleLines.length-1?'▸ ':'· '}${l}</div>`).join('')}</div>
       ${(!b.over && b.enemy.marked && !b.enemy.isWanted) ? `<div style="font-size:10px;color:#fff44d;margin-top:2px;">✦ This one is Marked — extremely rare!</div>` : ''}
-      ${(!b.over && !b.isBoss) ? `<div style="font-size:10px;color:var(--amber);margin-top:6px;">Est. catch chance if thrown now: ${(catchChance*100).toFixed(0)}% (Trap Spheres: ${state.inventory.trapSphere})</div>` : ''}
+      ${(!b.over && !b.isBoss) ? `<div style="font-size:9.5px;color:var(--amber);margin-top:6px;">Acquisition odds rise as ${escapeHtml(getForm(b.enemy).name)}'s HP drops.</div>` : ''}
       ${(!b.over && b.isBoss) ? `<div style="font-size:10px;color:var(--crimson);margin-top:6px;">This foe cannot be captured — it must be defeated.</div>` : ''}
     `;
 
@@ -2975,7 +2989,7 @@
       <div style="border-top:1px solid var(--glass-border); margin:10px 0 8px; padding-top:8px;">
         <div style="font-size:9px; color:var(--ink-dim); letter-spacing:1px; margin-bottom:4px;">ACTIONS</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
-          ${b.isBoss ? '' : `<button class="btn btn-cyan" id="act-catch" ${state.inventory.trapSphere<=0?'disabled':''}>◈ Throw Trap Sphere</button>`}
+          ${b.isBoss ? '' : captureButtonsHtml(b.enemy)}
           <button class="btn btn-amber" id="act-medicine" ${(state.inventory.medicine<=0 || p.hp>=p.maxHp)?'disabled':''}>🩹 Use Medicine (x${state.inventory.medicine})</button>
           ${['nanoPatch','overloadChip','firewallChip'].filter(id => (state.inventory[id]||0) > 0).map(id => `<button class="btn btn-violet" data-item="${id}" ${(id==='nanoPatch' && p.hp>=p.maxHp)?'disabled':''}>${SUPPLY_ITEMS[id].icon} ${SUPPLY_ITEMS[id].name} (x${state.inventory[id]})</button>`).join('')}
           <button class="btn" id="act-flee">🏃 Flee</button>
@@ -2984,22 +2998,85 @@
     controlsEl.querySelectorAll('[data-move]').forEach(btn=>{
       btn.addEventListener('click', ()=>battleAction('move', btn.getAttribute('data-move')));
     });
-    const catchBtn = controlsEl.querySelector('#act-catch');
-    if(catchBtn) catchBtn.addEventListener('click', ()=>battleAction('catch'));
+    controlsEl.querySelectorAll('[data-capture]').forEach(btn=>{
+      btn.addEventListener('click', ()=>attemptCapture(btn.getAttribute('data-capture')));
+    });
     controlsEl.querySelectorAll('[data-item]').forEach(btn => btn.addEventListener('click', ()=>battleAction('item', btn.getAttribute('data-item'))));
     const medBtn = controlsEl.querySelector('#act-medicine');
     if(medBtn) medBtn.addEventListener('click', ()=>battleAction('medicine'));
     controlsEl.querySelector('#act-flee').addEventListener('click', ()=>battleAction('flee'));
   }
 
-  function estimateCatchChance(enemy){
+  function estimateCatchChance(enemy, programId){
     const hpFrac = enemy.hp / enemy.maxHp;
     let chance = 0.05 + Math.pow(1 - hpFrac, 2) * 0.9;
+    const program = programId && CAPTURE_PROGRAMS[programId];
+    if(program) chance *= program.mult;
     if(enemy.isAnomaly) chance += 0.15;
     if(enemy.isWanted) chance += 0.20;
     const ap = getActive();
     if(ap && hasModule(ap,'trapAssist')) chance *= 1.25;
     return Math.max(0.05, Math.min(0.95, chance));
+  }
+
+  function captureButtonsHtml(enemy){
+    const owned = CAPTURE_PROGRAM_IDS.filter(id => (state.inventory[id]||0) > 0);
+    if(!owned.length){
+      return `<div style="font-size:9.5px; color:var(--ink-dim); text-align:center; padding:4px 0;">No capture programs installed — visit the Shop.</div>`;
+    }
+    return owned.map(id => {
+      const program = CAPTURE_PROGRAMS[id];
+      const chance = Math.round(estimateCatchChance(enemy, id) * 100);
+      return `<button class="btn btn-cyan" data-capture="${id}">${program.icon} ${program.name} — ${chance}% <span style="opacity:.7;">(x${state.inventory[id]})</span></button>`;
+    }).join('');
+  }
+
+  // Runs a capture program on the current wild encounter. The outcome is decided up front so the
+  // CAPTURE.EXE overlay can animate toward the real result rather than a random-looking number;
+  // game state (inventory, storage, Bits, XP) is only applied once the overlay finishes.
+  function attemptCapture(programId){
+    const b = state.battle;
+    if(!b || b.over) return;
+    if(b.isBoss){ logMsg('This foe cannot be captured — it must be defeated.'); render(); return; }
+    const program = CAPTURE_PROGRAMS[programId];
+    const owned = (state.inventory[programId]||0);
+    if(!program || owned <= 0){ logMsg('That capture program is not installed.'); render(); return; }
+    const enemy = b.enemy;
+    const enemyName = getForm(enemy).name;
+    const chance = estimateCatchChance(enemy, programId);
+    const success = Math.random() < chance;
+    state.inventory[programId] = owned - 1;
+    b.catchAttempted = true;
+    const finish = () => resolveCapture(b, enemy, program, success);
+    if(motionOn()) playCapture(program.name, enemyName, success, finish);
+    else finish();
+    render();
+  }
+  function resolveCapture(b, enemy, program, success){
+    if(state.battle !== b || b.over) return;
+    if(success){
+      const caught = { ...enemy };
+      caught.uid = 'm' + Math.random().toString(36).slice(2,10);
+      caught.hp = caught.maxHp; caught.hunger=100; caught.energy=100;
+      delete caught.isAnomaly;
+      const wasWanted = caught.isWanted;
+      const wantedId = caught.wantedEntryId;
+      delete caught.isWanted; delete caught.wantedEntryId;
+      state.storage.push(caught);
+      dexMarkCaught(caught);
+      questEvent('catch', 1, { type: getForm(caught).type });
+      if(wasWanted) state.wanted = state.wanted.filter(w=>w.id!==wantedId);
+      const bits = bitsBoost(Math.round((10 + enemy.level*4) * (enemy.isAnomaly ? 1.8 : 1)));
+      state.bits += bits;
+      fx({k:'caught'});
+      logMsg((enemy.marked ? '✦ MARKED! ' : '') + (wasWanted ? `${program.name} re-linked ${getForm(enemy).name} — the one that got away! +${bits} Bits.` : `${program.name} complete — ${getForm(enemy).name} added to your Network Registry! +${bits} Bits.`));
+      gainXp(getActive(), Math.round((6 + enemy.level*3) * (enemy.isAnomaly ? 1.5 : 1)));
+      b.over = true; render(); return;
+    }
+    fx({k:'escape'});
+    logMsg(`${program.name} failed — the connection was severed.`);
+    enemyTurn();
+    render();
   }
 
   function markBattleOver(b){
@@ -3009,15 +3086,10 @@
     }
   }
 
-  function battleAction(action, moveId, skipAnim){
+  function battleAction(action, moveId){
     const b = state.battle;
     const p = getActive();
     if(b.over) return;
-    // Throw animation first; the catch itself is only resolved once it finishes.
-    if(action === 'catch' && !skipAnim && !b.isBoss && state.inventory.trapSphere > 0 && motionOn()){
-      playThrow(() => { if(state.battle === b && !b.over) battleAction('catch', moveId, true); });
-      return;
-    }
 
     if(action === 'flee'){
       if(Math.random() < fleeChance(p, b.enemy)){ logMsg('You escaped safely.'); markBattleOver(b); }
@@ -3064,34 +3136,6 @@
         fx({k:'shield'});
         logMsg('A Firewall flares up around your partner.');
       } else { render(); return; }
-    }
-    else if(action === 'catch'){
-      if(b.isBoss){ logMsg('This foe cannot be captured — you must defeat it to pass.'); render(); return; }
-      state.inventory.trapSphere--;
-      b.catchAttempted = true;
-      const chance = estimateCatchChance(b.enemy);
-      if(Math.random() < chance){
-        const caught = { ...b.enemy };
-        caught.uid = 'm' + Math.random().toString(36).slice(2,10);
-        caught.hp = caught.maxHp; caught.hunger=100; caught.energy=100;
-        delete caught.isAnomaly;
-        const wasWanted = caught.isWanted;
-        const wantedId = caught.wantedEntryId;
-        delete caught.isWanted; delete caught.wantedEntryId;
-        state.storage.push(caught);
-        dexMarkCaught(caught);
-        questEvent('catch', 1, { type: getForm(caught).type });
-        if(wasWanted) state.wanted = state.wanted.filter(w=>w.id!==wantedId);
-        const bits = bitsBoost(Math.round((10 + b.enemy.level*4) * (b.enemy.isAnomaly ? 1.8 : 1)));
-        state.bits += bits;
-        logMsg((b.enemy.marked ? '✦ MARKED! ' : '') + (wasWanted ? `You finally caught ${getForm(b.enemy).name} — the one that got away! +${bits} Bits.` : `Captured ${getForm(b.enemy).name}! +${bits} Bits. Added to Storage Box.`));
-        gainXp(p, Math.round((6 + b.enemy.level*3) * (b.enemy.isAnomaly ? 1.5 : 1)));
-        fx({k:'caught'});
-        b.over = true; render(); return;
-      } else {
-        fx({k:'escape'});
-        logMsg('The Trap Sphere shattered — capture failed!');
-      }
     }
 
     if(b.enemy.hp <= 0){
@@ -3176,7 +3220,7 @@
   const HELP_SECTIONS = [
     { id:'start', icon:'🚀', title:'Getting Started', color:'var(--phosphor)', blurb:'The goal, the town, and how saving works.', cards:[
       { h:'The goal', b:'Explore the wilderness, catch monsters, grow your partner stronger, and defeat each biome\'s boss. Beating a boss unlocks the next biome. Neon Haven (the town) is your home base.' },
-      { h:'Your partner', b:'One monster is your <b>active partner</b> — the one who explores and fights. Everyone else waits in the Storage Box. Swap partners there any time.' },
+      { h:'Your partner', b:'One monster is your <b>active partner</b> — the one who explores and fights. Everyone else waits in the Network Registry. Swap partners there any time.' },
       { h:'The town menu', b:'Buttons are grouped in pairs: <b>Gate / Mine</b> to go out, <b>Wanted / Daily</b> for goals, <b>Jobs / Farm</b> to earn, <b>Training / Breeding</b> to grow, <b>Play / Rest</b> to care, <b>Storage / Inventory / Shop</b> to manage, then Dex, Help and System. A 🔒 means it isn\'t unlocked yet — tap it to see how.' },
       { h:'The 📜 Log', b:'The Log button at the top of every screen shows your recent messages, newest first. A small amber dot means something new happened. In battle, a running log of that fight sits under the monsters.' },
       { h:'Motion', b:'Battles, catches, level-ups and evolutions are animated. If motion bothers you or your phone struggles, open <b>System</b> and switch <b>Motion</b> to Reduced. It follows your device\'s reduce-motion setting until you change it.' },
@@ -3185,7 +3229,7 @@
     { id:'explore', icon:'⛩', title:'Exploring the Wilderness', color:'var(--cyan)', blurb:'Maps, fog, tiles, chests and biomes.', cards:[
       { h:'Moving', b:'Use the arrow pad to step around the map. Each step costs <b>1 Energy</b> and <b>2 Hunger</b> and gives your partner <b>1 XP</b>. A step onto open ground has about a 20% chance of starting a wild encounter. If Hunger hits 0 your partner is too weak to explore and you return to town.' },
       { h:'Fog and seeds', b:'Only tiles near you are shown; the rest is fog that clears as you move. Every map has a <b>seed</b> number. The same seed always builds the same layout, so ☆ favorite a seed to come back to a map you liked. Tap ⧉ to copy it, or Enter Seed to type one in.' },
-      { h:'Map symbols', b:'<b>⛩</b> gate (exit to town) · <b>▪</b> chest (Bits or a Trap Sphere) · <b>✦</b> shrine (Bits and XP) · <b>⚷</b> key, opens a <b>▣</b> vault (Bits and Trap Spheres) · <b>✕</b> anomaly (a stronger, charged monster in a fixed spot) · <b>☠</b> the boss · <b>♨</b> heat vent · <b>✪</b> daily cache. Tap ❓ Legend on the map to see these. Some tiles block the way.' },
+      { h:'Map symbols', b:'<b>⛩</b> gate (exit to town) · <b>▪</b> chest (Bits or a capture program) · <b>✦</b> shrine (Bits and XP) · <b>⚷</b> key, opens a <b>▣</b> vault (Bits and capture programs) · <b>✕</b> anomaly (a stronger, charged monster in a fixed spot) · <b>☠</b> the boss · <b>♨</b> heat vent · <b>✪</b> daily cache. Tap ❓ Legend on the map to see these. Some tiles block the way.' },
       { h:'Biome bosses', b:'Each biome has a boss. Bosses can\'t be caught — you have to defeat them. Beating boss #1 unlocks the Training Ground, beating two unlocks the Data Mine, and each boss opens the next biome.' },
       { h:'Special biomes', b:'<b>Overclocked Foundry:</b> heat vents hurt your partner (Fire types are immune, Metal and Earth take half, Water and Nature take extra). Vents never faint you. <b>The Ghost Server:</b> fog closes back in behind you, and a hint tells you how close the boss is.' },
       { h:'Wild levels', b:'Wild monsters are stronger than your partner in later biomes — their level is based on your partner\'s level plus a biome bonus, so you can\'t just out-level the danger.' },
@@ -3195,7 +3239,7 @@
       { h:'Type effectiveness', b:'Type moves deal <b>1.5×</b> when strong ("Super effective!") and <b>0.67×</b> when weak. The two universal moves are typeless. Damage also scales with your STR and the target\'s DEF.' },
       { h:'Dodging and fleeing', b:'A faster partner (SPD) can dodge counterattacks completely and has better odds of running away with <b>Flee</b>. Flee chance depends on your SPD versus the enemy\'s and never goes below 20% or above 90%.' },
       { h:'Healing and battle items', b:'<b>Use Medicine</b> restores your partner\'s HP to full mid-fight. Battle chips from the Shop (Battle tab) help too: the <b>Overload Chip</b> is a big typeless blast and the <b>Firewall Chip</b> blocks the next enemy attack.' },
-      { h:'Catching', b:'Throw a <b>Trap Sphere</b> to try to catch a wild monster. Catch chance starts at 5% and climbs steeply as the enemy\'s HP drops — the battle screen shows the current estimate, capped at 95%. Anomalies are a bit easier (+15%) and Wanted monsters easier still (+20%). Weaken first, then throw.' },
+      { h:'Acquisition', b:'When you encounter a wild monster, your Cyber Explorer scans it, then you fight it. Once it\'s weakened, run a <b>capture program</b> from the Actions list — <b>Basic Capture.exe</b>, then <b>Advanced Capture.exe</b>, <b>Hunter.exe</b> and <b>Containment.exe</b> as you unlock better ones. Every program button shows its current odds, which rise steeply as the enemy\'s HP drops (capped at 95%). Anomalies are a bit easier (+15%) and Wanted monsters easier still (+20%). A failed run doesn\'t end the fight — the target gets a turn, then try again.' },
       { h:'When it goes wrong', b:'If your partner faints you retreat to town with 20% HP. If a wild monster escapes, you may be offered to add it to your <b>Wanted Board</b>. Rare glowing <b>✦ Marked</b> monsters (about 1 in 128) are worth catching.' },
     ]},
     { id:'partners', icon:'🧬', title:'Partners & Stats', color:'var(--amber)', blurb:'Stats, IVs, hunger, energy and evolution.', cards:[
@@ -3216,7 +3260,7 @@
       { h:'Gear', b:'Gear is found only in the Data Mine. Each monster has two gear slots; gear gives a stat bonus or a move any species can use. Extras can be sold.' },
     ]},
     { id:'economy', icon:'◈', title:'Bits, Shop & Farm', color:'var(--amber)', blurb:'Earning and spending Bits, jobs and the farm.', cards:[
-      { h:'Earning Bits', b:'Win battles, open chests and shrines, do Jobs, play, complete Daily quests, harvest crops, or sell spare monsters from the Storage Box (your active partner can\'t be sold, and neither can your last monster).' },
+      { h:'Earning Bits', b:'Win battles, open chests and shrines, do Jobs, play, complete Daily quests, harvest crops, or sell spare monsters from the Network Registry (your active partner can\'t be sold, and neither can your last monster).' },
       { h:'Job Board', b:'Send a partner on a job for an instant payout influenced by their stats. Each job costs Energy and Hunger and starts a cooldown; explore the wilderness to reduce it.' },
       { h:'Shop', b:'Five tabs: Supplies, Growth, Battle, Modules and Cosmetics. Each item explains its effect and shows how many you own.' },
       { h:'Server Farm', b:'Buy seeds in the Shop and plant them in pods. Crops grow as you take steps, then wait to be harvested — if you leave them too long they wither. Crops give Bits, Prime Meat, Medicine or even Evolution Crests. Upgrade the farm for more pods.' },
@@ -3237,7 +3281,7 @@
     { id:'dex', icon:'📖', title:'Dex & Storage', color:'var(--violet)', blurb:'Collection tracking, sorting and milestones.', cards:[
       { h:'The Dex', b:'Meeting a species logs it; catching or hatching one reveals it fully. Filter by caught, missing or type. Some lines have more than two stages.' },
       { h:'Milestones', b:'Reach collection goals in the Dex (like catching half the lines) and claim a reward.' },
-      { h:'Storage and sorting', b:'The Storage Box, Job Board, Training and Breeding lists all pin your active partner first and share one sort setting (level, stats, potential and more). Tap the direction button to flip ascending/descending.' },
+      { h:'Storage and sorting', b:'The Network Registry, Job Board, Training and Breeding lists all pin your active partner first and share one sort setting (level, stats, potential and more). Tap the direction button to flip ascending/descending. The Network Registry also shows your total monster count, and each card has a 🔍 Inspect button for the full profile: exact IVs, moves and everything held.' },
     ]},
   ];
   let helpSection = null; // transient UI state, not persisted
@@ -3277,7 +3321,7 @@
     { t:'The town menu', b:'The buttons below the screen are your town. <b>Wilderness Gate</b> is where you head out. <b>Shop</b>, <b>Storage</b>, <b>Inventory</b>, <b>Jobs</b> and the rest unlock or grow as you progress — a 🔒 tells you how to open it. The <b>📜 Log</b> at the top shows what just happened, on any screen.' },
     { t:'Exploring', b:'Pick a biome, then use the arrow pad to walk the map. Each step costs Energy and Hunger and earns a little XP. Fog hides the map until you get close. Look for <b>▪</b> chests, <b>✦</b> shrines and the <b>⛩</b> gate back home. Tap <b>❓ Legend</b> for all the symbols.' },
     { t:'Battles', b:'Wild monsters can appear as you walk. Pick a move — <b>▲</b> means strong against that enemy, <b>▼</b> weak. Use <b>Medicine</b> to heal, or <b>Flee</b> if it\'s going badly. A running log of the fight appears under the monsters.' },
-    { t:'Catching monsters', b:'Wear an enemy down, then throw a <b>Trap Sphere</b>. The lower its HP, the better your odds — the battle screen shows the chance. You start with 5 spheres; buy more in the Shop. Bosses can\'t be caught.' },
+    { t:'Acquiring monsters', b:'Wear an enemy down, then run a <b>capture program</b> — start with <b>Basic Capture.exe</b>. The lower its HP, the better your odds; each program shows its chance. You start with 5 Basic Capture.exe runs; buy more (and better programs) in the Shop. Bosses can\'t be captured, only defeated.' },
     { t:'Looking after your partner', b:'Watch the <b>Hunger</b> and <b>Energy</b> bars. Feed with Prime Meat from the Inventory, or use <b>Rest Partner</b> in town. If Hunger reaches 0 you can\'t keep exploring.' },
     { t:'Your first steps', b:'Claim your <b>Daily</b> reward, then head out through the Wilderness Gate. Anytime you\'re unsure, open <b>❓ Help</b> in the town menu — it explains every system by topic, and you can replay this tutorial there.' },
   ];
@@ -3404,11 +3448,12 @@
   }
 
   /* ---------------------------------------------------------
-     STORAGE BOX
+     NETWORK REGISTRY
   --------------------------------------------------------- */
   function renderStorage(screenEl, controlsEl){
     screenEl.innerHTML = `
-      ${screenTitle('📦 STORAGE BOX')}
+      ${screenTitle('📦 NETWORK REGISTRY')}
+      <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:6px;">${state.storage.length} monster${state.storage.length===1?'':'s'} in your network.</div>
       ${sortBarHtml()}
       <div style="display:flex; flex-direction:column; gap:8px;">
         ${sortedMonsters().map(m => monsterCard(m, {showSell:true})).join('')}
@@ -3421,6 +3466,9 @@
     state.storage.forEach(m=>{
       const setBtn = screenEl.querySelector(`[data-set="${m.uid}"]`);
       if(setBtn) setBtn.addEventListener('click', ()=>{ state.activeId = m.uid; logMsg(`${getForm(m).name} is now your active partner.`); render(); });
+    });
+    screenEl.querySelectorAll('[data-inspect]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ inspectUid = btn.getAttribute('data-inspect'); state.screen='inspect'; render(); });
     });
     screenEl.querySelectorAll('[data-sell]').forEach(btn=>{
       btn.addEventListener('click', ()=>{ sellConfirmUid = btn.getAttribute('data-sell'); render(); });
@@ -3463,6 +3511,68 @@
     });
   }
 
+
+  /* ---------------------------------------------------------
+     INSPECT — a single monster's full profile: exact IVs (not just the
+     Potential star summary), moves with power/type, and everything held.
+     Reached only from Storage; falls back to Town if the monster is gone
+     (e.g. sold from another tab/import) rather than rendering on nothing.
+  --------------------------------------------------------- */
+  let inspectUid = null;
+  const IV_STAT_LABELS = { hp:'HP', str:'STR', def:'DEF', spd:'SPD' };
+  function ivPct(v){ return Math.round(((v - IV_MIN) / (IV_MAX - IV_MIN)) * 100); }
+  function renderInspect(screenEl, controlsEl){
+    const m = state.storage.find(x => x.uid === inspectUid);
+    if(!m){ state.screen = 'storage'; render(); return; }
+    const sp = getForm(m);
+    const isActive = m.uid === state.activeId;
+    const line = EVOLUTION_LINES[m.speciesId];
+    const nextReq = m.stage < line.length ? line[m.stage].levelReq : null;
+    const ivRows = ['hp','str','def','spd'].map(k => {
+      const pct = ivPct(m.ivs[k]);
+      return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+        <span style="width:32px; font-size:9.5px; color:var(--ink-dim);">${IV_STAT_LABELS[k]}</span>
+        <div class="barwrap" style="flex:1;"><div class="barfill" style="width:${pct}%; background:${pct>=80?'var(--amber)':(pct>=50?'var(--phosphor)':'var(--ink-dim)')};"></div></div>
+        <span style="width:34px; text-align:right; font-size:9px; color:var(--ink-dim);">${pct}%</span>
+      </div>`;
+    }).join('');
+    const dexEntry = state.dex && state.dex[m.speciesId];
+    screenEl.innerHTML = `
+      ${screenTitle('🔍 INSPECT', sp.color)}
+      <div class="card" style="text-align:center; margin-bottom:8px;">
+        ${spriteImgHtml(m, 72)}
+        <div style="color:${sp.color}; margin-top:6px; font-size:13px;">${m.nickname||sp.name} <span class="badge">Gen ${m.gen} · Lv${m.level}</span></div>
+        <div style="font-size:9.5px; color:var(--ink-dim); margin-top:2px;">${sp.type} type · Stage ${m.stage}/${line.length}${nextReq?` · Evolves at Lv${nextReq}`:' · Final form'}${isActive?' · <span style="color:var(--phosphor);">Active partner</span>':''}${m.marked?' · <span style="color:#fff44d;">✦ Marked</span>':''}</div>
+      </div>
+      <div class="card" style="margin-bottom:8px;">
+        <div style="color:var(--phosphor); margin-bottom:6px;">Stats</div>
+        <div style="font-size:10px; color:var(--ink-dim); line-height:1.6;">HP ${m.hp}/${m.maxHp} · STR ${m.str} · DEF ${m.def} · SPD ${m.spd}</div>
+        <div style="font-size:9.5px; color:var(--ink-dim); margin-top:4px;">XP ${m.xp}/${xpToNext(m.level)} · Crests used ${m.crestCount||0}/3</div>
+      </div>
+      <div class="card" style="margin-bottom:8px;">
+        <div style="color:var(--amber); margin-bottom:6px;">Individual Values <span style="font-size:9px; color:var(--ink-dim); font-weight:normal;">— ${potentialStars(m.ivs)} overall, standout ${(ivBestStat(m.ivs)||'hp').toUpperCase()}</span></div>
+        ${ivRows}
+      </div>
+      <div class="card" style="margin-bottom:8px;">
+        <div style="color:var(--crimson); margin-bottom:6px;">Moves</div>
+        <div style="font-size:10px; color:var(--ink-dim); line-height:1.7;">
+          ${m.movesKnown.map(id => { const mv = MOVES[id]; return `${mv.name}${mv.type?` <span style="opacity:.7;">[${mv.type}]</span>`:''} — ${mv.power}× power`; }).join('<br>')}
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:8px;">
+        <div style="color:var(--cyan); margin-bottom:6px;">Held</div>
+        <div style="font-size:10px; color:var(--ink-dim); line-height:1.7;">
+          Accessory: ${m.cosmetic ? COSMETICS.find(c=>c.id===m.cosmetic).name : 'None'}<br>
+          Gear: ${(m.gearSlots||[]).filter(Boolean).map(g=>GEAR_ITEMS[g].name).join(', ') || 'None equipped'}<br>
+          Module: ${m.module && MODULES[m.module.id] ? `${MODULES[m.module.id].name}${m.module.ticksLeft!=null?` (${m.module.ticksLeft} ticks left)`:''}` : 'None equipped'}
+        </div>
+      </div>
+      ${dexEntry ? `<div class="card"><div style="color:var(--violet); margin-bottom:4px;">Dex record</div><div style="font-size:9.5px; color:var(--ink-dim);">${dexEntry.catches} caught of this line · first on ${dexEntry.firstCaughtAt ? new Date(dexEntry.firstCaughtAt).toLocaleDateString() : 'unknown'}</div></div>` : ''}
+    `;
+    controlsEl.innerHTML = `<button class="btn" id="back" style="width:100%;">← Back to Storage</button>`;
+    controlsEl.querySelector('#back').addEventListener('click', ()=>{ state.screen='storage'; render(); });
+  }
+
   function monsterCard(m, opts){
     opts = opts || {};
     const sp = getForm(m);
@@ -3484,7 +3594,10 @@
             ${spriteImgHtml(m, 36)}
             <div>${m.nickname||sp.name} <span class="badge">Gen ${m.gen} · Lv${m.level}</span> ${isActive?'<span class="badge" style="color:var(--phosphor);border-color:var(--phosphor)">ACTIVE</span>':''} ${m.marked?'<span class="badge" style="color:#fff44d;border-color:#fff44d;">✦ MARKED</span>':''}</div>
           </div>
-          ${!isActive ? `<button class="btn" style="padding:5px 8px; font-size:10px; flex-shrink:0;" data-set="${m.uid}">Set Active</button>` : ''}
+          <div style="display:flex; gap:4px; flex-shrink:0;">
+            <button class="btn btn-cyan" style="padding:5px 8px; font-size:10px;" data-inspect="${m.uid}">🔍 Inspect</button>
+            ${!isActive ? `<button class="btn" style="padding:5px 8px; font-size:10px;" data-set="${m.uid}">Set Active</button>` : ''}
+          </div>
         </div>
         <div style="font-size:9.5px; color:var(--ink-dim); margin-top:6px;">
           HP ${m.hp}/${m.maxHp} · STR ${m.str} · DEF ${m.def} · SPD ${m.spd} · Type: ${sp.type}
@@ -4187,7 +4300,7 @@
     enemy.isAmbush = true;
     const enemyName = getForm(enemy).name;
     dexMarkSeen(enemy.speciesId, enemy.stage);
-    playTransition(`⚠ CORRUPTION DETECTED<br>A rogue process —<br>${enemyName} — boots up!`, 'var(--crimson)', ()=>{
+    playScanTransition(`⚠ CORRUPTION DETECTED<br>A rogue process —<br>${enemyName} — boots up!`, 'var(--crimson)', ()=>{
       state.battle = { enemy, fled:false, over:false, isBoss:false, catchAttempted:false, source:'mine', ambush:true };
       state.screen = 'battle';
       logMsg(`A rogue ${enemyName} process ambushed you at depth ${depth}m!`);
@@ -4584,7 +4697,7 @@
     if(!def || state.bits < def.price) return;
     state.bits -= def.price;
     invModules().push(newModuleInstance(id));
-    logMsg(`Purchased ${def.name}. Equip it from the Inventory or a partner's card in the Storage Box.`);
+    logMsg(`Purchased ${def.name}. Equip it from the Inventory or a partner's card in the Network Registry.`);
     render();
   }
 
@@ -4654,7 +4767,7 @@
         if(!cos || state.bits < cos.price || p.ownedCosmetics.includes(id)) return;
         state.bits -= cos.price;
         p.ownedCosmetics.push(id);
-        logMsg(`Purchased ${cos.name} for ${getForm(p).name}! Equip it from the Storage Box.`);
+        logMsg(`Purchased ${cos.name} for ${getForm(p).name}! Equip it from the Network Registry.`);
         render();
       });
     });
@@ -4666,7 +4779,10 @@
      INVENTORY
   --------------------------------------------------------- */
   const INVENTORY_INFO = {
-    trapSphere: {name:'Trap Sphere', icon:'◈',  desc:'Used automatically when you throw it in battle.', usableHere:false},
+    basicCapture:    {name:'Basic Capture.exe',    icon:'📡', desc:'Standard acquisition script. Run it from the battle screen.', usableHere:false},
+    advancedCapture: {name:'Advanced Capture.exe', icon:'💾', desc:'Better odds than Basic. Run it from the battle screen.', usableHere:false},
+    hunterExe:       {name:'Hunter.exe',           icon:'🎯', desc:'Strong odds even against sturdy targets. Run it from the battle screen.', usableHere:false},
+    containmentExe:  {name:'Containment.exe',      icon:'🔒', desc:'About as close to a guarantee as it gets. Run it from the battle screen.', usableHere:false},
     primeMeat:  {name:'Prime Meat',  icon:'🍖', desc:'Fills hunger, restores a little energy.', usableHere:true},
     medicine:   {name:'Medicine',    icon:'🩹', desc:'Restores your active partner\'s HP to full.', usableHere:true},
     evoCrest:   {name:'Evolution Crest', icon:'🔷', desc:'Permanently hardens a partner\'s stats. Buy from the Shop — applies immediately on purchase.', usableHere:false},
@@ -4862,8 +4978,11 @@
     if(Array.isArray(s.storage)) s.storage.forEach(migrateMonster);
     if(s.battle && s.battle.enemy) migrateMonster(s.battle.enemy);
     if(s.battle && typeof s.battle.isBoss !== 'boolean') s.battle.isBoss = false;
-    if(!s.inventory) s.inventory = { trapSphere:5, primeMeat:4, medicine:2, evoCrest:0 };
-    ['trapSphere','primeMeat','medicine','evoCrest'].concat(Object.keys(SUPPLY_ITEMS)).forEach(k=>{ if(typeof s.inventory[k] !== 'number' || s.inventory[k] < 0) s.inventory[k] = 0; });
+    if(!s.inventory) s.inventory = { basicCapture:5, advancedCapture:0, hunterExe:0, containmentExe:0, primeMeat:4, medicine:2, evoCrest:0 };
+    // Pre-25.4 saves stored a flat `trapSphere` count for the old Trap Sphere item — carry it over as
+    // Basic Capture.exe runs rather than losing it, then drop the old key.
+    if(typeof s.inventory.trapSphere === 'number'){ s.inventory.basicCapture = (s.inventory.basicCapture||0) + s.inventory.trapSphere; delete s.inventory.trapSphere; }
+    ['basicCapture','advancedCapture','hunterExe','containmentExe','primeMeat','medicine','evoCrest'].concat(Object.keys(SUPPLY_ITEMS)).forEach(k=>{ if(typeof s.inventory[k] !== 'number' || s.inventory[k] < 0) s.inventory[k] = 0; });
     if(!Array.isArray(s.inventory.modules)) s.inventory.modules = [];
     s.inventory.modules = s.inventory.modules.filter(x => x && MODULES[x.id]).map(x => ({ uid: x.uid || ('mod' + Math.random().toString(36).slice(2,9)), id:x.id, ticksLeft: MODULES[x.id].ticks == null ? null : (typeof x.ticksLeft === 'number' ? Math.max(1, Math.min(MODULES[x.id].ticks, x.ticksLeft)) : MODULES[x.id].ticks) }));
     if(!s.gearSeen || typeof s.gearSeen !== 'object') s.gearSeen = {};
@@ -5046,7 +5165,7 @@
      MOTION + FX
      Every effect here is cosmetic: game state is always updated first and rendered
      immediately, and effects play on top of the fresh DOM. (The one deliberate delay
-     is the Trap Sphere throw, which runs BEFORE the catch is resolved, so nothing is
+     is the capture program run, which plays BEFORE the outcome is applied, so nothing is
      decided until it ends.) Motion follows the device's reduce-motion setting unless the
      player picks Full/Reduced under System. Reduced mode plays no animations at all.
   --------------------------------------------------------- */
@@ -5179,37 +5298,84 @@
     q.forEach((ev, i) => setTimeout(() => { try{ playFx(ev); }catch(e){} }, i * 240));
   }
 
-  // Trap Sphere throw. Plays BEFORE the catch is resolved so the outcome is a surprise,
-  // then hands off to the real battle logic. Controls are locked while it plays.
-  function playThrow(done){
-    const E = document.getElementById('bt-enemy'), P = document.getElementById('bt-player'), ctl = document.getElementById('controls');
-    if(!E || !P || !motionOn()){ done(); return; }
+  // CAPTURE.EXE overlay. The outcome (success/fail) is decided by the caller before this plays,
+  // so the animation always resolves toward the real result rather than a random-looking readout.
+  // Controls are locked for the duration; a hard fallback timer guarantees `done()` still fires.
+  function playCapture(programName, enemyName, success, done){
+    const ctl = document.getElementById('controls');
     let finished = false;
-    const finish = () => { if(finished) return; finished = true; try{ ball.remove(); }catch(e){} if(ctl) ctl.style.pointerEvents = ''; done(); };
+    const finish = () => { if(finished) return; finished = true; try{ ov.remove(); }catch(e){} if(ctl) ctl.style.pointerEvents = ''; done(); };
     if(ctl) ctl.style.pointerEvents = 'none';
-    const a = centerOf(P), b = centerOf(E);
-    const sx = a.x, sy = a.y - 14, ex = b.x, ey = b.y - 8;
-    const ball = document.createElement('div');
-    ball.style.cssText = 'position:fixed; left:0; top:0; width:16px; height:16px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff, #4be37a 40%, #0b6b34); box-shadow:0 0 12px #4be37a; z-index:930; pointer-events:none;';
-    document.body.appendChild(ball);
-    setTimeout(finish, 3200); // never leave the controls locked
-    const top = Math.min(sy, ey) - 60;
-    const fly = animate(ball, [
-      { transform:`translate(${sx-8}px, ${sy-8}px) rotate(0deg)` },
-      { transform:`translate(${(sx+ex)/2-8}px, ${top}px) rotate(360deg)`, offset:.5 },
-      { transform:`translate(${ex-8}px, ${ey-8}px) rotate(720deg)` }
-    ], { duration: 520, easing:'ease-in-out', fill:'forwards' });
-    if(!fly){ finish(); return; }
-    fly.onfinish = () => {
-      animate(E, [{ transform:'scale(1)', opacity:1, filter:'brightness(1)' }, { transform:'scale(.15)', opacity:0, filter:'brightness(3)' }], { duration: 260, fill:'forwards' });
-      burst(E, '#4be37a', 8, 36);
-      const land = animate(ball, [{ transform:`translate(${ex-8}px, ${ey-8}px)` }, { transform:`translate(${ex-8}px, ${ey+18}px)` }], { duration: 220, easing:'ease-in', fill:'forwards' });
-      const wobble = () => {
-        const w = animate(ball, [0, -1, 0, 1, 0, -1, 0].map((s, i) => ({ transform:`translate(${ex-8}px, ${ey+18}px) rotate(${s*28}deg)`, offset: i/6 })), { duration: 900, fill:'forwards' });
-        if(w) w.onfinish = () => { burst(ball, '#ffffff', 8, 30); setTimeout(finish, 120); }; else finish();
-      };
-      if(land) land.onfinish = wobble; else wobble();
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed; inset:0; z-index:940; display:flex; align-items:center; justify-content:center; background:rgba(2,8,5,.88); padding:20px;';
+    ov.innerHTML = `
+      <div class="card" style="width:100%; max-width:300px; text-align:left; border-color:var(--phosphor); font-family:'IBM Plex Mono',monospace;">
+        <div class="pixel-font glow" style="color:var(--phosphor); font-size:12px; margin-bottom:8px; letter-spacing:1px;">${escapeHtml(programName.toUpperCase())}</div>
+        <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:4px;">Target: <span style="color:var(--ink);">${escapeHtml(enemyName)}</span></div>
+        <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:10px;">Encryption: <span id="cap-enc" style="color:var(--crimson); letter-spacing:1px;">██████████</span></div>
+        <div id="cap-status" style="font-size:10.5px; color:var(--ink-dim); margin-bottom:6px;">Attempting acquisition...</div>
+        <div id="cap-pct" class="pixel-font" style="font-size:26px; color:var(--phosphor);">0%</div>
+      </div>`;
+    document.body.appendChild(ov);
+    const card = ov.firstElementChild;
+    const encEl = ov.querySelector('#cap-enc'), pctEl = ov.querySelector('#cap-pct'), statusEl = ov.querySelector('#cap-status');
+    setTimeout(finish, 3400); // hard fallback: never leave the controls locked
+    if(!motionOn()){ // reduced motion: show the result instantly rather than not at all
+      pctEl.textContent = success ? '100%' : Math.round(60 + Math.random()*20) + '%';
+      statusEl.textContent = success ? 'CAPTURE.EXE COMPLETE' : 'CAPTURE.EXE FAILED ' + '—' + ' link lost';
+      statusEl.style.color = success ? 'var(--phosphor)' : 'var(--crimson)';
+      setTimeout(finish, 500);
+      return;
+    }
+    let pct = 0;
+    const target = success ? 100 : (58 + Math.random()*22); // a failed run stalls partway through
+    const tick = () => {
+      if(!document.body.contains(ov)) return;
+      const remaining = target - pct;
+      pct = Math.min(target, pct + Math.max(0.6, remaining * 0.18) * (0.6 + Math.random()*0.8));
+      pctEl.textContent = Math.floor(pct) + '%';
+      const bars = Math.max(0, 10 - Math.floor(pct / 10));
+      encEl.textContent = '█'.repeat(bars) + '░'.repeat(10 - bars);
+      if(pct < target - 0.5){ setTimeout(tick, 55 + Math.random()*70); return; }
+      if(success){
+        pctEl.textContent = '100%'; pctEl.style.color = 'var(--phosphor)';
+        encEl.textContent = '░'.repeat(10);
+        statusEl.textContent = 'CAPTURE.EXE COMPLETE'; statusEl.style.color = 'var(--phosphor)';
+        flashEl(card, 'brightness(1.8)', 320);
+        burst(card, '#4be37a', 14, 60);
+      } else {
+        statusEl.textContent = 'CAPTURE.EXE FAILED ' + '—' + ' link lost'; statusEl.style.color = 'var(--crimson)';
+        pctEl.style.color = 'var(--crimson)';
+        shakeEl(card, 6, 300);
+      }
+      setTimeout(finish, 850);
     };
+    tick();
+  }
+
+  // A quick "scanning the target" beat before an encounter, then hands off to playTransition's
+  // usual name reveal. Skips straight to the reveal under reduced motion.
+  function playScanTransition(revealMessage, accentColor, onDone){
+    if(!motionOn()){ playTransition(revealMessage, accentColor, onDone, 500); return; }
+    const screenEl = document.getElementById('screen'), controlsEl = document.getElementById('controls');
+    screenEl.style.pointerEvents = 'none'; controlsEl.style.pointerEvents = 'none';
+    clearTimeout(transitionTimer); clearTimeout(inputLockTimer);
+    screenEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:260px; text-align:center; padding:0 10px; font-family:'IBM Plex Mono',monospace;">
+        <div class="pixel-font glow" style="color:var(--crimson); font-size:11px; letter-spacing:1px;">UNKNOWN ENTITY DETECTED</div>
+        <div style="color:var(--ink-dim); font-size:10.5px; margin-top:14px;">Scanning...</div>
+        <div id="scan-pct" class="pixel-font glow" style="color:var(--phosphor); font-size:20px; margin-top:10px;">0%</div>
+      </div>`;
+    controlsEl.innerHTML = '';
+    let pct = 0;
+    const tick = () => {
+      const el = document.getElementById('scan-pct');
+      if(!el){ playTransition(revealMessage, accentColor, onDone, 300); return; }
+      pct = Math.min(100, pct + 16 + Math.random()*26);
+      el.textContent = Math.floor(pct) + '%';
+      transitionTimer = setTimeout(pct < 100 ? tick : () => playTransition(revealMessage, accentColor, onDone, 450), pct < 100 ? (55 + Math.random()*55) : 180);
+    };
+    transitionTimer = setTimeout(tick, 140);
   }
 
   function countUpBits(el, from, to){
@@ -5379,14 +5545,13 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const BUILD = {
-    version: '25.2',
+    version: '25.4',
     date: '2026-09-21',
     notes: [
-      'Play now costs Energy and Hunger on every try, hit or miss, and only allows a few tries in a row before a short break. It no longer refills Hunger or Energy.',
-      'New: the game tells you when an update is available, and shows what changed after you update.',
-      'The title screen now shows the version number.',
-      'New animations: hits, damage numbers, sliding HP bars, dodges, entrances, a Trap Sphere throw and catch reveal, level-up bursts, counting Bits, and a full-screen evolution sequence.',
-      'New Motion setting under System (Full or Reduced). It follows your device\'s reduce-motion setting by default.',
+      'New: a Network Registry Inspect screen for each monster, with exact IVs, full move list and everything held.',
+      'The Network Registry (formerly the Storage Box) now shows your total monster count.',
+      'Capture rework: catching a monster now runs a capture program (Basic Capture.exe, and the pricier Advanced/Hunter/Containment.exe) from the battle screen, with its own CAPTURE.EXE animation. Trap Spheres were converted 1:1 into Basic Capture.exe runs.',
+      'Wild encounters open with a quick scan beat before the fight.',
     ],
   };
   const SEEN_BUILD_KEY = 'cybertamer_seen_build';

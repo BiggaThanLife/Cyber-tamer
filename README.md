@@ -18,7 +18,7 @@ A monster-taming RPG that runs in your browser. Explore seeded wilderness maps, 
 ## Quick start
 1. Open the link and tap **New Game**. A short tutorial walks you through the basics (you can skip it, and replay it from **Help**).
 2. From the town of Neon Haven, tap **Wilderness Gate**, pick a biome and tap **New Map**.
-3. Walk with the arrow pad. When a wild monster appears, weaken it with moves, then throw a **Trap Sphere** to catch it.
+3. Walk with the arrow pad. When a wild monster appears, weaken it with moves, then run a **capture program** (start with Basic Capture.exe) to acquire it.
 4. Beat a biome's boss to unlock the next biome and new features.
 
 Stuck at any point? Open **Help** from the town menu. It has the same information as this page, split into topics. The **📜 Log** button at the top of every screen shows what just happened.
@@ -29,7 +29,7 @@ Stuck at any point? Open **Help** from the town menu. It has the same informatio
 Explore, catch monsters, grow your partner stronger, and defeat each biome's boss. Beating a boss unlocks the next biome.
 
 ### Your partner
-One monster is your **active partner**, the one who explores and fights. The rest wait in the **Storage Box**, where you can swap partners, sort lists and sell spares. Your active partner and your last monster can't be sold.
+One monster is your **active partner**, the one who explores and fights. The rest wait in the **Network Registry**, where you can swap partners, sort lists and sell spares. Your active partner and your last monster can't be sold.
 
 ### The town menu
 The buttons are grouped in pairs:
@@ -41,7 +41,7 @@ The buttons are grouped in pairs:
 | Job Board / Server Farm | Earn Bits |
 | Training Ground / Breeding Lab | Grow and improve monsters |
 | Play / Rest Partner | Look after your partner |
-| Storage Box / Inventory | Manage what you own |
+| Network Registry / Inventory | Manage what you own |
 | Shop / Dex | Buy things, track your collection |
 | Help / System | Help topics, save export and import |
 
@@ -57,9 +57,9 @@ A 🔒 means it isn't unlocked yet. Tap it to see how to unlock it.
 | Symbol | Meaning |
 |---|---|
 | ⛩ | Gate, the exit back to town |
-| ▪ | Chest: Bits or a Trap Sphere |
+| ▪ | Chest: Bits or a capture program |
 | ✦ | Shrine: Bits and XP |
-| ⚷ and ▣ | A key, which opens a vault with Bits and Trap Spheres |
+| ⚷ and ▣ | A key, which opens a vault with Bits and capture programs |
 | ✕ | Anomaly: a stronger, charged monster in a fixed spot |
 | ☠ | The biome boss |
 | ♨ | Heat vent (Foundry only) |
@@ -77,7 +77,7 @@ Some tiles block your way.
 - If your partner faints, you retreat to town with 20% HP.
 
 ### Catching monsters
-- Throw a **Trap Sphere**. The chance starts at 5% and rises steeply as the enemy's HP drops, up to 95%. The battle screen shows the current estimate.
+- Encountering a wild monster opens with a quick scan, then the fight. Once it's weakened, run a **capture program** — each one shows its own live odds, starting around 5% and rising steeply as the enemy's HP drops (capped at 95%). Basic Capture.exe is the starting tool; Advanced Capture.exe, Hunter.exe and Containment.exe are pricier and noticeably better.
 - Anomalies are a bit easier (+15%) and Wanted monsters easier still (+20%).
 - **Pressure Point** is a lighter hit that leaves foes easier to capture.
 - Bosses **cannot** be caught. You have to defeat them.
@@ -207,7 +207,10 @@ Beating boss #1 unlocks the Training Ground. Beating two unlocks the Data Mine.
 
 | Item | Price | Effect |
 |---|---|---|
-| Trap Sphere | 20 | Used automatically when you throw it in battle |
+| Basic Capture.exe | 20 | Run from the battle screen to try to acquire a wild monster |
+| Advanced Capture.exe | 60 | Better odds than Basic |
+| Hunter.exe | 160 | Strong odds even against sturdy targets |
+| Containment.exe | 420 | About as close to a guarantee as it gets |
 | Prime Meat | 15 | Fills hunger, restores a little energy |
 | Medicine | 25 | Restores HP to full |
 | Evolution Crest | 100 | Permanently boosts stats (max 3 per monster) |
@@ -291,7 +294,7 @@ Buy seeds, plant them in pods, and charge them to start growing. Crops grow as y
 | Milestone | Goal | Reward |
 |---|---|---|
 | First Marked Catch | Catch a Marked monster | 150 Bits, 1 Crest |
-| Half the Dex | Catch half of the 20 lines | 200 Bits, 3 Trap Spheres |
+| Half the Dex | Catch half of the 20 lines | 200 Bits, 3 Basic Capture.exe runs |
 | Dex Complete | Catch all 20 lines | 400 Bits, 2 Crests |
 | Full Evolution | Catch every line's evolved form | 500 Bits, 2 Crests |
 | Living Dex | Catch a Marked monster of every line | 1,000 Bits, 3 Crests |

@@ -1,11 +1,10 @@
 {
-  "version": "25.2",
+  "version": "25.4",
   "date": "2026-09-21",
   "notes": [
-    "Play now costs Energy and Hunger on every try, hit or miss, and only allows a few tries in a row before a short break. It no longer refills Hunger or Energy.",
-    "New: the game tells you when an update is available, and shows what changed after you update.",
-    "The title screen now shows the version number.",
-    "New animations: hits, damage numbers, sliding HP bars, dodges, entrances, a Trap Sphere throw and catch reveal, level-up bursts, counting Bits, and a full-screen evolution sequence.",
-    "New Motion setting under System (Full or Reduced). It follows your device's reduce-motion setting by default."
+    "New: a Network Registry Inspect screen for each monster, with exact IVs, full move list and everything held.",
+    "The Network Registry (formerly the Storage Box) now shows your total monster count.",
+    "Capture rework: catching a monster now runs a capture program (Basic Capture.exe, and the pricier Advanced/Hunter/Containment.exe) from the battle screen, with its own CAPTURE.EXE animation. Trap Spheres were converted 1:1 into Basic Capture.exe runs.",
+    "Wild encounters open with a quick scan beat before the fight."
   ]
 }
