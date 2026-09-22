@@ -137,6 +137,9 @@ Unlocks after you defeat **two** biome bosses.
 - A 4-match creates a **Data Packet** that clears its whole row or column; a 5-match creates an **Exploit** that clears the area around it.
 - Later biomes use a bigger board, more tile types and more Firewalls, and give fewer moves — the challenge comes from all of those together, not just a shrinking move count.
 - Solving it pays Bits and a capture program. Running out of moves just re-locks the node — no other penalty, and you can try again any time. **Abandon** leaves it for later.
+- **Packet Tracer** (◈300): shows the boss's direction and how close it is on *any* map, not just the Ghost Server.
+- **Port Scanner** (◈350): reveals Locked Nodes through the fog, so you can spot one before you've walked near it.
+- **Restricted Zones:** a rare ⛔ tile that blocks the way outright, like a wall — until you own a **Firewall Breaker** (◈900). Walking into one with the tool forces the path open for good, for a one-time reward of Bits and a Basic Capture.exe. Old maps and favorited seeds are never blocked by a tool you don't own — it only ever opens up new ground.
 
 ### Daily Ops and the Wanted Board
 - **Login streak:** claim a reward each day on a 7-day cycle. Each finished cycle adds a 25% Bits bonus, up to +100%. One missed day is forgiven, and a long break earns a welcome-back gift.

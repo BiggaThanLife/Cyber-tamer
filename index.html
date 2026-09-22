@@ -833,7 +833,10 @@
   // certain map tiles. v1 has just Decrypter, for Locked Nodes; the dict is built to take more
   // tools later (e.g. a tool gating a harder node tier) without restructuring anything that uses it.
   const EXPLORER_TOOLS = {
-    decrypter: { id:'decrypter', name:'Decrypter', icon:'🔑', price:500, desc:'Lets your Explorer crack Locked Nodes found while exploring — sealed data caches guarded by a Data Breach that needs solving to get in.' },
+    decrypter:      { id:'decrypter',      name:'Decrypter',       icon:'🔑', price:500, desc:'Lets your Explorer crack Locked Nodes found while exploring — sealed data caches guarded by a Data Breach that needs solving to get in.' },
+    packetTracer:   { id:'packetTracer',   name:'Packet Tracer',   icon:'🧭', price:300, desc:'Traces the nearest boss signal on any map, showing its direction and how close it is.' },
+    portScanner:    { id:'portScanner',    name:'Port Scanner',    icon:'📶', price:350, desc:'Shows Locked Node data caches through the fog, so you can head for one without stumbling into it blind.' },
+    firewallBreaker:{ id:'firewallBreaker',name:'Firewall Breaker',icon:'🔨', price:900, desc:'Lets your Explorer force through Restricted Zones — rare blocked paths that open for good once cleared, for Bits and new ground beyond them.' },
   };
   function hasTool(id){ return !!(state.tools && state.tools[id]); }
 
@@ -1331,7 +1334,7 @@
       tutorialDone: false,
       perfectStreak: 0,
       perfectBest: 0,
-      tools: { decrypter: false },
+      tools: { decrypter: false, packetTracer: false, portScanner: false, firewallBreaker: false },
       breach: null,
     };
   }
@@ -1658,6 +1661,19 @@
       }
     }
 
+    // Restricted Zone — same additive pattern, its own derived PRNG, but converts an existing
+    // wall tile (blockA/blockB) into something that opens for good with a Firewall Breaker,
+    // rather than claiming open ground. A favorited seed without the tool sees no difference at
+    // all (still just a wall); with the tool it's strictly a new option, never new blockage.
+    {
+      const rr = mulberry32((useSeed ^ 0x3c6ef372) >>> 0);
+      if(rr() < 0.35){
+        const cand = [];
+        for(let y=0;y<size;y++) for(let x=0;x<size;x++) if(grid[y][x].role === 'blockA' || grid[y][x].role === 'blockB') cand.push([x,y]);
+        if(cand.length){ const [rx,ry] = cand[Math.floor(rr()*cand.length)]; grid[ry][rx] = { role:'restricted', opened:false }; }
+      }
+    }
+
     const fog = grid.map(row => row.map(()=>false));
     revealFog(fog, cx, cy, size, 1);
     return { size, grid, fog, px:cx, py:cy, steps:0, biomeIndex, hasKey:false, keyPairPresent:hasKeyPair, seed:useSeed,
@@ -1727,14 +1743,17 @@
       revealFog(w.fog, w.px, w.py, w.size, 1);
     }
   }
-  function bossSignalText(w){
+  function bossSignalText(w, biome){
+    // The Ghost Server's own mechanic keeps its flavor text; a Packet Tracer working on any
+    // other biome reads as the tool's own signal instead, not a biome-specific effect.
+    const ghostFlavor = biome && biome.bossSignal;
     let bx=-1, by=-1;
     for(let y=0;y<w.size;y++) for(let x=0;x<w.size;x++) if(w.grid[y][x].role === 'boss'){ bx=x; by=y; }
-    if(bx < 0) return '👁 The ghost signal has gone quiet.';
+    if(bx < 0) return ghostFlavor ? '👁 The ghost signal has gone quiet.' : '🧭 No boss signal on this map.';
     const dx = bx - w.px, dy = by - w.py, dist = Math.max(Math.abs(dx), Math.abs(dy));
     const dir = ((dy<0?'N':(dy>0?'S':'')) + (dx>0?'E':(dx<0?'W':''))) || 'right here';
     const band = dist <= 3 ? 'very close' : (dist <= 7 ? 'near' : 'far');
-    return `👁 Ghost signal: ${band} · ${dir}`;
+    return ghostFlavor ? `👁 Ghost signal: ${band} · ${dir}` : `🧭 Boss signal: ${band} · ${dir}`;
   }
   function revealFog(fog, px, py, size, radius){
     for(let y=Math.max(0,py-radius); y<=Math.min(size-1,py+radius); y++){
@@ -2624,7 +2643,9 @@
           continue;
         }
         const c = w.grid[y][x];
-        const visible = w.fog[y][x];
+        // Port Scanner: an un-opened Locked Node blips through the fog like a beacon, once owned
+        // — nothing else about that tile's surroundings is revealed, just its own position.
+        const visible = w.fog[y][x] || (c.role==='locked' && !c.opened && hasTool('portScanner'));
         let bg = '#04120b', glyph='', col='#0a2818';
         if(visible){
           if(c.role==='open'){ bg=biome.tiles.open.bg; glyph='·'; col=biome.tiles.open.col; }
@@ -2640,6 +2661,7 @@
           else if(c.role==='hazard'){ const ht = biome.tiles.hazard || {bg:'#3a1005',glyph:'♨',col:'#ff9a3d'}; bg=ht.bg; glyph=ht.glyph; col=ht.col; }
           else if(c.role==='cache'){ bg='#0a2418'; glyph= c.opened?'·':'✪'; col='#7dffb0'; }
           else if(c.role==='locked'){ bg= c.opened?'#0a2418':'#1a1424'; glyph= c.opened?'·':'🧩'; col= c.opened?'#4be37a':'#c093ff'; }
+          else if(c.role==='restricted'){ bg= c.opened?biome.tiles.open.bg:'#241010'; glyph= c.opened?'·':'⛔'; col= c.opened?biome.tiles.open.col:'#ff6b4a'; }
         }
         const isPlayer = (vx===VIEW_RADIUS && vy===VIEW_RADIUS);
         grid += `<div class="tile"${isPlayer ? ' id="pl-tile"' : ''} style="background:${bg};color:${col};">${isPlayer ? '<span style="color:var(--phosphor);text-shadow:0 0 6px var(--phosphor);">◉</span>' : glyph}</div>`;
@@ -2655,9 +2677,9 @@
         <button class="btn" id="legend-toggle" style="padding:2px 6px; font-size:9px;">${wildLegendOpen?'▲ Hide':'❓ Legend'}</button>
       </div>
       ${biome.mechanic ? `<div style="font-size:9px; color:${biome.accentColor}; margin-bottom:4px;">${biome.mechanic.split('.')[0]}.</div>` : ''}
-      ${biome.bossSignal ? `<div style="font-size:10px; color:var(--violet); margin-bottom:4px;">${bossSignalText(w)}</div>` : ''}
+      ${(biome.bossSignal || hasTool('packetTracer')) ? `<div style="font-size:10px; color:var(--violet); margin-bottom:4px;">${bossSignalText(w, biome)}</div>` : ''}
       ${w.daily && state.daily && !state.daily.sector.claimed ? `<div style="font-size:9.5px; color:#7dffb0; margin-bottom:4px;">✪ Daily Sector — find the cache for today's bonus.</div>` : ''}
-      ${wildLegendOpen ? `<div style="font-size:9px; color:var(--ink-dim); margin-bottom:6px; background:rgba(255,255,255,.03); border-radius:6px; padding:4px 6px;">⛩ gate exits · ✦ shrine · ⚷ key / ▣ vault · ✕ anomaly · ☠ boss lurks nearby · ♨ heat vent · ✪ daily cache · 🧩 locked node (needs a Decrypter)</div>` : ''}
+      ${wildLegendOpen ? `<div style="font-size:9px; color:var(--ink-dim); margin-bottom:6px; background:rgba(255,255,255,.03); border-radius:6px; padding:4px 6px;">⛩ gate exits · ✦ shrine · ⚷ key / ▣ vault · ✕ anomaly · ☠ boss lurks nearby · ♨ heat vent · ✪ daily cache · 🧩 locked node (needs a Decrypter) · ⛔ restricted zone (needs a Firewall Breaker)</div>` : ''}
       ${grid}
       <div style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:6px; font-size:9px; color:var(--ink-dim);">
         <span>Seed <span class="pixel-font" style="color:var(--phosphor);">${seedStr}</span></span>
@@ -2745,6 +2767,20 @@
       logMsg(`A ${tileInfo.name} blocks the way.`);
       fx({k:'bump'});
       render(); return;
+    }
+    if(cell.role === 'restricted' && !cell.opened){
+      if(!hasTool('firewallBreaker')){
+        logMsg('⛔ A Restricted Zone blocks the way — requires a Firewall Breaker to force through.');
+        fx({k:'bump'});
+        render(); return;
+      }
+      // Opens for good on the spot, then movement continues into the newly-cleared tile below.
+      cell.opened = true;
+      fx({k:'mapLoot'});
+      const bits = 25 + w.biomeIndex*12;
+      state.bits += bits;
+      state.inventory.basicCapture++;
+      logMsg(`🔨 Forced through the Restricted Zone: +◈${bits} Bits and 1 Basic Capture.exe. The path is clear for good.`);
     }
 
     w.px = nx; w.py = ny; w.steps++;
@@ -3290,6 +3326,8 @@
       { h:'Special biomes', b:'<b>Overclocked Foundry:</b> heat vents hurt your partner (Fire types are immune, Metal and Earth take half, Water and Nature take extra). Vents never faint you. <b>The Ghost Server:</b> fog closes back in behind you, and a hint tells you how close the boss is.' },
       { h:'Wild levels', b:'Wild monsters are stronger than your partner in later biomes — their level is based on your partner\'s level plus a biome bonus, so you can\'t just out-level the danger.' },
       { h:'Locked Nodes', b:'A 🧩 tile you find while exploring — a sealed data cache you can\'t open without a <b>Decrypter</b> (a one-time Explorer Tool, bought once in the Shop\'s Tools tab). With one, stepping onto the node opens a <b>Data Breach</b>: a match-3 grid where swapping tiles into a run of 3+ clears them, and any match next to a 🛡 Firewall damages it. Breach every Firewall before you run out of moves to win Bits and a capture program. A 4-match creates a Data Packet (clears its row or column when matched again) and a 5-match creates an Exploit (clears the area around it) — bigger boards, more tile types and more Firewalls in later biomes make it genuinely harder, not just shorter. Running out of moves just re-locks the node for another try, no other cost.' },
+      { h:'Restricted Zones', b:'A rare ⛔ tile that blocks the way outright, like a wall, until you own a <b>Firewall Breaker</b>. With one, walking into it forces the path open for good — a one-time reward, and everything past it is reachable from then on. Old maps and favorited seeds are never blocked by one you don\'t own; it only ever opens up new ground.' },
+      { h:'Other Explorer Tools', b:'<b>Packet Tracer</b> shows the boss\'s direction and distance on any map, not just the Ghost Server. <b>Port Scanner</b> shows Locked Nodes through the fog before you\'ve walked near them. Both are one-time purchases in the Shop\'s Tools tab, same as the Decrypter and Firewall Breaker.' },
     ]},
     { id:'battle', icon:'⚔', title:'Battles & Catching', color:'var(--crimson)', blurb:'Moves, types, fleeing and capturing.', cards:[
       { h:'How a turn works', b:'Pick a move, it hits, then the enemy hits back. Every partner has two universal moves and learns type moves as they level. Move buttons show ▲ if the move is strong against this enemy and ▼ if it is weak.' },
@@ -6162,6 +6200,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.15', date:'2026-09-22', notes:[
+      'Small fix: the Decrypter tool now has its own icon (a key) instead of sharing a shield symbol with the Firewall tiles in Data Breach.',
+    ]},
     { version:'25.14', date:'2026-09-22', notes:[
       'Data Sorting is gone, replaced by Data Breach: a match-3 minigame. Swap tiles to line up 3+, take down Firewall tiles caught next to a match, and breach every Firewall before you run out of moves. Match-4 clears a row/column; match-5 clears the surrounding area.',
       'Later biomes use a bigger mix of tile types and more Firewalls, not just fewer moves.',
@@ -6216,10 +6257,11 @@
     ]},
   ];
   const BUILD = {
-    version: '25.15',
+    version: '25.16',
     date: '2026-09-22',
     notes: [
-      'Small fix: the Decrypter tool now has its own icon (a key) instead of sharing a shield symbol with the Firewall tiles in Data Breach.',
+      'New Explorer Tools in the Shop: Packet Tracer (shows the boss signal\'s direction and distance on any map, not just the Ghost Server), Port Scanner (reveals Locked Nodes through the fog before you\'ve walked near them), and Firewall Breaker (forces open rare ⛔ Restricted Zones for a one-time reward, opening a new path for good).',
+      'New map feature: Restricted Zones, a rare blocked tile that needs a Firewall Breaker to pass. Old maps and favorited seeds are never blocked by a tool you don\'t own — it only ever opens up new ground.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

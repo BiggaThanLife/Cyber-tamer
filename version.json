@@ -1,7 +1,8 @@
 {
-  "version": "25.15",
+  "version": "25.16",
   "date": "2026-09-22",
   "notes": [
-    "Small fix: the Decrypter tool now has its own icon (a key) instead of sharing a shield symbol with the Firewall tiles in Data Breach."
+    "New Explorer Tools in the Shop: Packet Tracer (shows the boss signal's direction and distance on any map, not just the Ghost Server), Port Scanner (reveals Locked Nodes through the fog before you've walked near them), and Firewall Breaker (forces open rare ⛔ Restricted Zones for a one-time reward, opening a new path for good).",
+    "New map feature: Restricted Zones, a rare blocked tile that needs a Firewall Breaker to pass. Old maps and favorited seeds are never blocked by a tool you don't own — it only ever opens up new ground."
   ]
 }
