@@ -1,8 +1,8 @@
 {
-  "version": "25.5",
+  "version": "25.6",
   "date": "2026-09-21",
   "notes": [
-    "Fixed: opening a screen (like Inspect) from partway down a long list no longer inherits that scroll position — every screen now opens at the top.",
-    "Fixed: the Inspect and Set Active buttons on a Network Registry card no longer squeeze the name/level onto a cramped, wrapping line."
+    "Ripe crops no longer wither. Harvest them whenever you get back — a long exploring trip never costs you a crop.",
+    "New: Play, Job Board and Training Ground now share a Perfect streak — a bright-zone hit celebrates on the spot, and beating your best streak logs a 🏆 callout."
   ]
 }

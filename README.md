@@ -270,7 +270,7 @@ Beating boss #1 unlocks the Training Ground. Beating two unlocks the Data Mine.
 **Cosmetics (Shop, Cosmetics tab).** Top Hat (40), Cyber Shades (35), Bowtie (30), Bandana (45), Golden Crown (120).
 
 ### Server Farm
-Buy seeds, plant them in pods, and charge them to start growing. Crops grow as you take steps, not in real time. A ripe crop left too long **withers**.
+Buy seeds, plant them in pods, and charge them to start growing. Crops grow as you take steps, not in real time. A ripe crop waits for you, however long you're out exploring.
 
 | Crop | Seed price | Grows in | Gives |
 |---|---|---|---|

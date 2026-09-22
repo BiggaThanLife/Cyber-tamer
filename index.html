@@ -728,8 +728,8 @@
   // plant a Data Seed, Charge it (power instead of water) to start growth,
   // then wait out growTicks of wilderness exploration before harvesting.
   // Deliberately keyed to state.ticks like Jobs/Training, not real time, so
-  // it rewards playing rather than idling — and a ready crop left too long
-  // withers, so there's still a reason to check in rather than plant-and-forget.
+  // it rewards playing rather than idling. A ripe crop waits indefinitely for
+  // you to come harvest it — see the tick loop in advanceTickCore.
   const CROPS = {
     bitshoot:     { id:'bitshoot',     name:'Bitshoot',      icon:'🌱', color:'var(--phosphor)', seedPrice:15,  growTicks:15, witherTicks:40, yieldBits:40,  desc:'Fast-growing code sprout. Modest payout, quick turnaround.' },
     byteberry:    { id:'byteberry',    name:'Byte Berry',    icon:'🍇', color:'var(--crimson)',  seedPrice:25,  growTicks:25, witherTicks:50, yieldItem:'primeMeat',  yieldAmount:3, desc:'Slow-ripening data fruit. Processes into Prime Meat.' },
@@ -1306,6 +1306,8 @@
       crestResetApplied: true,
       log: ['You wake up in Neon Haven with your partner by your side.'],
       tutorialDone: false,
+      perfectStreak: 0,
+      perfectBest: 0,
     };
   }
 
@@ -2683,12 +2685,10 @@
             pod.state = 'ready';
             pod.readyAtTick = state.ticks;
           }
-        } else if(pod.state === 'ready'){
-          const crop = CROPS[pod.cropId];
-          if(crop && (state.ticks - pod.readyAtTick) > crop.witherTicks){
-            pod.state = 'withered';
-          }
         }
+        // Ready pods no longer wither (v25.6) — a ripe crop waits indefinitely for you to get
+        // back to it, so a long exploring trip never costs you a harvest. `witherTicks` on CROPS
+        // and the 'withered' pod state are kept for old saves that already have a withered pod.
       });
     }
   }
@@ -3252,6 +3252,7 @@
       { h:'DEF — Defense', b:'Reduces damage taken from enemy attacks.' },
       { h:'SPD — Speed', b:'Improves your chance to dodge counterattacks and to flee successfully.' },
       { h:'Hunger and Energy', b:'Exploring drains both. Feed a partner with <b>Prime Meat</b> from the Inventory (+40 Hunger), or use <b>Rest Partner</b> in town (+35 Energy, a little Hunger lost). <b>Play</b> is a short timing game that earns small Bits and XP, but every try costs Energy and Hunger (hit or miss) and only a few tries fit before your partner needs a break — explore to recover. Jobs and Training need a minimum Energy too.' },
+      { h:'Perfect streak', b:'Play, Job Board and Training Ground all use the same timing bar. Tapping in the bright green zone is a <b>Perfect</b> hit, which celebrates on the spot and extends a shared streak across all three. Miss the green zone and the streak resets. Beating your best streak ever logs a 🏆 in the Log.' },
       { h:'Levels and evolution', b:'Partners gain XP from exploring and battles. Many species evolve into a stronger form at a set level. The Dex shows each line\'s stages.' },
       { h:'IVs and Potential', b:'Every monster has hidden ±15% variance on each stat, fixed for life at capture or hatch. It\'s shown as a Potential star rating (☆ to ★★★★★). Breeding can pass IVs down, sometimes with a mutation.' },
     ]},
@@ -3267,7 +3268,7 @@
       { h:'Earning Bits', b:'Win battles, open chests and shrines, do Jobs, play, complete Daily quests, harvest crops, or sell spare monsters from the Network Registry (your active partner can\'t be sold, and neither can your last monster).' },
       { h:'Job Board', b:'Send a partner on a job for an instant payout influenced by their stats. Each job costs Energy and Hunger and starts a cooldown; explore the wilderness to reduce it.' },
       { h:'Shop', b:'Five tabs: Supplies, Growth, Battle, Modules and Cosmetics. Each item explains its effect and shows how many you own.' },
-      { h:'Server Farm', b:'Buy seeds in the Shop and plant them in pods. Crops grow as you take steps, then wait to be harvested — if you leave them too long they wither. Crops give Bits, Prime Meat, Medicine or even Evolution Crests. Upgrade the farm for more pods.' },
+      { h:'Server Farm', b:'Buy seeds in the Shop and plant them in pods. Crops grow as you take steps, then wait — ripe and ready — for however long it takes you to come harvest them. Crops give Bits, Prime Meat, Medicine or even Evolution Crests. Upgrade the farm for more pods.' },
       { h:'Farm upgrades', b:'Vacant Plot (6 pods) → Server Shack (10) → Small Farm (16) → Farmhouse (24) → Large Estate (36). The Large Estate can unlock farm automation: Harvester, Drill and Autopilot.' },
     ]},
     { id:'mine', icon:'⛏', title:'The Data Mine', color:'var(--amber)', blurb:'Digging, depth, gear and signals.', cards:[
@@ -3822,6 +3823,7 @@
         if(dist <= 8) tier='GREAT';
         else if(dist <= 22) tier='GOOD';
         else tier='MISS';
+        registerTimingTier(tier);
         const gain = TRAIN_GAIN_BY_TIER[tier];
         const before = m.trainBonus[att.stat]||0;
         const after = Math.min(TRAIN_CAP_PER_STAT, before + gain);
@@ -3849,8 +3851,8 @@
      start growth, then wait out the crop's growTicks of exploration before
      harvesting. Growth advances on the same tick clock as Job/Training
      cooldowns — only while exploring — so it rewards playing, not idling.
-     A ready crop left unharvested past witherTicks goes to waste, so there's
-     still a reason to check back rather than plant-and-forget forever.
+     Ready crops wait indefinitely for you to come collect them (v25.6) — exploring never
+     costs you a harvest, so plant-and-forget is a perfectly fine way to play.
   --------------------------------------------------------- */
   function renderFarm(screenEl, controlsEl){
     const seeds = state.inventory.seeds;
@@ -3858,7 +3860,7 @@
     const nextTier = FARM_TIERS[(state.farm.tierIndex||0)+1];
     screenEl.innerHTML = `
       ${screenTitle('🌾 SERVER FARM', 'var(--phosphor)')}
-      <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:10px;">Plant a Data Seed, Charge the pod to start growth, then explore — pods only grow while you're out in the wilderness. Left too long after ripening, a crop withers.</div>
+      <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:10px;">Plant a Data Seed, Charge the pod to start growth, then explore — pods only grow while you're out in the wilderness. A ripe crop waits for you, however long you're out.</div>
       <div class="card" style="margin-bottom:10px; border-color:var(--violet);">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div style="color:var(--violet);">🏠 ${tier.name} <span class="badge">${state.farm.pods.length} pods</span></div>
@@ -4479,9 +4481,10 @@
       ${screenTitle(cfg.title, cfg.accent)}
       ${cfg.headerHtml || ''}
       <div style="font-size:10px; color:var(--ink-dim); text-align:center; margin-bottom:10px;">${cfg.hint}</div>
-      <div style="position:relative; height:36px; border-radius:8px; overflow:hidden; border:1px solid var(--glass-border); margin-bottom:14px; background:${trackGradient(cfg.greatHalf, cfg.goodHalf)};">
+      <div id="tg-track" style="position:relative; height:36px; border-radius:8px; overflow:hidden; border:1px solid var(--glass-border); margin-bottom:6px; background:${trackGradient(cfg.greatHalf, cfg.goodHalf)};">
         <div id="tg-marker" data-pct="50" style="position:absolute; top:-4px; left:50%; width:3px; height:44px; background:var(--phosphor); box-shadow:0 0 8px var(--phosphor); transform:translateX(-50%);"></div>
       </div>
+      <div style="text-align:center; font-size:9px; color:var(--ink-dim); margin-bottom:8px;">Perfect streak: ${state.perfectStreak||0}${state.perfectBest?` · Best: ${state.perfectBest}`:''}</div>
       <div style="text-align:center; font-size:11px; color:var(--ink-dim); min-height:34px;">${state.log[0] || ''}</div>
     `;
     controlsEl.innerHTML = `
@@ -4511,6 +4514,22 @@
       requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
+  }
+
+  // Perfect-streak tracking, shared by every GREAT/GOOD/MISS timing minigame (Play, Job Board,
+  // Training Ground). A GREAT extends the streak and celebrates on the spot; anything else ends
+  // it. Crossing the previous best logs a callout once, right when it happens.
+  function registerTimingTier(tier){
+    if(tier === 'GREAT'){
+      state.perfectStreak = (state.perfectStreak||0) + 1;
+      fx({k:'perfect', streak: state.perfectStreak});
+      if(state.perfectStreak > (state.perfectBest||0)){
+        state.perfectBest = state.perfectStreak;
+        if(state.perfectBest > 1) logMsg(`🏆 New best streak: ${state.perfectBest} perfect hit${state.perfectBest===1?'':'s'} in a row!`);
+      }
+    } else {
+      state.perfectStreak = 0;
+    }
   }
 
   /* ---------------------------------------------------------
@@ -4545,6 +4564,7 @@
         if(dist <= 8){ tier='GREAT'; bits=12; xp=6; }
         else if(dist <= 22){ tier='GOOD'; bits=5; xp=2; }
         else { tier='MISS'; }
+        registerTimingTier(tier);
         p.energy = Math.max(0, p.energy - PLAY_ENERGY_COST);
         p.hunger = Math.max(0, p.hunger - PLAY_HUNGER_COST);
         p.playCooldown = (p.playCooldown||0) + PLAY_COOLDOWN_STEP;
@@ -4586,6 +4606,7 @@
         if(dist <= greatHalf){ tier='GREAT'; bits = Math.round(10 + statVal*1.5); xp = Math.round(4 + statVal*0.3); }
         else if(dist <= goodHalf){ tier='GOOD'; bits = Math.round(5 + statVal*0.7); xp = 2; }
         else { tier='MISS'; bits = 0; xp = 0; }
+        registerTimingTier(tier);
         m.energy = Math.max(0, m.energy - JOB_ENERGY_COST);
         m.hunger = Math.max(0, m.hunger - JOB_HUNGER_COST);
         m.jobCooldown = JOB_COOLDOWN_BY_TIER[tier];
@@ -5045,6 +5066,8 @@
     if(!Array.isArray(s.recentSeeds)) s.recentSeeds = [];
     if(!Array.isArray(s.dexMilestonesClaimed)) s.dexMilestonesClaimed = [];
     if(typeof s.tutorialDone !== 'boolean') s.tutorialDone = true; // saves that predate the tutorial skip it
+    if(typeof s.perfectStreak !== 'number' || s.perfectStreak < 0) s.perfectStreak = 0;
+    if(typeof s.perfectBest !== 'number' || s.perfectBest < 0) s.perfectBest = 0;
     if(!s.listSort || typeof s.listSort.key !== 'string') s.listSort = { key:'default', dir:'asc' };
     if(!s.dex){
       // Backfill: retroactively populate the Dex from monsters this save
@@ -5288,6 +5311,15 @@
         break;
       }
       case 'mapLoot': { const t = document.getElementById('pl-tile'); burst(t, '#ffd93d', 12, 40); flashEl(t, 'brightness(2.5)', 360); break; }
+      case 'perfect': {
+        const track = document.getElementById('tg-track');
+        if(track){
+          floatText(track, ev.streak > 1 ? `PERFECT ×${ev.streak}!` : 'PERFECT!', '#ffd93d', 20);
+          burst(track, '#ffd93d', 14, 54);
+          flashEl(track, 'brightness(1.7)', 320);
+        }
+        break;
+      }
       case 'bump': shakeEl(screenEl, 5, 240); break;
       case 'hazard':
         animate(screenEl, [{ boxShadow:'inset 0 0 0 0 rgba(255,80,60,0)' }, { boxShadow:'inset 0 0 44px 8px rgba(255,80,60,.6)', offset:.3 }, { boxShadow:'inset 0 0 0 0 rgba(255,80,60,0)' }], { duration: 520 });
@@ -5547,11 +5579,11 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const BUILD = {
-    version: '25.5',
+    version: '25.6',
     date: '2026-09-21',
     notes: [
-      'Fixed: opening a screen (like Inspect) from partway down a long list no longer inherits that scroll position — every screen now opens at the top.',
-      'Fixed: the Inspect and Set Active buttons on a Network Registry card no longer squeeze the name/level onto a cramped, wrapping line.',
+      'Ripe crops no longer wither. Harvest them whenever you get back — a long exploring trip never costs you a crop.',
+      'New: Play, Job Board and Training Ground now share a Perfect streak — a bright-zone hit celebrates on the spot, and beating your best streak logs a 🏆 callout.',
     ],
   };
   const SEEN_BUILD_KEY = 'cybertamer_seen_build';
