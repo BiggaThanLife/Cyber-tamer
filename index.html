@@ -833,7 +833,7 @@
   // certain map tiles. v1 has just Decrypter, for Locked Nodes; the dict is built to take more
   // tools later (e.g. a tool gating a harder node tier) without restructuring anything that uses it.
   const EXPLORER_TOOLS = {
-    decrypter: { id:'decrypter', name:'Decrypter', icon:'🛡', price:500, desc:'Lets your Explorer crack Locked Nodes found while exploring — sealed data caches guarded by a Data Breach that needs solving to get in.' },
+    decrypter: { id:'decrypter', name:'Decrypter', icon:'🔑', price:500, desc:'Lets your Explorer crack Locked Nodes found while exploring — sealed data caches guarded by a Data Breach that needs solving to get in.' },
   };
   function hasTool(id){ return !!(state.tools && state.tools[id]); }
 
@@ -6162,6 +6162,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.14', date:'2026-09-22', notes:[
+      'Data Sorting is gone, replaced by Data Breach: a match-3 minigame. Swap tiles to line up 3+, take down Firewall tiles caught next to a match, and breach every Firewall before you run out of moves. Match-4 clears a row/column; match-5 clears the surrounding area.',
+      'Later biomes use a bigger mix of tile types and more Firewalls, not just fewer moves.',
+    ]},
     { version:'25.13', date:'2026-09-22', notes:[
       'Data Sorting is meaningfully harder now: bigger stacks (4 chunks per container, up from 3) and a tighter move budget. Rewards scale up to match.',
     ]},
@@ -6212,11 +6216,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.14',
+    version: '25.15',
     date: '2026-09-22',
     notes: [
-      'Data Sorting is gone, replaced by Data Breach: a match-3 minigame. Swap tiles to line up 3+, take down Firewall tiles caught next to a match, and breach every Firewall before you run out of moves. Match-4 clears a row/column; match-5 clears the surrounding area.',
-      'Later biomes use a bigger mix of tile types and more Firewalls, not just fewer moves.',
+      'Small fix: the Decrypter tool now has its own icon (a key) instead of sharing a shield symbol with the Firewall tiles in Data Breach.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
