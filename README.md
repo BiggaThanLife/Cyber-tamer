@@ -143,6 +143,11 @@ Unlocks after you defeat **two** biome bosses.
 - **Port Scanner** (◈350): reveals Locked Nodes through the fog, so you can spot one before you've walked near it.
 - **Restricted Zones:** a rare ⛔ tile that blocks the way outright, like a wall — until you own a **Firewall Breaker** (◈900). Walking into one with the tool forces the path open for good, for a one-time reward of Bits and a Basic Capture.exe. Old maps and favorited seeds are never blocked by a tool you don't own — it only ever opens up new ground.
 
+### Field Barriers
+- A rare tile that blocks the way like a wall unless your active partner's type matches the one it needs — Fire, Water, Earth, Electric, Nature, Void, Metal, or Glitch.
+- Walk up to it with the right type fielded and it opens for good, paying Bits and a capture program, same as a Restricted Zone.
+- No Shop tool unlocks these — you need to have actually caught, and be fielding, that type. A map can have several, of different types, so fully looting one may mean swapping partners more than once.
+
 ### Layer 2
 - Beat a biome's boss and a 🌀 **Layer 2** option opens up on that biome's card at the Wilderness Gate — a harder second pass through the same biome.
 - Favored species spawn even more often, the biome's own mechanic gets denser (more heat vents in the Foundry, a tighter fading-signal radius on the Ghost Server), and a new ⚡ **power surge** hazard shows up that no Layer 1 map has.

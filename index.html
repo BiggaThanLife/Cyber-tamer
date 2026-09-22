@@ -235,6 +235,22 @@
     Metal:    {special:'gear_ram',    ultimate:'titan_shear'},
     Glitch:   {special:'error_spike', ultimate:'segfault'},
   };
+  const TYPE_IDS = Object.keys(TYPE_MOVES);
+  // Field Barriers: a map tile that only opens for the matching TYPE of your currently active
+  // partner. Glyphs/colors here are map-tile-only and don't reuse any glyph already on the map
+  // (see renderWild's tile switch), even where an icon of the same emoji exists elsewhere in a
+  // completely different list (e.g. Shop items) — kept distinct on purpose since a map tile is
+  // read at a glance, unlike a scrolling list.
+  const TYPE_BARRIER_GLYPHS = {
+    Fire:     {glyph:'🔥', col:'#ff6b3a'},
+    Water:    {glyph:'💧', col:'#4fb8ff'},
+    Earth:    {glyph:'🪨', col:'#c98f3f'},
+    Electric: {glyph:'🔋', col:'#ffe14d'},
+    Nature:   {glyph:'🍃', col:'#4fd08a'},
+    Void:     {glyph:'🕳', col:'#8f4dff'},
+    Metal:    {glyph:'🔩', col:'#9fb0c0'},
+    Glitch:   {glyph:'👾', col:'#ff4d9e'},
+  };
   function specialMoveOf(lineId){
     const f = EVOLUTION_LINES[lineId][0];
     return f.specialMove || (TYPE_MOVES[f.type]||{}).special || null;
@@ -1745,6 +1761,24 @@
       }
     }
 
+    // Field Barriers — several per map, each requiring a specific TYPE as your active partner to
+    // cross for good. Same additive pattern as Restricted Zone (converts an existing wall tile,
+    // never claims open ground), but its own derived PRNG and drawn multiple times so a full loot
+    // of the map can require swapping partners more than once — collecting a varied roster is
+    // what pays off here, not a Shop purchase.
+    {
+      const fbr = mulberry32((mapSeed ^ 0x7f4a7c15) >>> 0);
+      const barrierCount = 2 + Math.floor(fbr()*3); // 2-4 per map
+      for(let i=0;i<barrierCount;i++){
+        const cand = [];
+        for(let y=0;y<size;y++) for(let x=0;x<size;x++) if(grid[y][x].role === 'blockA' || grid[y][x].role === 'blockB') cand.push([x,y]);
+        if(!cand.length) break;
+        const [bx,by] = cand[Math.floor(fbr()*cand.length)];
+        const reqType = TYPE_IDS[Math.floor(fbr()*TYPE_IDS.length)];
+        grid[by][bx] = { role:'barrier', opened:false, reqType };
+      }
+    }
+
     // Power Surge — Layer 2 only, on top of whatever hazard the biome already has (Foundry keeps
     // its heat vents AND gets surges). Its own derived PRNG placed last, so Layer 1 maps and
     // biomes without a layer2 entry never see it.
@@ -2771,6 +2805,7 @@
           else if(c.role==='cache'){ bg='#0a2418'; glyph= c.opened?'·':'✪'; col='#7dffb0'; }
           else if(c.role==='locked'){ bg= c.opened?'#0a2418':'#1a1424'; glyph= c.opened?'·':'🧩'; col= c.opened?'#4be37a':'#c093ff'; }
           else if(c.role==='restricted'){ bg= c.opened?biome.tiles.open.bg:'#241010'; glyph= c.opened?'·':'⛔'; col= c.opened?biome.tiles.open.col:'#ff6b4a'; }
+          else if(c.role==='barrier'){ const bt = TYPE_BARRIER_GLYPHS[c.reqType] || {glyph:'?',col:'#fff'}; bg= c.opened?biome.tiles.open.bg:'#181818'; glyph= c.opened?'·':bt.glyph; col= c.opened?biome.tiles.open.col:bt.col; }
           else if(c.role==='surge'){ bg='#241a05'; glyph='⚡'; col='#ffe14d'; }
         }
         const isPlayer = (vx===VIEW_RADIUS && vy===VIEW_RADIUS);
@@ -2790,7 +2825,7 @@
       ${biome.mechanic ? `<div style="font-size:9px; color:${biome.accentColor}; margin-bottom:4px;">${biome.mechanic.split('.')[0]}.</div>` : ''}
       ${(biome.bossSignal || hasTool('packetTracer')) ? `<div style="font-size:10px; color:var(--violet); margin-bottom:4px;">${bossSignalText(w, biome)}</div>` : ''}
       ${w.daily && state.daily && !state.daily.sector.claimed ? `<div style="font-size:9.5px; color:#7dffb0; margin-bottom:4px;">✪ Daily Sector — find the cache for today's bonus.</div>` : ''}
-      ${wildLegendOpen ? `<div style="font-size:9px; color:var(--ink-dim); margin-bottom:6px; background:rgba(255,255,255,.03); border-radius:6px; padding:4px 6px;">⛩ gate exits · ✦ shrine · ⚷ key / ▣ vault · ✕ anomaly · ☠ boss lurks nearby · ♨ heat vent · ✪ daily cache · 🧩 locked node (needs a Decrypter) · ⛔ restricted zone (needs a Firewall Breaker) · ⚡ power surge (Layer 2 only)</div>` : ''}
+      ${wildLegendOpen ? `<div style="font-size:9px; color:var(--ink-dim); margin-bottom:6px; background:rgba(255,255,255,.03); border-radius:6px; padding:4px 6px;">⛩ gate exits · ✦ shrine · ⚷ key / ▣ vault · ✕ anomaly · ☠ boss lurks nearby · ♨ heat vent · ✪ daily cache · 🧩 locked node (needs a Decrypter) · ⛔ restricted zone (needs a Firewall Breaker) · ⚡ power surge (Layer 2 only) · 🔥💧🪨🔋🍃🕳🔩👾 field barrier (needs a matching-type active partner)</div>` : ''}
       ${grid}
       <div style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:6px; font-size:9px; color:var(--ink-dim);">
         <span>Seed <span class="pixel-font" style="color:var(--phosphor);">${seedStr}</span></span>
@@ -2892,6 +2927,23 @@
       state.bits += bits;
       state.inventory.basicCapture++;
       logMsg(`🔨 Forced through the Restricted Zone: +◈${bits} Bits and 1 Basic Capture.exe. The path is clear for good.`);
+    }
+    if(cell.role === 'barrier' && !cell.opened){
+      const req = cell.reqType;
+      const activePartner = getActive();
+      const activePartnerType = getForm(activePartner).type;
+      if(activePartnerType !== req){
+        const bt = TYPE_BARRIER_GLYPHS[req];
+        logMsg(`${bt ? bt.glyph : '⚠'} A ${req} Field Barrier blocks the way — your active partner needs to be ${req} type to cross.`);
+        fx({k:'bump'});
+        render(); return;
+      }
+      cell.opened = true;
+      fx({k:'mapLoot'});
+      const bits = 25 + w.biomeIndex*12;
+      state.bits += bits;
+      state.inventory.basicCapture++;
+      logMsg(`${TYPE_BARRIER_GLYPHS[req].glyph} ${getForm(activePartner).name} clears the ${req} Field Barrier: +◈${bits} Bits and 1 Basic Capture.exe. The path is clear for good.`);
     }
 
     w.px = nx; w.py = ny; w.steps++;
@@ -3466,6 +3518,7 @@
       { h:'Restricted Zones', b:'A rare ⛔ tile that blocks the way outright, like a wall, until you own a <b>Firewall Breaker</b>. With one, walking into it forces the path open for good — a one-time reward, and everything past it is reachable from then on. Old maps and favorited seeds are never blocked by one you don\'t own; it only ever opens up new ground.' },
       { h:'Other Explorer Tools', b:'<b>Packet Tracer</b> shows the boss\'s direction and distance on any map, not just the Ghost Server. <b>Port Scanner</b> shows Locked Nodes through the fog before you\'ve walked near them. Both are one-time purchases in the Shop\'s Tools tab, same as the Decrypter and Firewall Breaker.' },
       { h:'Layer 2', b:'Once you\'ve beaten a biome\'s boss, a 🌀 <b>Layer 2</b> option opens up on that biome\'s card at the Wilderness Gate — a harder remix of the same biome, with favored species spawning even more often, a denser version of the biome\'s own mechanic, a new ⚡ power surge hazard exclusive to Layer 2, and a much stronger boss with its own title. Layer 2\'s layout is tied to the seed you enter, same as Layer 1, so favoriting a seed favorites both.' },
+      { h:'Field Barriers', b:'A rare tile that blocks the way like a wall unless your <b>active partner\'s type</b> matches the one it needs — 🔥 Fire, 💧 Water, 🪨 Earth, 🔋 Electric, 🍃 Nature, 🕳 Void, 🔩 Metal, or 👾 Glitch. Walk up to it with the right type fielded and it opens for good, paying Bits and a capture program, same as a Restricted Zone. No Shop tool unlocks these — you need to have actually caught, and be fielding, that type. A map can have several, of different types, so fully looting one may mean swapping partners more than once.' },
     ]},
     { id:'battle', icon:'⚔', title:'Battles & Catching', color:'var(--crimson)', blurb:'Moves, types, fleeing and capturing.', cards:[
       { h:'How a turn works', b:'Pick a move, it hits, then the enemy hits back. Every partner has two universal moves and learns type moves as they level. Move buttons show ▲ if the move is strong against this enemy and ▼ if it is weak.' },
@@ -6354,6 +6407,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.19', date:'2026-09-22', notes:[
+      'New: Personality. Every monster now rolls one of 8 personalities at capture or hatch, fixed for life and shown on its Inspect screen. Half are stat trade-offs (Aggressive, Guarded, Swift, Sturdy, Reckless, Calm); the other half are passive perks that don\'t touch stats (Focused adds dodge/flee chance, Adaptive cuts Hunger/Energy drain while exploring).',
+      'Splicing two parents in the Splice Lab gives the hybrid a coin-flip chance at either parent\'s personality.',
+    ]},
     { version:'25.18', date:'2026-09-22', notes:[
       'New: fainting now costs your partner 10% of their progress toward the next level, on top of retreating to town at 20% HP. This can never cost you a level you already have — only how close you are to the next one.',
     ]},
@@ -6422,11 +6479,11 @@
     ]},
   ];
   const BUILD = {
-    version: '25.19',
+    version: '25.20',
     date: '2026-09-22',
     notes: [
-      'New: Personality. Every monster now rolls one of 8 personalities at capture or hatch, fixed for life and shown on its Inspect screen. Half are stat trade-offs (Aggressive, Guarded, Swift, Sturdy, Reckless, Calm); the other half are passive perks that don\'t touch stats (Focused adds dodge/flee chance, Adaptive cuts Hunger/Energy drain while exploring).',
-      'Splicing two parents in the Splice Lab gives the hybrid a coin-flip chance at either parent\'s personality.',
+      'New: Field Barriers. A rare map tile that blocks the way unless your active partner\'s type matches (Fire, Water, Earth, Electric, Nature, Void, Metal or Glitch) — cross it with the right type fielded and it opens for good, paying Bits and a capture program. No Shop tool unlocks these; you need to have actually caught, and be fielding, that type.',
+      'A map can have several Field Barriers of different types, so fully looting one may mean swapping partners more than once.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
