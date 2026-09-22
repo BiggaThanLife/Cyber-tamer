@@ -1,10 +1,8 @@
 {
-  "version": "25.4",
+  "version": "25.5",
   "date": "2026-09-21",
   "notes": [
-    "New: a Network Registry Inspect screen for each monster, with exact IVs, full move list and everything held.",
-    "The Network Registry (formerly the Storage Box) now shows your total monster count.",
-    "Capture rework: catching a monster now runs a capture program (Basic Capture.exe, and the pricier Advanced/Hunter/Containment.exe) from the battle screen, with its own CAPTURE.EXE animation. Trap Spheres were converted 1:1 into Basic Capture.exe runs.",
-    "Wild encounters open with a quick scan beat before the fight."
+    "Fixed: opening a screen (like Inspect) from partway down a long list no longer inherits that scroll position — every screen now opens at the top.",
+    "Fixed: the Inspect and Set Active buttons on a Network Registry card no longer squeeze the name/level onto a cramped, wrapping line."
   ]
 }
