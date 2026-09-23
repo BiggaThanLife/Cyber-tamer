@@ -2411,6 +2411,7 @@
         <div style="font-size:9.5px; color:var(--ink-dim); margin-top:3px;">${originDef.story}</div>
         <div style="font-size:9px; color:var(--amber); margin-top:3px;">Perk: ${originDef.perkText}</div>
         ${(state.auditor_stage||0) > 0 ? `<div style="font-size:9px; color:var(--crimson); margin-top:6px; border-top:1px solid var(--glass-border); padding-top:6px;">Trace: ${state.trace||0}/100 (floor ${state.trace_floor||0}) — Auditor stage ${state.auditor_stage}/5</div>` : ''}
+        ${(state.translation_level||0) > 0 ? `<div style="font-size:9px; color:var(--cyan); margin-top:4px;">Rosetta.exe: Level ${state.translation_level}/5 — ${TRANSLATION_LEVEL_TEXT[state.translation_level-1]}</div>` : ''}
       </div>` : ''}
       <div class="card" style="margin-bottom:8px; font-size:11px; color:var(--ink-dim); line-height:1.6;">
         Export your save to a file you can keep as a backup or move to a different browser or device.
@@ -3991,6 +3992,32 @@
     logMsg(`📡 Auditor notice: ${text}`);
     if(stage === 1) logMsg('Patch: "Automated. Every abandoned site pings home once in a while."');
     showAlertModal(`<div class="pixel-font glow" style="font-size:9.5px; color:var(--crimson); margin-bottom:8px;">⚠ AUDITOR NOTICE</div>${text}`);
+  }
+
+  /* ---------------------------------------------------------
+     ROSETTA.EXE (translation) — Phase 3, the light version: state.translation_level (0-5) is a
+     read-only counter with flavor text, not the full "re-read old logs / decode world text" Archive
+     system the bible describes — no world text is currently gated behind it (nothing in this
+     codebase currently shows scrambled-vs-readable text), so building that reader would be new UI
+     with nothing yet to unlock. Rises the moment each biome's Network Access Key is found — the
+     bible's own trigger ("rises when each biome's key is used") — reusing state.biomeKeyFound
+     exactly like Trace reuses checkBiomeUnlocks, so this never duplicates it as new state. Level i+1
+     unlocks on biome i's key (Outskirts key -> level 1, ... Undergrid key -> level 4); Foundry's key
+     caps it at 5 and Ghost Server's key (the 6th) does nothing further, matching the bible's table
+     where level 5 covers "Foundry / Ghost Server" as one entry.
+     --------------------------------------------------------- */
+  const TRANSLATION_LEVEL_TEXT = [
+    'Fragments: rules exist, content unclear.',
+    'Labels and routes.',
+    'Names and ranks, update queues.',
+    'Whole logs, reporting lines.',
+    'Full sentences. The Ghost Admin\'s name.',
+  ];
+  function raiseTranslationForBiomeKey(i){
+    const level = Math.min(5, i + 1);
+    if(level <= (state.translation_level || 0)) return;
+    state.translation_level = level;
+    logMsg(`🔤 Rosetta.exe reads deeper — Level ${level}: ${TRANSLATION_LEVEL_TEXT[level-1]}`);
   }
 
   // Reusable origin-card picker — used by the (future) intro's Scene 5 AND by "Not quite" below,
@@ -5830,6 +5857,7 @@
       if(!state.biomeKeyFound[b.biomeIndex]){
         state.biomeKeyFound[b.biomeIndex] = true;
         logMsg(`🔑 Network Access Key acquired for ${BIOMES[b.biomeIndex].name}!`);
+        raiseTranslationForBiomeKey(b.biomeIndex);
         checkBiomeUnlocks();
       }
     } else {
