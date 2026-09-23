@@ -2412,6 +2412,7 @@
         <div style="font-size:9px; color:var(--amber); margin-top:3px;">Perk: ${originDef.perkText}</div>
         ${(state.auditor_stage||0) > 0 ? `<div style="font-size:9px; color:var(--crimson); margin-top:6px; border-top:1px solid var(--glass-border); padding-top:6px;">Trace: ${state.trace||0}/100 (floor ${state.trace_floor||0}) — Auditor stage ${state.auditor_stage}/5</div>` : ''}
         ${(state.translation_level||0) > 0 ? `<div style="font-size:9px; color:var(--cyan); margin-top:4px;">Rosetta.exe: Level ${state.translation_level}/5 — ${TRANSLATION_LEVEL_TEXT[state.translation_level-1]}</div>` : ''}
+        ${(state.port_level||0) > 0 ? `<div style="font-size:9px; color:var(--phosphor); margin-top:4px;">Port: Level ${state.port_level}/6 — ${PORT_LEVEL_TEXT[state.port_level]}</div>` : ''}
       </div>` : ''}
       <div class="card" style="margin-bottom:8px; font-size:11px; color:var(--ink-dim); line-height:1.6;">
         Export your save to a file you can keep as a backup or move to a different browser or device.
@@ -4020,6 +4021,36 @@
     logMsg(`🔤 Rosetta.exe reads deeper — Level ${level}: ${TRANSLATION_LEVEL_TEXT[level-1]}`);
   }
 
+  /* ---------------------------------------------------------
+     THE PORT — Phase 4, narrative-only per direct instruction ("reflect the mechanics we already
+     have"). state.port_level (0-6, placeholder since Phase 1a) is flavor text riding on top of
+     systems that already unlock themselves on their own existing conditions (Shop/Job Board/
+     Training Ground/Splice Lab all already gate independently elsewhere) — port_level never gates
+     anything here, it just narrates Haven filling in as the bible's own Feature column describes.
+     Level 1 is set once, the moment the story intro finishes (Patch going live is the "Outskirts
+     start" row); levels 2-6 rise off the exact same key-grant event Rosetta's level does, in
+     finishBreach(), so entering a new biome raises Port and Rosetta together like the bible's table
+     implies (both track "how far into the campaign you are"). Level 6, from the Foundry key, is
+     "the Public Port terminal appears in Haven, offline" — text only; per the ending being
+     intentionally left unbuilt (multiplayer/future content will decide what turns it on),
+     public_port_enabled stays false and nothing else reads it yet.
+     --------------------------------------------------------- */
+  const PORT_LEVEL_TEXT = [
+    '', // level 0 has no line — pre-intro, never shown
+    'Patch answers. The Shop and Job Board open.',
+    'More Haven handles show up. A roster starts to fill in.',
+    'NPC trading opens — peer-to-peer transfers.',
+    'NPC showcases and splicing partners open up.',
+    'NPC duels open on a Challenge Board.',
+    'A Public Port terminal appears in Haven. It reads OFFLINE.',
+  ];
+  function raisePortForBiomeKey(i){
+    const level = Math.min(6, i + 2);
+    if(level <= (state.port_level || 0)) return;
+    state.port_level = level;
+    logMsg(`📡 Port Level ${level} — ${PORT_LEVEL_TEXT[level]}`);
+  }
+
   // Reusable origin-card picker — used by the (future) intro's Scene 5 AND by "Not quite" below,
   // so there's exactly one place that renders the four origin cards.
   // One-time notice shown when a save flagged needsStoryReset (see migrateState/performStoryReset)
@@ -4122,6 +4153,10 @@
 
   function finishStoryIntro(){
     state.storyIntroDone = true;
+    if((state.port_level || 0) < 1){
+      state.port_level = 1;
+      logMsg(`📡 Port Level 1 — ${PORT_LEVEL_TEXT[1]}`);
+    }
     save();
     const after = introAfterFn;
     introAfterFn = null;
@@ -5858,6 +5893,7 @@
         state.biomeKeyFound[b.biomeIndex] = true;
         logMsg(`🔑 Network Access Key acquired for ${BIOMES[b.biomeIndex].name}!`);
         raiseTranslationForBiomeKey(b.biomeIndex);
+        raisePortForBiomeKey(b.biomeIndex);
         checkBiomeUnlocks();
       }
     } else {
