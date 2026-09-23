@@ -2636,14 +2636,17 @@
     };
   }
 
+  // Bits climb every day of the 7-day cycle — day 2's dip and day 4's plateau from the old table
+  // are gone, so the streak itself now reads as a visible payoff getting bigger, not just a
+  // fixed reward with one big spike on day 7. Item rewards stay on the same days as before.
   const LOGIN_REWARDS = [
     { day:1, bits:100 },
-    { day:2, bits:50,  basicCapture:2 },
-    { day:3, bits:150, primeMeat:2 },
-    { day:4, bits:100, medicine:2 },
-    { day:5, bits:250, basicCapture:2 },
-    { day:6, bits:150, seeds:{crestshard:1} },
-    { day:7, bits:400, evoCrest:1, medicine:2 },
+    { day:2, bits:130, basicCapture:2 },
+    { day:3, bits:170, primeMeat:2 },
+    { day:4, bits:220, medicine:2 },
+    { day:5, bits:280, basicCapture:2 },
+    { day:6, bits:350, seeds:{crestshard:1} },
+    { day:7, bits:450, evoCrest:1, medicine:2 },
   ];
   const COMEBACK_REWARD = { bits:150, primeMeat:3, basicCapture:2 };
   const QUEST_BONUS_REWARD = { bits:150, medicine:1, basicCapture:2 };

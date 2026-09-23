@@ -30,7 +30,7 @@ Active partner pinned first on Storage, Jobs, Training, Breeding. `SORT_OPTIONS`
 
 ### Daily Ops (v23)
 - Clock: local date via injectable `clockFn`; monotonic (`lastSeenDay`).
-- Login streak: 7-day cycle, +25% per completed cycle (max +100%). One missed day forgiven; 4+ days away gives a welcome-back gift.
+- Login streak: 7-day cycle, +25% per completed cycle (max +100%). One missed day forgiven; 4+ days away gives a welcome-back gift. `LOGIN_REWARDS`' bits climb every day of the cycle (100/130/170/220/280/350/450, no version bump yet) — the old table dipped on day 2 and plateaued on day 4, so a growing streak didn't visibly read as a growing reward; item rewards (capture programs/Databite/Medicine/seed/Evo Crest) stay on the same days as before, only the bits column changed.
 - 3 quests/day seeded by date, gated by unlocks, never all chores, bonus cache for clearing all 3. `questEvent(kind, n, meta)` is called from real code paths.
 - Daily sector: seeded map with one `role:'cache'` tile from its own PRNG. Every 5th claim gives a Crest.
 
