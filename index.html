@@ -813,19 +813,57 @@
     { id:'estate',    name:'Large Estate',  podCount:36, cost:5000, desc:'Sprawling server grounds — the full operation.' },
   ];
 
-  // GEAR — removable, swappable equipment (2 slots per monster), distinct
-  // from Crests/Training which are permanent investment. Found only in the
-  // Mine Shaft (Data Mine), never bought. Either a flat stat bonus while equipped, or a
-  // granted move any species can use regardless of its own moveset.
+  // GEAR — removable, swappable equipment (2 slots per monster), distinct from Crests/Training
+  // which are permanent investment. Found only in the Data Mine, never bought (see the Stat
+  // Drive conversation — keeping this mine-exclusive was explicit). Three rarity tiers, weighted
+  // by dive depth via gearTierWeights(): Common is the original 7-ish flat-bonus items; Rare adds
+  // Type Wards (damage resistance) and dodge/flee gear on top of stronger stats, plus the two
+  // move-granters (build-defining enough to not be a Common-tier freebie); Legendary (never seen
+  // before depth 25) is one showpiece per new mechanic — HP-threshold, same-type damage bonus
+  // (STAB), a pure evasion piece, and a big flat all-stat trophy. `resist`/`dodgeBonus`/
+  // `fleeBonus`/`stab`/`hpThreshold` are read live in battle code (enemyTurn/battleAction/
+  // dodgeChance/fleeChance), not baked into recalcStats, since HP-threshold effects need to react
+  // to HP changing turn to turn.
   const GEAR_ITEMS = {
-    coreBattery:    { id:'coreBattery',    name:'Core Battery',     icon:'🔋', color:'var(--phosphor)', statBonus:{hp:10},              desc:'A backup power cell. +10 HP while equipped.' },
-    servoBooster:   { id:'servoBooster',   name:'Servo Booster',    icon:'⚙',  color:'var(--amber)',    statBonus:{spd:5},              desc:'+5 SPD while equipped.' },
-    reinforcedPlate:{ id:'reinforcedPlate',name:'Reinforced Plate', icon:'🛡', color:'var(--cyan)',     statBonus:{def:5},              desc:'+5 DEF while equipped.' },
-    overclockChip:  { id:'overclockChip',  name:'Overclock Chip',   icon:'🔺', color:'var(--crimson)',  statBonus:{str:5},              desc:'+5 STR while equipped.' },
-    balancedCore:   { id:'balancedCore',   name:'Balanced Core',    icon:'⚪', color:'var(--violet)',   statBonus:{str:2,def:2,spd:2},  desc:'A little of everything: +2 STR/DEF/SPD.' },
-    thermalCore:    { id:'thermalCore',    name:'Thermal Core',     icon:'🔥', color:'var(--crimson)',  grantMove:'thermal_burst',      desc:'Grants Thermal Burst, a Fire attack, to any partner regardless of species.' },
-    frostCore:      { id:'frostCore',      name:'Frost Core',       icon:'❄',  color:'var(--cyan)',     grantMove:'frost_lance',        desc:'Grants Frost Lance, a Water attack, to any partner regardless of species.' },
+    // --- Common: available from depth 1, the original lineup, unchanged ---
+    coreBattery:    { id:'coreBattery',    name:'Core Battery',     icon:'🔋', color:'var(--phosphor)', tier:'common', statBonus:{hp:10},              desc:'A backup power cell. +10 HP while equipped.' },
+    servoBooster:   { id:'servoBooster',   name:'Servo Booster',    icon:'⚙',  color:'var(--amber)',    tier:'common', statBonus:{spd:5},              desc:'+5 SPD while equipped.' },
+    reinforcedPlate:{ id:'reinforcedPlate',name:'Reinforced Plate', icon:'🛡', color:'var(--cyan)',     tier:'common', statBonus:{def:5},              desc:'+5 DEF while equipped.' },
+    overclockChip:  { id:'overclockChip',  name:'Overclock Chip',   icon:'🔺', color:'var(--crimson)',  tier:'common', statBonus:{str:5},              desc:'+5 STR while equipped.' },
+    balancedCore:   { id:'balancedCore',   name:'Balanced Core',    icon:'⚪', color:'var(--violet)',   tier:'common', statBonus:{str:2,def:2,spd:2},  desc:'A little of everything: +2 STR/DEF/SPD.' },
+    // --- Rare: starts appearing around depth ~15-20 ---
+    thermalCore:     { id:'thermalCore',     name:'Thermal Core',      icon:'🔥', color:'var(--crimson)', tier:'rare', grantMove:'thermal_burst', desc:'Grants Thermal Burst, a Fire attack, to any partner regardless of species.' },
+    frostCore:       { id:'frostCore',       name:'Frost Core',        icon:'❄',  color:'var(--cyan)',    tier:'rare', grantMove:'frost_lance',   desc:'Grants Frost Lance, a Water attack, to any partner regardless of species.' },
+    insulatedHousing:{ id:'insulatedHousing',name:'Insulated Housing', icon:'🧯', color:'var(--crimson)', tier:'rare', resist:{type:'Fire',pct:0.3},     desc:'Fire Ward: -30% damage taken from Fire moves.' },
+    coolantJacket:   { id:'coolantJacket',   name:'Coolant Jacket',    icon:'🧊', color:'var(--cyan)',    tier:'rare', resist:{type:'Water',pct:0.3},    desc:'Water Ward: -30% damage taken from Water moves.' },
+    groundingStrap:  { id:'groundingStrap',  name:'Grounding Strap',   icon:'🧿', color:'var(--amber)',   tier:'rare', resist:{type:'Electric',pct:0.3}, desc:'Electric Ward: -30% damage taken from Electric moves.' },
+    reflexCoil:      { id:'reflexCoil',      name:'Reflex Coil',       icon:'💫', color:'var(--phosphor)',tier:'rare', dodgeBonus:0.10,                  desc:'+10% dodge chance while equipped.' },
+    sprintFrame:     { id:'sprintFrame',     name:'Sprint Frame',      icon:'👟', color:'var(--amber)',   tier:'rare', fleeBonus:0.10,                   desc:'+10% flee chance while equipped.' },
+    overchargedCell: { id:'overchargedCell', name:'Overcharged Cell',  icon:'🔆', color:'var(--crimson)', tier:'rare', statBonus:{hp:15,str:3},          desc:'+15 HP and +3 STR while equipped — a stronger hybrid stat piece.' },
+    // --- Legendary: never seen before depth 25, always rare even past it ---
+    primeCore:       { id:'primeCore',       name:'Prime Core',        icon:'💠', color:'var(--phosphor)', tier:'legendary', statBonus:{hp:20,str:8,def:8,spd:8}, desc:'The full package: +20 HP, +8 STR/DEF/SPD while equipped.' },
+    resonanceMatrix: { id:'resonanceMatrix', name:'Resonance Matrix',  icon:'🔮', color:'var(--violet)',   tier:'legendary', stab:0.20,                          desc:'+20% damage with moves matching your partner\'s own type while equipped.' },
+    lastBastion:     { id:'lastBastion',     name:'Last Bastion',      icon:'🏰', color:'var(--cyan)',     tier:'legendary', hpThreshold:{below:0.3,mult:1.5},   desc:'DEF surges +50% while your partner\'s HP is below 30%.' },
+    vortexEngine:    { id:'vortexEngine',    name:'Vortex Engine',     icon:'🌪', color:'var(--amber)',    tier:'legendary', dodgeBonus:0.15, fleeBonus:0.15,    desc:'+15% dodge AND +15% flee chance while equipped.' },
   };
+  const GEAR_TIERS = ['common','rare','legendary'];
+  // Weighted odds of each tier on a gear drop, by dive depth. Legendary is exactly 0 below the
+  // floor (never a fluke early find), then ramps to a small permanent slice; Rare ramps from the
+  // start and caps out; Common absorbs whatever's left, so it never fully disappears.
+  const GEAR_LEGENDARY_FLOOR = 25;
+  function gearTierWeights(depth){
+    const rare = Math.min(0.45, depth * 0.02);
+    const legendary = depth < GEAR_LEGENDARY_FLOOR ? 0 : Math.min(0.12, (depth - GEAR_LEGENDARY_FLOOR) * 0.003);
+    const common = Math.max(0, 1 - rare - legendary);
+    return { common, rare, legendary };
+  }
+  function rollGearId(depth){
+    const w = gearTierWeights(depth);
+    const r = Math.random();
+    const tier = r < w.legendary ? 'legendary' : (r < w.legendary + w.rare ? 'rare' : 'common');
+    const pool = Object.keys(GEAR_ITEMS).filter(id => GEAR_ITEMS[id].tier === tier);
+    return pool[Math.floor(Math.random()*pool.length)];
+  }
   // CAPTURE PROGRAMS — acquisition tools, one run per attempt (replaces the old single Trap Sphere item).
   // `mult` scales estimateCatchChance(); tiers exist so better ones can be added later without touching
   // the underlying formula. Inventory keys match these ids directly (state.inventory.basicCapture etc).
@@ -838,10 +876,26 @@
   const CAPTURE_PROGRAM_IDS = ['basicCapture','advancedCapture','hunterExe','containmentExe'];
 
   const GEAR_SLOT_COUNT = 2;
-  const GEAR_SELL = { coreBattery:60, servoBooster:75, reinforcedPlate:75, overclockChip:90, balancedCore:100, thermalCore:140, frostCore:140 };
-  function gearSellPrice(id){ return GEAR_SELL[id] != null ? GEAR_SELL[id] : 50; }
+  // Individual sell prices for the original Common-tier items (kept exactly as before, so nobody's
+  // existing stock changes value); anything newer sells by tier instead of a hand-tuned entry each.
+  const GEAR_SELL = { coreBattery:60, servoBooster:75, reinforcedPlate:75, overclockChip:90, balancedCore:100 };
+  const GEAR_TIER_SELL = { common:80, rare:180, legendary:500 };
+  function gearSellPrice(id){
+    if(GEAR_SELL[id] != null) return GEAR_SELL[id];
+    const g = GEAR_ITEMS[id];
+    return (g && GEAR_TIER_SELL[g.tier]) || 50;
+  }
   function gearEffectText(g){
     if(g.statBonus) return Object.keys(g.statBonus).map(k => `+${g.statBonus[k]} ${k.toUpperCase()}`).join(' · ');
+    if(g.resist) return `${g.resist.type} Ward: -${Math.round(g.resist.pct*100)}% damage from ${g.resist.type}`;
+    if(g.stab) return `+${Math.round(g.stab*100)}% damage with same-type moves`;
+    if(g.hpThreshold) return `DEF +${Math.round((g.hpThreshold.mult-1)*100)}% while HP < ${Math.round(g.hpThreshold.below*100)}%`;
+    if(g.dodgeBonus || g.fleeBonus){
+      const parts = [];
+      if(g.dodgeBonus) parts.push(`+${Math.round(g.dodgeBonus*100)}% dodge`);
+      if(g.fleeBonus) parts.push(`+${Math.round(g.fleeBonus*100)}% flee`);
+      return parts.join(' · ');
+    }
     if(g.grantMove){ const mv = MOVES[g.grantMove]; return mv ? `Grants ${mv.name} — ${mv.type} attack, ${mv.power}× power` : 'Grants a move'; }
     return '';
   }
@@ -1203,6 +1257,26 @@
   }
   function gearGrantedMoves(m){
     return (m.gearSlots||[]).map(gearId => gearId && GEAR_ITEMS[gearId] && GEAR_ITEMS[gearId].grantMove).filter(Boolean);
+  }
+  // Battle-live gear effects (Rare/Legendary mechanics) — read directly from equipped gear at the
+  // moment they matter, not baked into recalcStats, since gearHpThresholdDefMult needs to react
+  // to HP changing turn to turn rather than a one-time snapshot.
+  function equippedGearDefs(m){ return (m.gearSlots||[]).map(id => id && GEAR_ITEMS[id]).filter(Boolean); }
+  function gearDodgeBonus(m){ return equippedGearDefs(m).reduce((n,g) => n + (g.dodgeBonus||0), 0); }
+  function gearFleeBonus(m){ return equippedGearDefs(m).reduce((n,g) => n + (g.fleeBonus||0), 0); }
+  function gearStabBonus(m){ return equippedGearDefs(m).reduce((n,g) => n + (g.stab||0), 0); }
+  // Damage-taken multiplier from Type Wards, for a specific incoming move type. Multiple Wards of
+  // the SAME type would stack additively (capped at 80% reduction); Wards for other types just
+  // don't apply — this only ever reduces damage, never increases it.
+  function gearResistMult(m, moveType){
+    const pct = equippedGearDefs(m).reduce((n,g) => n + ((g.resist && g.resist.type === moveType) ? g.resist.pct : 0), 0);
+    return 1 - Math.min(0.8, pct);
+  }
+  // Effective DEF for an incoming-damage calc only — Last Bastion-style gear spikes DEF while HP
+  // is below its threshold. Never written back to m.def itself (that stays recalcStats's job).
+  function gearHpThresholdDefMult(m){
+    const ratio = m.maxHp ? (m.hp / m.maxHp) : 1;
+    return equippedGearDefs(m).reduce((mult,g) => (g.hpThreshold && ratio < g.hpThreshold.below) ? mult * g.hpThreshold.mult : mult, 1);
   }
   function getBattleMoves(m){
     const granted = gearGrantedMoves(m);
@@ -3481,7 +3555,10 @@
       const mv = MOVES[moveId];
       if(!mv){ console.error('Unknown move id:', moveId); render(); return; }
       const mult = typeMultiplier(mv.type, getForm(b.enemy).type);
-      const dmg = Math.max(1, Math.round(p.str * mv.power * mult * (1 + Math.random()*0.25) - b.enemy.def*0.5));
+      // Resonance Matrix-style gear: bonus damage when the move's type matches the partner's own
+      // type (typeless universal moves have no `mv.type`, so they never qualify).
+      const stabMult = (mv.type && mv.type === getForm(p).type) ? (1 + gearStabBonus(p)) : 1;
+      const dmg = Math.max(1, Math.round(p.str * mv.power * mult * stabMult * (1 + Math.random()*0.25) - b.enemy.def*0.5));
       b.enemy.hp = Math.max(0, b.enemy.hp - dmg);
       fx({k:'hit', on:'enemy', dmg, mult});
       logMsg(`${mv.name} hit for ${dmg} damage.${mult>1 ? ' Super effective!' : (mult<1 ? ' Not very effective...' : '')}`);
@@ -3561,12 +3638,13 @@
   // (3%-35%) so it's a real edge rather than a coinflip that overrides HP/DEF.
   function dodgeChance(defenderSpd, attackerSpd, defenderMon){
     const ratio = defenderSpd / Math.max(1, attackerSpd);
-    const bonus = (defenderMon && personalityDef(defenderMon) && personalityDef(defenderMon).dodgeBonus) || 0;
+    let bonus = (defenderMon && personalityDef(defenderMon) && personalityDef(defenderMon).dodgeBonus) || 0;
+    if(defenderMon) bonus += gearDodgeBonus(defenderMon);
     return Math.max(0.03, Math.min(0.35, 0.12 * ratio + bonus));
   }
   function fleeChance(p, enemy){
     const ratio = p.spd / Math.max(1, enemy.spd);
-    const bonus = (personalityDef(p) && personalityDef(p).fleeBonus) || 0;
+    const bonus = ((personalityDef(p) && personalityDef(p).fleeBonus) || 0) + gearFleeBonus(p);
     return Math.max(0.2, Math.min(0.9, 0.5 + (ratio-1)*0.25 + bonus));
   }
 
@@ -3581,7 +3659,12 @@
       return;
     }
     const mult = typeMultiplier(getForm(b.enemy).type, getForm(p).type);
-    let dmg = Math.max(1, Math.round(b.enemy.str * mult * (1+Math.random()*0.3) - p.def*0.5));
+    // Type Ward gear reduces damage taken from a matching-type hit; Last Bastion-style gear spikes
+    // effective DEF while HP is below its threshold — both computed fresh here (never stored on
+    // p.def itself) since they depend on the attack/HP state at this exact moment.
+    const resistMult = gearResistMult(p, getForm(b.enemy).type);
+    const effectiveDef = p.def * gearHpThresholdDefMult(p);
+    let dmg = Math.max(1, Math.round(b.enemy.str * mult * resistMult * (1+Math.random()*0.3) - effectiveDef*0.5));
     if(p.hp - dmg <= 0 && hasModule(p,'lastStand')){
       dmg = Math.max(0, p.hp - 1);
       consumeModule(p);
@@ -3663,7 +3746,7 @@
       { h:'Splice Lab', b:'Unlocks when your farm reaches a Server Shack. Pick two different monsters from the Network Registry and pay 50 Bits to splice their genomes. The reveal shows the new hybrid, then opens straight to its Inspect screen. Offspring inherit IVs from their parents.' },
       { h:'Modules', b:'Each monster holds one module. Timed modules burn one tick per step or dig, only while that monster is your active partner. A few are permanent, and Sync Link shares XP with benched monsters. Equip them from the Inventory or Storage.' },
       { h:'Stat Drives and Capsules', b:'<b>Stat Drives</b> permanently add stats — bought directly in the Shop for your active partner, applying immediately like an Evolution Crest. Capped at 5 uses per stat per partner (+5 STR/DEF/SPD, +20 HP), and the price doubles with each use already taken on that partner, so stacking several at once gets expensive fast. <b>Exp Capsules</b> give a lump of XP.' },
-      { h:'Gear', b:'Gear is found only in the Data Mine. Each monster has two gear slots; gear gives a stat bonus or a move any species can use. Extras can be sold.' },
+      { h:'Gear', b:'Gear is found only in the Data Mine. Each monster has two gear slots. There are three rarity tiers, and which one you find is weighted by dive depth — Common is available from the surface, Rare starts showing up as you push past depth ~15-20, and Legendary never appears at all before depth 25 (and stays rare even past it). Common/Rare gear gives stat bonuses or a granted move; Rare also adds Type Wards (reduced damage from one type) and dodge/flee gear. Legendary gear is build-defining: a big all-stat piece, bonus damage on same-type moves, a DEF spike when HP runs low, or pure evasion. Extras can be sold — better tiers sell for more.' },
     ]},
     { id:'economy', icon:'◈', title:'Bits, Shop & Farm', color:'var(--amber)', blurb:'Earning and spending Bits, jobs and the farm.', cards:[
       { h:'Earning Bits', b:'Win battles, open chests and shrines, do Jobs, play, complete Daily quests, harvest crops, or sell spare monsters from the Network Registry (your active partner can\'t be sold, and neither can your last monster).' },
@@ -4741,17 +4824,19 @@
         enterMineCell(nx, ny);
         break;
       case 'gearDrop': {
-        const gearIds = Object.keys(GEAR_ITEMS);
-        const gearId = gearIds[Math.floor(Math.random()*gearIds.length)];
+        const gearId = rollGearId(depth);
         const gear = GEAR_ITEMS[gearId];
         state.inventory.gear[gearId] = (state.inventory.gear[gearId]||0) + 1;
         if(!state.gearSeen) state.gearSeen = {};
         state.gearSeen[gearId] = true;
         enterMineCell(nx, ny);
-        logMsg(`Salvaged a component: ${gear.icon} ${gear.name}!`);
-        // Gear is the rarest find down here — worth a real moment, not just
-        // a log line. Reuses the transition system for a celebratory flash.
-        playTransition(`⚙ COMPONENT SALVAGED<br><span style="font-size:20px;">${gear.icon}</span><br>${gear.name}`, 'var(--violet)', ()=>{ render(); }, 900);
+        const tierLabel = gear.tier === 'legendary' ? 'LEGENDARY' : (gear.tier === 'rare' ? 'Rare' : 'Common');
+        logMsg(`Salvaged a component: ${gear.icon} ${gear.name} (${tierLabel})!`);
+        // Gear is the rarest find down here — worth a real moment, not just a log line. Reuses
+        // the transition system for a celebratory flash; Legendary gets its own accent color so
+        // it actually feels different from pulling another Core Battery.
+        const flashColor = gear.tier === 'legendary' ? 'var(--amber)' : (gear.tier === 'rare' ? 'var(--cyan)' : 'var(--violet)');
+        playTransition(`⚙ COMPONENT SALVAGED<br><span style="font-size:9px;">${tierLabel}</span><br><span style="font-size:20px;">${gear.icon}</span><br>${gear.name}`, flashColor, ()=>{ render(); }, 900);
         return;
       }
       case 'monster':
@@ -5881,9 +5966,10 @@
       <div style="font-size:10px; color:var(--violet); margin:12px 0 6px;">⚙ Mine Gear <span style="color:var(--ink-dim);">— ${found.length}/${gearIds.length} types discovered · found only in the Data Mine</span></div>
       <div style="display:flex; flex-direction:column; gap:8px;">
         ${found.length ? found.map(id => { const g = GEAR_ITEMS[id], owned = inv.gear[id]||0, spare = gearSpare(id), users = gearEquippedBy(id);
+          const tierColor = g.tier === 'legendary' ? 'var(--amber)' : (g.tier === 'rare' ? 'var(--cyan)' : 'var(--ink-dim)');
           return `<div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-              <div style="color:${g.color}">${g.icon} ${g.name} <span class="badge">x${owned}</span></div>
+              <div style="color:${g.color}">${g.icon} ${g.name} <span class="badge" style="color:${tierColor};border-color:${tierColor};">${g.tier.toUpperCase()}</span> <span class="badge">x${owned}</span></div>
               <button class="btn btn-crimson" style="padding:5px 8px; font-size:9.5px; flex-shrink:0;" data-gear-sell="${id}" ${spare>0?'':'disabled'}>Sell ◈${gearSellPrice(id)}</button>
             </div>
             <div style="font-size:9.5px; color:var(--ink-dim); margin-top:3px;">${g.desc}</div>
@@ -6628,6 +6714,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.27', date:'2026-09-23', notes:[
+      'Rebalanced: Stat Drives (HP/STR/DEF/SPD) now apply directly to your active partner, like Evolution Crest, instead of sitting in Inventory. Capped at 5 uses per stat per partner (was 10), and the price doubles with each use already taken on that partner — the first is still affordable, but stacking several at once for under 1000 Bits is no longer possible.',
+      'Existing bonuses from before this change are kept in full — nothing already earned is taken away, but a partner already at the old higher cap can\'t buy any more of that Drive.',
+    ]},
     { version:'25.26', date:'2026-09-23', notes:[
       'Playtest fixes: Inventory now leads with Databite and Medicine (the two you actually tap Use on there), not the capture programs.',
       'The main screen box is noticeably bigger on tall phones — it was capped at 400px regardless of screen size.',
@@ -6731,11 +6821,12 @@
     ]},
   ];
   const BUILD = {
-    version: '25.27',
+    version: '25.28',
     date: '2026-09-23',
     notes: [
-      'Rebalanced: Stat Drives (HP/STR/DEF/SPD) now apply directly to your active partner, like Evolution Crest, instead of sitting in Inventory. Capped at 5 uses per stat per partner (was 10), and the price doubles with each use already taken on that partner — the first is still affordable, but stacking several at once for under 1000 Bits is no longer possible.',
-      'Existing bonuses from before this change are kept in full — nothing already earned is taken away, but a partner already at the old higher cap can\'t buy any more of that Drive.',
+      'New: Data Mine gear now comes in three rarity tiers — Common, Rare and Legendary — instead of one flat pool. Which tier you find is weighted by how deep you are: Rare starts showing up around depth 15-20, Legendary never appears before depth 25 and stays rare even past it.',
+      '10 new gear items across Rare and Legendary, with mechanics the game hasn\'t had before: Type Wards (reduced damage from one type), dodge/flee gear, a same-type damage bonus, and a DEF spike when HP runs low.',
+      'Thermal Core and Frost Core (the move-granting gear) moved up to the Rare tier.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

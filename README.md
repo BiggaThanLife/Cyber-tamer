@@ -111,7 +111,7 @@ Monsters gain XP from exploring and battles. Every species has a second, stronge
 - **Splice Lab** (formerly Breeding Lab): unlocks when your farm reaches a **Server Shack**. Pick two different monsters and pay 50 Bits to splice their genomes. A full-screen reveal shows the new hybrid, then opens straight to its Inspect screen.
 - **Modules:** each monster holds one. Timed modules burn one tick per step or dig, only while that monster is your active partner. Sync Link is the exception and keeps running on the bench.
 - **Stat Drives:** bought directly in the Shop for your active partner, applying instantly like a Crest. Capped at 5 uses per stat per partner, and the price doubles with each use already taken on that partner — the first is cheap, fully maxing one stat is a real investment.
-- **Gear:** found only in the Data Mine. Each monster has two gear slots.
+- **Gear:** found only in the Data Mine. Each monster has two gear slots, and gear comes in three rarity tiers weighted by dive depth — Common from the surface, Rare from around depth 15-20, Legendary never before depth 25 (and still rare past it). See [Gear](#gear) below for the full tier breakdown.
 
 ### Earning Bits
 Win battles, open chests and shrines, do jobs, play, complete daily quests, harvest crops, or sell spare monsters.
@@ -282,17 +282,40 @@ Beating boss #1 unlocks the Training Ground. Beating two unlocks the Data Mine. 
 | Safety Buffer | 500 | one use | Survive one lethal hit with 1 HP |
 | Legacy Lock | 250 | never wears out | Holder will not evolve while equipped |
 
-**Gear (Data Mine only, 2 slots per monster).** Not sold in shops. Extras can be sold.
+### Gear
+Found only in the Data Mine, never sold in shops — 2 slots per monster, extras can be sold. Which rarity tier a drop is comes from how deep you are when you find it, not the drop rate itself (still a flat 4% of cells): Common is available from the surface, Rare starts showing up around depth 15-20, and Legendary never appears before depth 25 (and stays a small slice even past it).
 
-| Gear | Effect | Sells for |
-|---|---|---|
-| Core Battery | +10 HP | 60 |
-| Servo Booster | +5 SPD | 75 |
-| Reinforced Plate | +5 DEF | 75 |
-| Overclock Chip | +5 STR | 90 |
-| Balanced Core | +2 STR, DEF and SPD | 100 |
-| Thermal Core | Grants Thermal Burst (Fire) to any partner | 140 |
-| Frost Core | Grants Frost Lance (Water) to any partner | 140 |
+**Common** — sells for 60-100.
+
+| Gear | Effect |
+|---|---|
+| Core Battery | +10 HP |
+| Servo Booster | +5 SPD |
+| Reinforced Plate | +5 DEF |
+| Overclock Chip | +5 STR |
+| Balanced Core | +2 STR, DEF and SPD |
+
+**Rare** — sells for 180.
+
+| Gear | Effect |
+|---|---|
+| Thermal Core | Grants Thermal Burst (Fire) to any partner |
+| Frost Core | Grants Frost Lance (Water) to any partner |
+| Insulated Housing | Fire Ward: -30% damage taken from Fire moves |
+| Coolant Jacket | Water Ward: -30% damage taken from Water moves |
+| Grounding Strap | Electric Ward: -30% damage taken from Electric moves |
+| Reflex Coil | +10% dodge chance |
+| Sprint Frame | +10% flee chance |
+| Overcharged Cell | +15 HP, +3 STR |
+
+**Legendary** — sells for 500. Never seen before depth 25.
+
+| Gear | Effect |
+|---|---|
+| Prime Core | +20 HP, +8 STR/DEF/SPD |
+| Resonance Matrix | +20% damage with moves matching your partner's own type |
+| Last Bastion | DEF +50% while HP is below 30% |
+| Vortex Engine | +15% dodge AND +15% flee |
 
 **Cosmetics (Shop, Cosmetics tab).** Top Hat (40), Cyber Shades (35), Bowtie (30), Bandana (45), Golden Crown (120).
 
