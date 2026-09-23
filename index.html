@@ -4253,8 +4253,8 @@
      already saw the tutorial).
      Steps 0-3 are the bible's Section 8 prelude ("The Glow"/"The Husks"/"Your Rig"/"One Signal") —
      black-screen, text-only, tap-to-continue, laying out 2086 and why the world is empty BEFORE the
-     player identifies themselves. Steps 4-8 are the original Phase 1b jack-in sequence (handle,
-     origin pick, boot line, jack-in cue, starter beat), unchanged apart from renumbering.
+     player identifies themselves. Steps 4-9 are the Phase 1b jack-in sequence (handle, origin pick,
+     an incoming-message notice, Patch's boot line, the jack-in cue, starter beat).
      --------------------------------------------------------- */
   const HANDLE_SUGGESTIONS = ['NullRoute','Kilobit','Cindergrid','Faultline','Grayhat_7','StaticEcho','Backchannel','LowLatency','Deadcell','Offgrid'];
   const INTRO_PRELUDE_SCENES = [
@@ -4297,11 +4297,29 @@
     switch(introStep){
       case 4: renderIntroHandle(screenEl, controlsEl); break;
       case 5: renderIntroOrigin(screenEl, controlsEl); break;
-      case 6: renderIntroBootLine(screenEl, controlsEl); break;
-      case 7: renderIntroJackIn(screenEl, controlsEl); break;
-      case 8: renderIntroStarter(screenEl, controlsEl); break;
+      case 6: renderIntroPatchNotice(screenEl, controlsEl); break;
+      case 7: renderIntroBootLine(screenEl, controlsEl); break;
+      case 8: renderIntroJackIn(screenEl, controlsEl); break;
+      case 9: renderIntroStarter(screenEl, controlsEl); break;
       default: renderIntroPrelude(screenEl, controlsEl, 0);
     }
+  }
+
+  // A one-beat "incoming message" notice between picking an origin and actually hearing from
+  // Patch — makes Patch's first line feel like something arriving rather than just the next
+  // screen in a queue. Read-gated (a "Read" tap) rather than auto-advancing, same tap-through
+  // pattern as every other intro scene.
+  function renderIntroPatchNotice(screenEl, controlsEl){
+    screenEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:260px; text-align:center; gap:10px;">
+        <div class="pixel-font glow" style="font-size:10px; color:var(--cyan);">⚠ INCOMING MESSAGE</div>
+        <div style="font-size:11px; color:var(--ink-dim);">Another user is sending a message.</div>
+      </div>`;
+    controlsEl.innerHTML = `<button class="btn btn-primary" id="intro-continue" style="width:100%;">Read</button>`;
+    controlsEl.querySelector('#intro-continue').addEventListener('click', ()=>{
+      introStep = 7;
+      render();
+    });
   }
 
   // Full black screen, text only — no card/panel chrome — matching the bible's "total darkness"
@@ -4375,7 +4393,7 @@
       const btn = screenEl.querySelector(`[data-origin-pick="${id}"]`);
       btn.addEventListener('click', ()=>{
         state.origin = id;
-        introStep = 6;
+        introStep = 6; // -> renderIntroPatchNotice, then 7 -> renderIntroBootLine
         render();
       });
     });
@@ -4392,7 +4410,7 @@
     controlsEl.innerHTML = `<button class="btn btn-primary" id="intro-continue" style="width:100%;">Continue</button>`;
     controlsEl.querySelector('#intro-continue').addEventListener('click', ()=>{
       state.originConfirmed = true;
-      introStep = 7;
+      introStep = 8;
       render();
     });
   }
@@ -4407,7 +4425,7 @@
       </div>`;
     controlsEl.innerHTML = `<button class="btn btn-primary" id="intro-continue" style="width:100%;">Continue</button>`;
     controlsEl.querySelector('#intro-continue').addEventListener('click', ()=>{
-      introStep = 8;
+      introStep = 9;
       render();
     });
   }
