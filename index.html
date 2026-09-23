@@ -2427,6 +2427,7 @@
       {label:'⇩ Import Save File', cls:'', fn:triggerInGameImport},
       {label:`🎞 Motion: ${motionOn() ? 'Full' : 'Reduced'}`, cls:'', fn:()=>{ setMotionMode(motionOn() ? 'reduced' : 'full'); render(); }},
       {label:'🗓 Update Notes', cls:'', fn:()=>{ state.screen='changelog'; render(); }},
+      ...(state.storyIntroDone ? [{label:'▶ Replay Intro', cls:'', fn:replayStoryIntro}] : []),
       {label:'← Back to Town', cls:'btn-primary', fn:()=>{ state.screen='town'; render(); }},
       {label:'⏻ Return to Title', cls:'btn-crimson', fn:()=>{ appMode='boot'; lastRenderedScreen=null; render(); }},
     ];
@@ -4266,6 +4267,12 @@
   let introStep = 0;
   let introHandle = '';
   let introAfterFn = null;
+  // Replay mode (System menu > Replay Intro): view-only. The player can still tap through
+  // different handle/origin choices for the sake of rewatching those scenes, but none of it
+  // is real — finishStoryIntro() restores the snapshot taken here and skips every one-time
+  // side effect (port_level bump, tutorial), since those already happened the first time through.
+  let introReplayMode = false;
+  let introReplaySnapshot = null;
 
   function startStoryIntro(afterFn){
     introStep = 0;
@@ -4275,11 +4282,25 @@
     render();
   }
 
+  function replayStoryIntro(){
+    introReplayMode = true;
+    introReplaySnapshot = { handle: state.handle, origin: state.origin, originConfirmed: state.originConfirmed };
+    startStoryIntro(()=>{});
+  }
+
   function finishStoryIntro(){
-    state.storyIntroDone = true;
-    if((state.port_level || 0) < 1){
-      state.port_level = 1;
-      logMsg(`📡 Port Level 1 — ${PORT_LEVEL_TEXT[1]}`);
+    if(introReplayMode){
+      state.handle = introReplaySnapshot.handle;
+      state.origin = introReplaySnapshot.origin;
+      state.originConfirmed = introReplaySnapshot.originConfirmed;
+      introReplayMode = false;
+      introReplaySnapshot = null;
+    } else {
+      state.storyIntroDone = true;
+      if((state.port_level || 0) < 1){
+        state.port_level = 1;
+        logMsg(`📡 Port Level 1 — ${PORT_LEVEL_TEXT[1]}`);
+      }
     }
     save();
     const after = introAfterFn;
