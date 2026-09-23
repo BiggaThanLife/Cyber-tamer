@@ -448,6 +448,7 @@
     state.storage.splice(idx,1);
     recycleConfirmUid = null;
     logMsg(`♻ Recycled ${getForm(m).name} — ${type}-type progress: ${state.recycleCounts[type]}/${RECYCLE_QUOTA}.`);
+    raiseTrace(2, true);
     checkBiomeUnlocks();
     render();
   }
@@ -1194,7 +1195,10 @@
       if(st.boss && st.recycle && st.key){
         const wasLower = state.unlockedBiomeIndex <= i;
         state.unlockedBiomeIndex = Math.max(state.unlockedBiomeIndex, i+1);
-        if(wasLower) logMsg(`🌐 All requirements met in ${BIOMES[i].name} — the path to ${BIOMES[i+1].name} has opened!`);
+        if(wasLower){
+          logMsg(`🌐 All requirements met in ${BIOMES[i].name} — the path to ${BIOMES[i+1].name} has opened!`);
+          advanceTraceForBiomeClear(i);
+        }
       }
     }
   }
@@ -2406,6 +2410,7 @@
         <div style="color:var(--cyan);">${state.handle ? state.handle + ' — ' : ''}${originDef.name}</div>
         <div style="font-size:9.5px; color:var(--ink-dim); margin-top:3px;">${originDef.story}</div>
         <div style="font-size:9px; color:var(--amber); margin-top:3px;">Perk: ${originDef.perkText}</div>
+        ${(state.auditor_stage||0) > 0 ? `<div style="font-size:9px; color:var(--crimson); margin-top:6px; border-top:1px solid var(--glass-border); padding-top:6px;">Trace: ${state.trace||0}/100 (floor ${state.trace_floor||0}) — Auditor stage ${state.auditor_stage}/5</div>` : ''}
       </div>` : ''}
       <div class="card" style="margin-bottom:8px; font-size:11px; color:var(--ink-dim); line-height:1.6;">
         Export your save to a file you can keep as a backup or move to a different browser or device.
@@ -2956,6 +2961,7 @@
       const biome = BIOMES[idx];
       playTransition(`Entering<br>${biome.name}${layer===2?' — Layer 2':''}...`, biome.accentColor, ()=>{
         state.wild = generateWildMap(idx, undefined, seed, layer===2 ? {layer:2} : undefined);
+        if(layer === 2) raiseTrace(8, true);
         recordVisitedSeed(idx, state.wild.seed);
         state.screen = 'wild';
         render();
@@ -3615,6 +3621,7 @@
       fx({k:'caught'});
       logMsg((enemy.marked ? '✦ MARKED! ' : '') + (wasWanted ? `${program.name} re-linked ${getForm(enemy).name} — the one that got away! +${bits} Bits.` : `${program.name} complete — ${getForm(enemy).name} added to your Network Registry! +${bits} Bits.`));
       gainXp(getActive(), Math.round((6 + enemy.level*3) * (enemy.isAnomaly ? 1.5 : 1)));
+      fireAuditorStage(1); // "After first capture (Outskirts)" — a no-op after the first real capture
       b.over = true; render(); return;
     }
     fx({k:'escape'});
@@ -3692,6 +3699,7 @@
         state.bits += bits;
         gainXp(p, (isL2 ? 140 : 80) + b.enemy.level*8);
         questEvent('win', 1, { type: getForm(b.enemy).type });
+        raiseTrace(15, false); // boss defeats are never reduced by Insider's Clean Logs
         let unlockMsg = '';
         if(isL2){
           state.layer2Defeated[b.biomeIndex] = true;
@@ -3926,6 +3934,64 @@
   const WITNESS_FARM_BONUS_CHANCE = 0.20; // ~20% chance of an extra grow-tick per tick, ≈20% faster on average
   const KEEPER_WANTED_CATCH_BONUS = 0.05; // +5 percentage points on top of the existing +20% Wanted bonus
   const INSIDER_TRACE_MULT = 0.85;        // Clean Logs: ~15% less Trace from player-triggered sources (wired when Trace exists)
+
+  /* ---------------------------------------------------------
+     TRACE + AUDITOR NOTICES — Phase 2. One global 0-100 value (state.trace) with a floor
+     (state.trace_floor) that only ever rises, per the bible's "OPEN" numeric weights: boss
+     defeat +15 (not reduced by Insider — the bible's reduced-source list is Data Breaches,
+     recycling and Layer 2 entries only, never boss defeats), Data Breach solved +5, Layer 2
+     entry +8, recycling +2. No decay, no fail state at 100 — "story flavor only" per the bible,
+     so trace is a number the player can see (System menu) and Auditor notices react to, nothing
+     more. auditor_stage (0-5) and trace_floor both advance together off the SAME event —
+     checkBiomeUnlocks() flipping unlockedBiomeIndex — since "leaving biome i" and "entering
+     biome i+1" are the same transition; entering the final biome (Ghost Server) still raises
+     the floor but fires no notice ("Quiet: Auditor notices stop" per the bible). Stage 1 is the
+     one exception, firing after the player's first-ever capture rather than a biome transition.
+  --------------------------------------------------------- */
+  const AUDITOR_REF = 'Ref. 7741-A';
+  const BIOME_TRACE_FLOORS = [5, 15, 25, 40, 55]; // index i = floor set when biome i is cleared (entering biome i+1)
+  function auditorNoticeText(stage){
+    switch(stage){
+      case 1: return `An access event of unknown origin has been recorded. Standard verification procedures have been initiated. No action required at this time. ${AUDITOR_REF}`;
+      case 2: return `An unregistered connection has been observed. No action required at this time. ${AUDITOR_REF}`;
+      case 3: return `The connection persists. A review has been opened. ${AUDITOR_REF}`;
+      case 4: return `Activity has been attributed to a single origin. Remediation is scheduled. ${AUDITOR_REF}`;
+      case 5: return `${state.handle || 'Unknown'}. Your port has been located. This notice is a courtesy. ${AUDITOR_REF}`;
+      default: return null;
+    }
+  }
+  function raiseTrace(amount, playerTriggered){
+    if(!state) return;
+    let amt = amount;
+    if(playerTriggered && state.origin === 'insider') amt = amt * INSIDER_TRACE_MULT;
+    amt = Math.round(amt);
+    if(amt <= 0) return;
+    const floor = state.trace_floor || 0;
+    state.trace = Math.min(100, Math.max(state.trace || 0, floor) + amt);
+  }
+  // Called only from checkBiomeUnlocks() when biome i is fully cleared. Silent (no notice) for
+  // the Ghost Server transition (i+1 === BIOMES.length-1) per "Quiet: Auditor notices stop".
+  function advanceTraceForBiomeClear(i){
+    const floor = BIOME_TRACE_FLOORS[i];
+    if(floor === undefined) return;
+    if(floor > (state.trace_floor || 0)){
+      state.trace_floor = floor;
+      state.trace = Math.max(state.trace || 0, floor);
+    }
+    const nextBiomeIdx = i + 1;
+    const isGhostServer = nextBiomeIdx === BIOMES.length - 1;
+    if(isGhostServer) return; // notices stop; floor still rises, nothing shown
+    fireAuditorStage(Math.min(5, i + 2));
+  }
+  function fireAuditorStage(stage){
+    if(stage <= (state.auditor_stage || 0)) return;
+    state.auditor_stage = stage;
+    const text = auditorNoticeText(stage);
+    if(!text) return;
+    logMsg(`📡 Auditor notice: ${text}`);
+    if(stage === 1) logMsg('Patch: "Automated. Every abandoned site pings home once in a while."');
+    showAlertModal(`<div class="pixel-font glow" style="font-size:9.5px; color:var(--crimson); margin-bottom:8px;">⚠ AUDITOR NOTICE</div>${text}`);
+  }
 
   // Reusable origin-card picker — used by the (future) intro's Scene 5 AND by "Not quite" below,
   // so there's exactly one place that renders the four origin cards.
@@ -5758,6 +5824,7 @@
       state.inventory[tierProgram] = (state.inventory[tierProgram]||0) + 1;
       const progName = CAPTURE_PROGRAMS[tierProgram].name;
       logMsg(`🛡 Breach complete! +◈${bits} Bits and 1 ${progName}.`);
+      raiseTrace(5, true);
       // First Data Breach ever solved in this biome also grants its Network Access Key — one of
       // the three biome-unlock conditions. Later breaches in the same biome are unaffected.
       if(!state.biomeKeyFound[b.biomeIndex]){
