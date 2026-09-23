@@ -2157,6 +2157,7 @@
         case 'statsGuide': renderStatsGuide(screenEl, controlsEl); break;
         case 'inspect': renderInspect(screenEl, controlsEl); break;
         case 'breach': renderBreach(screenEl, controlsEl); break;
+        case 'storyIntro': renderStoryIntro(screenEl, controlsEl); break;
       }
       // A fresh screen always starts scrolled to the top — otherwise it can silently inherit
       // scroll position from whatever the previous (often longer) screen was left at, which
@@ -2233,7 +2234,7 @@
       appMode = 'game';
       render();
       markBuildSeen();
-      showTutorial(0);
+      startStoryIntro(()=> showTutorial(0));
     };
     if(canContinue){
       showConfirmModal('Starting a new game will overwrite your existing save on this device. Continue?', proceed);
@@ -2265,11 +2266,14 @@
       showStoryResetNotice(()=>{
         state = performStoryReset(state);
         save();
-        render();
-        if(pendingTutorial){ pendingTutorial = false; showTutorial(0); }
-        else maybeShowWhatsNew();
+        const wasPendingTutorial = pendingTutorial;
+        pendingTutorial = false;
+        startStoryIntro(()=>{
+          if(wasPendingTutorial) showTutorial(0);
+          else maybeShowWhatsNew();
+        });
       });
-      return; // wait for the notice to resolve before the tutorial/what's-new can show
+      return; // wait for the notice to resolve before the intro/tutorial/what's-new can show
     }
     if(pendingTutorial){ pendingTutorial = false; showTutorial(0); }
     else if(appMode === 'game') maybeShowWhatsNew();
@@ -2300,7 +2304,11 @@
         logMsg('Save file imported successfully.');
         render();
         if(state.needsStoryReset){
-          showStoryResetNotice(()=>{ state = performStoryReset(state); save(); render(); });
+          showStoryResetNotice(()=>{
+            state = performStoryReset(state);
+            save();
+            startStoryIntro(()=>{});
+          });
         }
       }catch(err){
         console.error('Import error:', err);
@@ -2375,7 +2383,11 @@
           logMsg('Save file imported successfully.');
           render();
           if(state.needsStoryReset){
-            showStoryResetNotice(()=>{ state = performStoryReset(state); save(); render(); });
+            showStoryResetNotice(()=>{
+              state = performStoryReset(state);
+              save();
+              startStoryIntro(()=>{});
+            });
           }
         }catch(err){
           console.error('Import error:', err);
@@ -3991,6 +4003,154 @@
         logMsg(`Patch: "${ORIGINS[newId].bootLine}" Updated.`);
         render();
       });
+    });
+  }
+
+  /* ---------------------------------------------------------
+     STORY INTRO — Phase 1b: the 5-scene cold open, screen id 'storyIntro'.
+     introStep/introHandle/introAfterFn are transient (not saved) — a page refresh mid-intro
+     just restarts it from scene 0, which is fine since nothing it sets (handle/origin) is
+     read anywhere until finishStoryIntro() marks state.storyIntroDone. startStoryIntro(afterFn)
+     is the only entry point; afterFn runs once the player reaches the end (normally showTutorial(0)
+     for a first-time player, or nothing extra for a reset-flow replay who already saw the tutorial).
+     --------------------------------------------------------- */
+  const HANDLE_SUGGESTIONS = ['NullRoute','Kilobit','Cindergrid','Faultline','Grayhat_7','StaticEcho','Backchannel','LowLatency','Deadcell','Offgrid'];
+  let introStep = 0;
+  let introHandle = '';
+  let introAfterFn = null;
+
+  function startStoryIntro(afterFn){
+    introStep = 0;
+    introHandle = state.handle || '';
+    introAfterFn = afterFn || (()=>{});
+    state.screen = 'storyIntro';
+    render();
+  }
+
+  function finishStoryIntro(){
+    state.storyIntroDone = true;
+    save();
+    const after = introAfterFn;
+    introAfterFn = null;
+    state.screen = 'town';
+    render();
+    if(after) after();
+  }
+
+  function renderStoryIntro(screenEl, controlsEl){
+    switch(introStep){
+      case 0: renderIntroHandle(screenEl, controlsEl); break;
+      case 1: renderIntroOrigin(screenEl, controlsEl); break;
+      case 2: renderIntroBootLine(screenEl, controlsEl); break;
+      case 3: renderIntroJackIn(screenEl, controlsEl); break;
+      case 4: renderIntroStarter(screenEl, controlsEl); break;
+      default: renderIntroHandle(screenEl, controlsEl);
+    }
+  }
+
+  function renderIntroHandle(screenEl, controlsEl){
+    screenEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:10px; padding:6px 2px;">
+        <div class="pixel-font glow" style="font-size:10px; color:var(--phosphor);">SIGNAL DETECTED</div>
+        <div style="font-size:11px; color:var(--ink); line-height:1.6;">
+          The connection holds. Something on the other end is listening, and it wants a name before it says anything else.
+        </div>
+        <input id="intro-handle-input" type="text" maxlength="16" placeholder="Enter a handle" value="${(introHandle||'').replace(/"/g,'&quot;')}"
+          style="background:var(--bg); border:1px solid var(--ink-dim); color:var(--phosphor); font-family:inherit; font-size:12px; padding:8px; border-radius:4px; outline:none;">
+      </div>`;
+    controlsEl.innerHTML = `<div style="display:flex; flex-direction:column; gap:8px;">
+      <button class="btn" id="intro-randomize">🎲 Suggest a Handle</button>
+      <button class="btn btn-primary" id="intro-continue">Continue</button>
+    </div>`;
+    const input = screenEl.querySelector('#intro-handle-input');
+    input.addEventListener('input', ()=>{ introHandle = input.value; });
+    controlsEl.querySelector('#intro-randomize').addEventListener('click', ()=>{
+      let pick = HANDLE_SUGGESTIONS[Math.floor(Math.random()*HANDLE_SUGGESTIONS.length)];
+      if(HANDLE_SUGGESTIONS.length > 1){
+        while(pick === introHandle) pick = HANDLE_SUGGESTIONS[Math.floor(Math.random()*HANDLE_SUGGESTIONS.length)];
+      }
+      introHandle = pick;
+      input.value = pick;
+    });
+    controlsEl.querySelector('#intro-continue').addEventListener('click', ()=>{
+      const val = (input.value || '').trim();
+      if(!val) return;
+      introHandle = val;
+      state.handle = val;
+      introStep = 1;
+      render();
+    });
+  }
+
+  function renderIntroOrigin(screenEl, controlsEl){
+    screenEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:10px; padding:6px 2px;">
+        <div class="pixel-font glow" style="font-size:10px; color:var(--phosphor);">WHAT BROUGHT YOU OUT HERE, ${(state.handle||'').toUpperCase()}?</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${ORIGIN_IDS.map(id => { const o = ORIGINS[id]; return `
+            <button class="btn" style="text-align:left; padding:8px 10px;" data-origin-pick="${id}">
+              <div style="color:var(--phosphor);">${o.name}</div>
+              <div style="font-size:9px; color:var(--ink-dim); margin-top:2px;">${o.story}</div>
+              <div style="font-size:8.5px; color:var(--amber); margin-top:2px;">Perk: ${o.perkText}</div>
+            </button>`; }).join('')}
+        </div>
+      </div>`;
+    controlsEl.innerHTML = '';
+    ORIGIN_IDS.forEach(id => {
+      const btn = screenEl.querySelector(`[data-origin-pick="${id}"]`);
+      btn.addEventListener('click', ()=>{
+        state.origin = id;
+        introStep = 2;
+        render();
+      });
+    });
+  }
+
+  function renderIntroBootLine(screenEl, controlsEl){
+    const o = ORIGINS[state.origin];
+    screenEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:10px; padding:6px 2px;">
+        <div class="pixel-font glow" style="font-size:10px; color:var(--cyan);">PATCH</div>
+        <div style="font-size:11px; color:var(--ink); line-height:1.6;">"${o.bootLine}" Noted. Everything from here logs under that.</div>
+        <div style="font-size:9.5px; color:var(--ink-dim);">Perk: ${o.perkText}</div>
+      </div>`;
+    controlsEl.innerHTML = `<button class="btn btn-primary" id="intro-continue" style="width:100%;">Continue</button>`;
+    controlsEl.querySelector('#intro-continue').addEventListener('click', ()=>{
+      state.originConfirmed = true;
+      introStep = 3;
+      render();
+    });
+  }
+
+  function renderIntroJackIn(screenEl, controlsEl){
+    screenEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:10px; padding:6px 2px;">
+        <div class="pixel-font glow" style="font-size:10px; color:var(--crimson);">⚠ UNRECOGNIZED ACCESS. LOGGING.</div>
+        <div style="font-size:11px; color:var(--ink); line-height:1.6;">
+          Whatever's on the other end lets the connection through anyway. The grid opens up in front of you, further than fog and static let you see.
+        </div>
+      </div>`;
+    controlsEl.innerHTML = `<button class="btn btn-primary" id="intro-continue" style="width:100%;">Continue</button>`;
+    controlsEl.querySelector('#intro-continue').addEventListener('click', ()=>{
+      introStep = 4;
+      render();
+    });
+  }
+
+  function renderIntroStarter(screenEl, controlsEl){
+    const starter = state.storage && state.storage[0];
+    const line = starter ? getForm(starter).name : 'something';
+    screenEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:10px; padding:6px 2px;">
+        <div class="pixel-font glow" style="font-size:10px; color:var(--phosphor);">CAPTURE.EXE — RESIDUAL PROCESS</div>
+        <div style="font-size:11px; color:var(--ink); line-height:1.6;">
+          Something was already running when you connected. It doesn't fight the handshake — it answers to it. <b style="color:var(--phosphor);">${line}</b> is with you now.
+        </div>
+        <div style="font-size:9.5px; color:var(--ink-dim);">Neon Haven is just ahead. Patch is already talking.</div>
+      </div>`;
+    controlsEl.innerHTML = `<button class="btn btn-primary" id="intro-continue" style="width:100%;">Enter Neon Haven</button>`;
+    controlsEl.querySelector('#intro-continue').addEventListener('click', ()=>{
+      finishStoryIntro();
     });
   }
 
