@@ -1,8 +1,7 @@
 {
-  "version": "25.22",
+  "version": "25.23",
   "date": "2026-09-22",
   "notes": [
-    "Improved: running out of Hunger while exploring now shows a popup explaining what happened, on top of the log message.",
-    "Improved: the Hunger/Energy low-resource warning is now a red pulsing glow on the bar (plus the label itself turning red), instead of a subtle shake that was easy to miss."
+    "Fixed: the Out of Hunger popup wrongly suggested Rest Partner as a fix — Rest Partner restores Energy and actually costs Hunger, so it made things worse, not better. It now just points you at feeding your partner."
   ]
 }

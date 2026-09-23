@@ -3053,7 +3053,7 @@
       const pname = getForm(p).name;
       logMsg(`${pname} is starving and too weak to explore further! You head back to Neon Haven.`);
       state.screen='town'; render();
-      showAlertModal(`<span style="color:var(--crimson);">⚠ Out of Hunger</span><br><br>${pname} was too weak to keep exploring and you're back in Neon Haven. Feed them from the Inventory or use Rest Partner before heading out again.`);
+      showAlertModal(`<span style="color:var(--crimson);">⚠ Out of Hunger</span><br><br>${pname} was too weak to keep exploring and you're back in Neon Haven. Feed them Prime Meat (or another food item) from the Inventory before heading out again.`);
       return;
     }
     if(cell.role === 'open' && Math.random() < encounterChance(p)){
@@ -6415,6 +6415,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.22', date:'2026-09-22', notes:[
+      'Improved: running out of Hunger while exploring now shows a popup explaining what happened, on top of the log message.',
+      'Improved: the Hunger/Energy low-resource warning is now a red pulsing glow on the bar (plus the label itself turning red), instead of a subtle shake that was easy to miss.',
+    ]},
     { version:'25.21', date:'2026-09-22', notes:[
       'Fixed/improved: running out of Hunger while exploring now clearly says you\'re heading back to Neon Haven, not just that your partner is too weak to continue.',
       'New: the Hunger and Energy bars shake once they drop to 20% or below, so there\'s a visible warning before Hunger actually runs out and sends you home.',
@@ -6495,11 +6499,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.22',
+    version: '25.23',
     date: '2026-09-22',
     notes: [
-      'Improved: running out of Hunger while exploring now shows a popup explaining what happened, on top of the log message.',
-      'Improved: the Hunger/Energy low-resource warning is now a red pulsing glow on the bar (plus the label itself turning red), instead of a subtle shake that was easy to miss.',
+      'Fixed: the Out of Hunger popup wrongly suggested Rest Partner as a fix — Rest Partner restores Energy and actually costs Hunger, so it made things worse, not better. It now just points you at feeding your partner.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
