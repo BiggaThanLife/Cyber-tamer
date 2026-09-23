@@ -19,17 +19,17 @@ A monster-taming RPG that runs in your browser. Explore seeded wilderness maps, 
 1. Open the link and tap **New Game**. A short tutorial walks you through the basics (you can skip it, and replay it from **Help**).
 2. From the town of Neon Haven, tap **Wilderness Gate**, pick a biome and tap **New Map**.
 3. Walk with the arrow pad. When a wild monster appears, weaken it with moves, then run a **capture program** (start with Basic Capture.exe) to acquire it.
-4. Beat a biome's boss to unlock the next biome and new features.
+4. Beat a biome's boss, Recycle enough of its type, and find its Network Access Key to unlock the next biome and new features.
 
 Stuck at any point? Open **Help** from the town menu. It has the same information as this page, split into topics. The **📜 Log** button at the top of every screen shows what just happened.
 
 ## How to play
 
 ### The goal
-Explore, catch monsters, grow your partner stronger, and defeat each biome's boss. Beating a boss unlocks the next biome.
+Explore, catch monsters, grow your partner stronger, and defeat each biome's boss. Opening the next biome takes three things, done in any order, all within the biome you're currently in: defeat its boss, **Recycle Entity** 10 monsters of its boss's type from the Network Registry, and find its **Network Access Key** by solving a Data Breach there.
 
 ### Your partner
-One monster is your **active partner**, the one who explores and fights. The rest wait in the **Network Registry**, where you can swap partners, sort lists and sell spares. Your active partner and your last monster can't be sold. Tap the 🔓/🔒 icon on any card (or on its Inspect screen) to lock a monster you never want to sell by mistake — a locked monster's Sell button is disabled until you unlock it again.
+One monster is your **active partner**, the one who explores and fights. The rest wait in the **Network Registry**, where you can swap partners, sort lists, sell spares, or **Recycle Entity** them instead. Selling pays Bits; Recycling pays nothing but permanently counts toward that type's biome-unlock requirement (tracked for life, not reset). Your active partner and your last monster can't be sold or recycled. Tap the 🔓/🔒 icon on any card (or on its Inspect screen) to lock a monster you never want to lose by mistake — a locked monster's Sell and Recycle buttons are both disabled until you unlock it again.
 
 ### The town menu
 The buttons are grouped in pairs:
@@ -140,6 +140,7 @@ Unlocks after you defeat **two** biome bosses.
 - A 4-match creates a **Data Packet** that clears its whole row or column; a 5-match creates an **Exploit** that clears the area around it.
 - Later biomes use a bigger board, more tile types and more Firewalls, and give fewer moves — the challenge comes from all of those together, not just a shrinking move count.
 - Solving it pays Bits and a capture program. Running out of moves just re-locks the node — no other penalty, and you can try again any time. **Abandon** leaves it for later.
+- The very first Data Breach you solve in a biome also awards that biome's **Network Access Key**, one of the three requirements to unlock the next biome. Solving more after that is just the normal Bits/capture-program reward.
 - **Packet Tracer** (◈300): shows the boss's direction and how close it is on *any* map, not just the Ghost Server.
 - **Port Scanner** (◈350): reveals Locked Nodes through the fog, so you can spot one before you've walked near it.
 - **Restricted Zones:** a rare ⛔ tile that blocks the way outright, like a wall — until you own a **Firewall Breaker** (◈900). Walking into one with the tool forces the path open for good, for a one-time reward of Bits and a Basic Capture.exe. Old maps and favorited seeds are never blocked by a tool you don't own — it only ever opens up new ground.
@@ -216,16 +217,16 @@ There are eight types. A type move deals **1.5×** damage when strong and **0.67
 ### Biomes and bosses
 Wild monsters' levels are based on your partner's level plus a biome bonus, so you can't simply out-level the danger.
 
-| # | Biome | Boss | Notes |
-|---|---|---|---|
-| 1 | Neon Outskirts | The Crag Warden (Terrabit line) | A gentle introduction |
-| 2 | Sunbaked Wastes | The Cinder Sovereign (Pyrelix line) | |
-| 3 | Frostbyte Tundra | The Glacial Tyrant (Hydrune line) | |
-| 4 | The Undergrid | The Kernel Corruptor (Nyxbyte line) | |
-| 5 | Overclocked Foundry | The Forgemaster (Ferrocog line) | Heat vents hurt your partner. Fire is immune, Metal and Earth take half, Water and Nature take extra. Vents never faint you. |
-| 6 | The Ghost Server | The Ghost Admin (Glitchling line) | You only see 2 tiles around you, and explored ground is forgotten. A ghost signal hints where the boss is. |
+| # | Biome | Boss | Recycle type to unlock next | Notes |
+|---|---|---|---|---|
+| 1 | Neon Outskirts | The Crag Warden (Terrabit line) | Earth | A gentle introduction |
+| 2 | Sunbaked Wastes | The Cinder Sovereign (Pyrelix line) | Fire | |
+| 3 | Frostbyte Tundra | The Glacial Tyrant (Hydrune line) | Water | |
+| 4 | The Undergrid | The Kernel Corruptor (Nyxbyte line) | Void | |
+| 5 | Overclocked Foundry | The Forgemaster (Ferrocog line) | Metal | Heat vents hurt your partner. Fire is immune, Metal and Earth take half, Water and Nature take extra. Vents never faint you. |
+| 6 | The Ghost Server | The Ghost Admin (Glitchling line) | — | You only see 2 tiles around you, and explored ground is forgotten. A ghost signal hints where the boss is. |
 
-Beating boss #1 unlocks the Training Ground. Beating two unlocks the Data Mine.
+Beating boss #1 unlocks the Training Ground. Beating two unlocks the Data Mine. Unlocking the biome after each one (2 through 6) also needs 10 Recycled monsters of the listed type and that biome's Network Access Key from a Data Breach — see [Unlocking the next biome](#the-goal).
 
 ### Items
 

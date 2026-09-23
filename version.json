@@ -1,7 +1,10 @@
 {
-  "version": "25.24",
+  "version": "25.25",
   "date": "2026-09-22",
   "notes": [
-    "Renamed: Prime Meat is now Databite — fits the digital-creature theme better. Purely a name change; it still does the same thing."
+    "New: unlocking the next biome now takes three things, done in any order, all in the biome you're currently in — defeat its boss, Recycle Entity 10 monsters of its boss's type from the Network Registry, and find its Network Access Key by solving a Data Breach there.",
+    "New Network Registry button: Recycle Entity — an alternative to Sell. It pays no Bits, but permanently counts toward that type's biome-unlock requirement (tracked for life, not reset).",
+    "The first Data Breach you solve in a biome now also awards its Network Access Key; solving more there afterward is just the usual Bits and capture program.",
+    "Existing saves keep whatever biomes they already had open — this only applies to biomes not yet unlocked."
   ]
 }

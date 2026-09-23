@@ -423,6 +423,27 @@
     render();
   }
 
+  // Recycle Entity: the alternative to Sell, for the biome-unlock recycle requirement — pays no
+  // Bits (Sell stays the only way to get Bits for a monster) and instead permanently adds 1 to
+  // the lifetime state.recycleCounts for that monster's type. Same eligibility rules as Sell
+  // (can't recycle your active partner, your last monster, or a locked one).
+  function recycleMonster(uid){
+    const idx = state.storage.findIndex(m => m.uid === uid);
+    if(idx < 0) return;
+    const m = state.storage[idx];
+    if(m.uid === state.activeId || state.storage.length <= 1) return;
+    if(m.locked){ logMsg(`${getForm(m).name} is locked — unlock it first if you really want to recycle it.`); render(); return; }
+    const type = getForm(m).type;
+    if(!state.recycleCounts) state.recycleCounts = {};
+    state.recycleCounts[type] = (state.recycleCounts[type] || 0) + 1;
+    if(m.module){ invModules().push(m.module); m.module = null; } // held module goes back to the bag
+    state.storage.splice(idx,1);
+    recycleConfirmUid = null;
+    logMsg(`♻ Recycled ${getForm(m).name} — ${type}-type progress: ${state.recycleCounts[type]}/${RECYCLE_QUOTA}.`);
+    checkBiomeUnlocks();
+    render();
+  }
+
   // Locking a monster just guards the Sell button (sellMonster refuses locked monsters too, as a
   // second line of defense) — nothing else about it changes. The padlock animates on the tapped
   // icon itself (data-lock="<uid>" identifies it after re-render, in both Storage and Inspect).
@@ -1071,11 +1092,49 @@
   }
   function isPassableRole(role){ return role !== 'blockA' && role !== 'blockB'; }
 
+  // Biome unlock, beyond just the boss: reaching biome i+1 needs THREE things done in biome i,
+  // in any order —
+  //   1. state.bossDefeated[i]                                          (existing)
+  //   2. state.recycleCounts[bossTypeOf(i)] >= RECYCLE_QUOTA             (new — see recycleMonster)
+  //   3. state.biomeKeyFound[i]                                          (new — see finishBreach)
+  // bossTypeOf(i) is always one of the 8 original roamer species' types (every biome's
+  // bossSpecies is one of them), so it's always catchable — and therefore recyclable — before
+  // that biome is ever reached, unlike a biome's own favored/habitat list (biomes 4-5 have none).
+  const RECYCLE_QUOTA = 10;
+  function bossTypeOf(biome){ return EVOLUTION_LINES[biome.bossSpecies][0].type; }
+  function biomeUnlockStatus(i){
+    const biome = BIOMES[i];
+    const type = bossTypeOf(biome);
+    const recycled = (state.recycleCounts && state.recycleCounts[type]) || 0;
+    return {
+      type,
+      boss: !!state.bossDefeated[i],
+      recycle: recycled >= RECYCLE_QUOTA, recycled,
+      key: !!(state.biomeKeyFound && state.biomeKeyFound[i]),
+    };
+  }
+  // Advances state.unlockedBiomeIndex as far as the three conditions allow, for every biome
+  // already reachable. Only ever moves it forward (Math.max) — never re-locks a biome a save
+  // already had access to under the old boss-only rule, so this is safe to call from migrateState
+  // too. Call after anything that could complete one of the three conditions.
+  function checkBiomeUnlocks(){
+    for(let i=0; i<BIOMES.length-1; i++){
+      if(state.unlockedBiomeIndex > i) continue; // already unlocked, nothing to check
+      const st = biomeUnlockStatus(i);
+      if(st.boss && st.recycle && st.key){
+        const wasLower = state.unlockedBiomeIndex <= i;
+        state.unlockedBiomeIndex = Math.max(state.unlockedBiomeIndex, i+1);
+        if(wasLower) logMsg(`🌐 All requirements met in ${BIOMES[i].name} — the path to ${BIOMES[i+1].name} has opened!`);
+      }
+    }
+  }
+
   /* ---------------------------------------------------------
      STATE
   --------------------------------------------------------- */
   let state = null;
   let sellConfirmUid = null;
+  let recycleConfirmUid = null;
   let lastRenderedScreen = null;
   let inputLockTimer = null;
   let appMode = 'boot'; // 'boot' (title screen) | 'game'
@@ -1403,6 +1462,8 @@
       unlockedBiomeIndex: 0,
       bossDefeated: BIOMES.map(()=>false),
       layer2Defeated: BIOMES.map(()=>false),
+      recycleCounts: Object.fromEntries(TYPE_IDS.map(t=>[t,0])),
+      biomeKeyFound: BIOMES.map(()=>false),
       ticks: 0,
       wanted: [],
       savedSeeds: [],
@@ -2655,7 +2716,16 @@
             <div style="color:${unlocked?b.accentColor:'var(--ink-dim)'}">${b.name}
               ${defeated ? '<span class="badge" style="color:var(--phosphor);border-color:var(--phosphor)">BOSS DEFEATED</span>' : (unlocked ? '<span class="badge" style="color:var(--crimson);border-color:var(--crimson)">BOSS AWAITS</span>' : '')}
             </div>
-            <div style="font-size:9.5px; color:var(--ink-dim); margin-top:4px;">${unlocked ? b.desc + (b.mechanic ? `<br><span style="color:${b.accentColor};">${b.mechanic}</span>` : '') : `Defeat the boss of ${BIOMES[i-1]?BIOMES[i-1].name:'the previous biome'} to unlock.`}</div>
+            <div style="font-size:9.5px; color:var(--ink-dim); margin-top:4px;">${unlocked ? b.desc + (b.mechanic ? `<br><span style="color:${b.accentColor};">${b.mechanic}</span>` : '') :
+              (i === state.unlockedBiomeIndex + 1 ? (()=>{
+                const st = biomeUnlockStatus(i-1);
+                const check = (done, label) => `<div style="margin-top:3px;">${done?'<span style="color:var(--phosphor);">✓</span>':'<span style="color:var(--ink-dim);">○</span>'} <span style="${done?'color:var(--ink-dim); text-decoration:line-through;':''}">${label}</span></div>`;
+                return `To open ${b.name}, in ${BIOMES[i-1].name}:`
+                  + check(st.boss, `Defeat ${BIOMES[i-1].bossTitle}`)
+                  + check(st.recycle, `Recycle ${RECYCLE_QUOTA} ${st.type}-type monsters (${Math.min(st.recycled,RECYCLE_QUOTA)}/${RECYCLE_QUOTA})`)
+                  + check(st.key, `Find the Network Access Key (solve a Data Breach)`);
+              })() : `Defeat the boss of ${BIOMES[i-1]?BIOMES[i-1].name:'the previous biome'} to unlock.`)
+            }</div>
             ${unlocked ? `
               <div style="display:flex; gap:6px; margin-top:8px;">
                 <button class="btn btn-primary" style="flex:1; padding:6px; font-size:10px;" data-enter="${i}">🎲 New Map</button>
@@ -3425,10 +3495,14 @@
           state.layer2Defeated[b.biomeIndex] = true;
         } else {
           state.bossDefeated[b.biomeIndex] = true;
+          checkBiomeUnlocks(); // may itself log a separate "path has opened" line if this was the last condition
           const nextIdx = b.biomeIndex + 1;
-          if(nextIdx < BIOMES.length && state.unlockedBiomeIndex < nextIdx){
-            state.unlockedBiomeIndex = nextIdx;
-            unlockMsg = ` The path to ${BIOMES[nextIdx].name} has opened!`;
+          if(nextIdx < BIOMES.length && state.unlockedBiomeIndex <= b.biomeIndex){
+            const st = biomeUnlockStatus(b.biomeIndex);
+            const remaining = [];
+            if(!st.recycle){ const left = RECYCLE_QUOTA - st.recycled; remaining.push(`Recycle ${left} more ${st.type}-type monster${left===1?'':'s'}`); }
+            if(!st.key) remaining.push('find the Network Access Key in a Data Breach here');
+            if(remaining.length) unlockMsg = ` To open the path to ${BIOMES[nextIdx].name}: ${remaining.join(', and ')}.`;
           }
         }
         fx({k:'faint'});
@@ -3519,7 +3593,8 @@
       { h:'Moving', b:'Use the arrow pad to step around the map. Each step costs <b>1 Energy</b> and <b>2 Hunger</b> and gives your partner <b>1 XP</b>. A step onto open ground has about a 20% chance of starting a wild encounter. If Hunger hits 0 your partner is too weak to explore and you return to town.' },
       { h:'Fog and seeds', b:'Only tiles near you are shown; the rest is fog that clears as you move. Every map has a <b>seed</b> number. The same seed always builds the same layout, so ☆ favorite a seed to come back to a map you liked. Tap ⧉ to copy it, or Enter Seed to type one in.' },
       { h:'Map symbols', b:'<b>⛩</b> gate (exit to town) · <b>▪</b> chest (Bits or a capture program) · <b>✦</b> shrine (Bits and XP) · <b>⚷</b> key, opens a <b>▣</b> vault (Bits and capture programs) · <b>✕</b> anomaly (a stronger, charged monster in a fixed spot) · <b>☠</b> the boss · <b>♨</b> heat vent · <b>✪</b> daily cache. Tap ❓ Legend on the map to see these. Some tiles block the way.' },
-      { h:'Biome bosses', b:'Each biome has a boss. Bosses can\'t be caught — you have to defeat them. Beating boss #1 unlocks the Training Ground, beating two unlocks the Data Mine, and each boss opens the next biome.' },
+      { h:'Biome bosses', b:'Each biome has a boss. Bosses can\'t be caught — you have to defeat them. Beating boss #1 unlocks the Training Ground, beating two unlocks the Data Mine.' },
+      { h:'Unlocking the next biome', b:'Opening the next biome takes <b>three</b> things, done in any order, all in the biome you\'re currently in: defeat its boss, <b>Recycle Entity</b> 10 monsters of its boss\'s type from the Network Registry (an alternative to Sell — no Bits, but it counts toward this), and find that biome\'s <b>Network Access Key</b> by solving a Data Breach there (only the first solve grants it; more give the usual Bits and capture program). The Biome Select screen shows a checklist for whichever biome is next. Recycle progress is tracked for life per type, so catches and recycles from well before you needed them still count.' },
       { h:'Special biomes', b:'<b>Overclocked Foundry:</b> heat vents hurt your partner (Fire types are immune, Metal and Earth take half, Water and Nature take extra). Vents never faint you. <b>The Ghost Server:</b> fog closes back in behind you, and a hint tells you how close the boss is.' },
       { h:'Wild levels', b:'Wild monsters are stronger than your partner in later biomes — their level is based on your partner\'s level plus a biome bonus, so you can\'t just out-level the danger.' },
       { h:'Locked Nodes', b:'A 🧩 tile you find while exploring — a sealed data cache you can\'t open without a <b>Decrypter</b> (a one-time Explorer Tool, bought once in the Shop\'s Tools tab). With one, stepping onto the node opens a <b>Data Breach</b>: a match-3 grid where swapping tiles into a run of 3+ clears them, and any match next to a 🛡 Firewall damages it. Breach every Firewall before you run out of moves to win Bits and a capture program. A 4-match creates a Data Packet (clears its row or column when matched again) and a 5-match creates an Exploit (clears the area around it) — bigger boards, more tile types and more Firewalls in later biomes make it genuinely harder, not just shorter. Running out of moves just re-locks the node for another try, no other cost.' },
@@ -3779,6 +3854,15 @@
     screenEl.querySelectorAll('[data-sell-cancel]').forEach(btn=>{
       btn.addEventListener('click', ()=>{ sellConfirmUid = null; render(); });
     });
+    screenEl.querySelectorAll('[data-recycle]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ recycleConfirmUid = btn.getAttribute('data-recycle'); render(); });
+    });
+    screenEl.querySelectorAll('[data-recycle-confirm]').forEach(btn=>{
+      btn.addEventListener('click', ()=>recycleMonster(btn.getAttribute('data-recycle-confirm')));
+    });
+    screenEl.querySelectorAll('[data-recycle-cancel]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ recycleConfirmUid = null; render(); });
+    });
     screenEl.querySelectorAll('[data-equip-cos]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const uid = btn.getAttribute('data-equip-uid');
@@ -3896,6 +3980,9 @@
       else if(state.storage.length<=1) sellBlockReason = ' (last partner)';
       else if(m.locked) sellBlockReason = ' (locked)';
     }
+    // Recycle Entity shares Sell's eligibility rules exactly (same three block reasons), so it
+    // reuses canSell/sellBlockReason rather than duplicating that logic.
+    const recycleConfirming = opts.showSell && recycleConfirmUid === m.uid;
     const equippedId = m.cosmetic || 'none';
     return `
       <div class="card">
@@ -3972,6 +4059,16 @@
             </div>
           ` : `
             <button class="btn ${canSell?'btn-crimson':''}" style="padding:6px; font-size:10px; width:100%;" data-sell="${m.uid}" ${canSell?'':'disabled'}>💰 Sell for ◈${sellPrice(m)}${sellBlockReason}</button>
+          `}
+        </div>
+        <div style="margin-top:6px;">
+          ${recycleConfirming ? `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+              <button class="btn btn-cyan" style="padding:6px; font-size:10px;" data-recycle-confirm="${m.uid}">Confirm — Recycle (no Bits)</button>
+              <button class="btn" style="padding:6px; font-size:10px;" data-recycle-cancel="${m.uid}">Cancel</button>
+            </div>
+          ` : `
+            <button class="btn ${canSell?'btn-cyan':''}" style="padding:6px; font-size:10px; width:100%;" data-recycle="${m.uid}" ${canSell?'':'disabled'}>♻ Recycle Entity${sellBlockReason}</button>
           `}
         </div>` : ''}
       </div>`;
@@ -5171,6 +5268,13 @@
       state.inventory[tierProgram] = (state.inventory[tierProgram]||0) + 1;
       const progName = CAPTURE_PROGRAMS[tierProgram].name;
       logMsg(`🛡 Breach complete! +◈${bits} Bits and 1 ${progName}.`);
+      // First Data Breach ever solved in this biome also grants its Network Access Key — one of
+      // the three biome-unlock conditions. Later breaches in the same biome are unaffected.
+      if(!state.biomeKeyFound[b.biomeIndex]){
+        state.biomeKeyFound[b.biomeIndex] = true;
+        logMsg(`🔑 Network Access Key acquired for ${BIOMES[b.biomeIndex].name}!`);
+        checkBiomeUnlocks();
+      }
     } else {
       logMsg('🛡 Out of moves — the node re-secured itself. It stays here if you want another attempt later.');
     }
@@ -5944,8 +6048,25 @@
     if(s.wild && typeof s.wild.layer !== 'number') s.wild.layer = 1;
     const miningUnlockedFor = s.legacyUnlockAll || s.bossDefeated.filter(Boolean).length >= 2;
     if(s.screen === 'mine' && !miningUnlockedFor) s.screen = 'town';
-    // Biomes were added after some saves were made: if a boss is already down, the next biome must be open.
-    s.bossDefeated.forEach((beaten, i) => { if(beaten) s.unlockedBiomeIndex = Math.max(s.unlockedBiomeIndex, Math.min(i+1, BIOMES.length-1)); });
+    // Recycle Entity / Network Access Key (biome unlock, take 2): a save from before this existed
+    // has no s.biomeKeyFound at all — grandfather it under the OLD boss-only rule (a boss already
+    // down keeps the next biome open, no retroactive recycle/key requirement). A save that already
+    // has s.biomeKeyFound got here under the new three-condition rule already; leave its
+    // unlockedBiomeIndex exactly as earned; checkBiomeUnlocks() (called from real gameplay actions,
+    // not here — it reads the global `state`, which isn't assigned to this object yet during
+    // migration) is what advances it further from here on.
+    const preRecycleFeatureSave = !Array.isArray(s.biomeKeyFound);
+    if(!s.recycleCounts || typeof s.recycleCounts !== 'object') s.recycleCounts = {};
+    TYPE_IDS.forEach(t => { if(typeof s.recycleCounts[t] !== 'number' || s.recycleCounts[t] < 0) s.recycleCounts[t] = 0; });
+    if(!Array.isArray(s.biomeKeyFound)) s.biomeKeyFound = BIOMES.map(()=>false);
+    else {
+      while(s.biomeKeyFound.length < BIOMES.length) s.biomeKeyFound.push(false);
+      s.biomeKeyFound.length = BIOMES.length;
+    }
+    if(preRecycleFeatureSave){
+      // Biomes were added after some saves were made: if a boss is already down, the next biome must be open.
+      s.bossDefeated.forEach((beaten, i) => { if(beaten) s.unlockedBiomeIndex = Math.max(s.unlockedBiomeIndex, Math.min(i+1, BIOMES.length-1)); });
+    }
     s.unlockedBiomeIndex = Math.max(0, Math.min(s.unlockedBiomeIndex, BIOMES.length-1));
     // Daily Ops state
     if(!s.daily || typeof s.daily !== 'object') s.daily = defaultDaily();
@@ -6415,6 +6536,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.24', date:'2026-09-22', notes:[
+      'Renamed: Prime Meat is now Databite — fits the digital-creature theme better. Purely a name change; it still does the same thing.',
+    ]},
     { version:'25.23', date:'2026-09-22', notes:[
       'Fixed: the Out of Hunger popup wrongly suggested Rest Partner as a fix — Rest Partner restores Energy and actually costs Hunger, so it made things worse, not better. It now just points you at feeding your partner.',
     ]},
@@ -6502,10 +6626,13 @@
     ]},
   ];
   const BUILD = {
-    version: '25.24',
+    version: '25.25',
     date: '2026-09-22',
     notes: [
-      'Renamed: Prime Meat is now Databite — fits the digital-creature theme better. Purely a name change; it still does the same thing.',
+      'New: unlocking the next biome now takes three things, done in any order, all in the biome you\'re currently in — defeat its boss, Recycle Entity 10 monsters of its boss\'s type from the Network Registry, and find its Network Access Key by solving a Data Breach there.',
+      'New Network Registry button: Recycle Entity — an alternative to Sell. It pays no Bits, but permanently counts toward that type\'s biome-unlock requirement (tracked for life, not reset).',
+      'The first Data Breach you solve in a biome now also awards its Network Access Key; solving more there afterward is just the usual Bits and capture program.',
+      'Existing saves keep whatever biomes they already had open — this only applies to biomes not yet unlocked.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
