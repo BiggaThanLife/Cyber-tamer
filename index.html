@@ -4244,14 +4244,25 @@
   }
 
   /* ---------------------------------------------------------
-     STORY INTRO — Phase 1b: the 5-scene cold open, screen id 'storyIntro'.
-     introStep/introHandle/introAfterFn are transient (not saved) — a page refresh mid-intro
-     just restarts it from scene 0, which is fine since nothing it sets (handle/origin) is
-     read anywhere until finishStoryIntro() marks state.storyIntroDone. startStoryIntro(afterFn)
-     is the only entry point; afterFn runs once the player reaches the end (normally showTutorial(0)
-     for a first-time player, or nothing extra for a reset-flow replay who already saw the tutorial).
+     STORY INTRO — Phase 1b (+ the world-building prelude added afterward): the full cold open,
+     screen id 'storyIntro'. introStep/introHandle/introAfterFn are transient (not saved) — a page
+     refresh mid-intro just restarts it from scene 0, which is fine since nothing it sets
+     (handle/origin) is read anywhere until finishStoryIntro() marks state.storyIntroDone.
+     startStoryIntro(afterFn) is the only entry point; afterFn runs once the player reaches the end
+     (normally showTutorial(0) for a first-time player, or nothing extra for a reset-flow replay who
+     already saw the tutorial).
+     Steps 0-3 are the bible's Section 8 prelude ("The Glow"/"The Husks"/"Your Rig"/"One Signal") —
+     black-screen, text-only, tap-to-continue, laying out 2086 and why the world is empty BEFORE the
+     player identifies themselves. Steps 4-8 are the original Phase 1b jack-in sequence (handle,
+     origin pick, boot line, jack-in cue, starter beat), unchanged apart from renumbering.
      --------------------------------------------------------- */
   const HANDLE_SUGGESTIONS = ['NullRoute','Kilobit','Cindergrid','Faultline','Grayhat_7','StaticEcho','Backchannel','LowLatency','Deadcell','Offgrid'];
+  const INTRO_PRELUDE_SCENES = [
+    { lines:['2086.', 'The cities never sleep. Everything else does.'] },
+    { lines:['They built hundreds of thousands of data centers to think.', 'When the water ran out, they walked away.'] },
+    { lines:['You\'ve spent years listening to them.', 'Nothing but static.'], beat:'Until tonight.' },
+    { lines:['One dot on the map pulses green.', 'Still drawing power. No overseers. No logs.'], beat:'Someone left the lights on.' },
+  ];
   let introStep = 0;
   let introHandle = '';
   let introAfterFn = null;
@@ -4279,14 +4290,37 @@
   }
 
   function renderStoryIntro(screenEl, controlsEl){
-    switch(introStep){
-      case 0: renderIntroHandle(screenEl, controlsEl); break;
-      case 1: renderIntroOrigin(screenEl, controlsEl); break;
-      case 2: renderIntroBootLine(screenEl, controlsEl); break;
-      case 3: renderIntroJackIn(screenEl, controlsEl); break;
-      case 4: renderIntroStarter(screenEl, controlsEl); break;
-      default: renderIntroHandle(screenEl, controlsEl);
+    if(introStep >= 0 && introStep < INTRO_PRELUDE_SCENES.length){
+      renderIntroPrelude(screenEl, controlsEl, introStep);
+      return;
     }
+    switch(introStep){
+      case 4: renderIntroHandle(screenEl, controlsEl); break;
+      case 5: renderIntroOrigin(screenEl, controlsEl); break;
+      case 6: renderIntroBootLine(screenEl, controlsEl); break;
+      case 7: renderIntroJackIn(screenEl, controlsEl); break;
+      case 8: renderIntroStarter(screenEl, controlsEl); break;
+      default: renderIntroPrelude(screenEl, controlsEl, 0);
+    }
+  }
+
+  // Full black screen, text only — no card/panel chrome — matching the bible's "total darkness"
+  // framing for the pre-jack-in prelude. Reuses the normal Continue-button controls row so it
+  // still fits the game's existing tap-through pattern rather than inventing a new one.
+  function renderIntroPrelude(screenEl, controlsEl, sceneIndex){
+    const scene = INTRO_PRELUDE_SCENES[sceneIndex];
+    screenEl.style.background = '#000';
+    screenEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:320px; text-align:center; gap:14px; padding:12px;">
+        ${scene.lines.map(l => `<div style="font-size:12px; color:var(--ink); line-height:1.6;">${l}</div>`).join('')}
+        ${scene.beat ? `<div class="pixel-font glow" style="font-size:11px; color:var(--phosphor); margin-top:8px;">${scene.beat}</div>` : ''}
+      </div>`;
+    controlsEl.innerHTML = `<button class="btn btn-primary" id="intro-continue" style="width:100%;">Continue</button>`;
+    controlsEl.querySelector('#intro-continue').addEventListener('click', ()=>{
+      screenEl.style.background = '';
+      introStep = sceneIndex + 1;
+      render();
+    });
   }
 
   function renderIntroHandle(screenEl, controlsEl){
@@ -4318,7 +4352,7 @@
       if(!val) return;
       introHandle = val;
       state.handle = val;
-      introStep = 1;
+      introStep = 5;
       render();
     });
   }
@@ -4341,7 +4375,7 @@
       const btn = screenEl.querySelector(`[data-origin-pick="${id}"]`);
       btn.addEventListener('click', ()=>{
         state.origin = id;
-        introStep = 2;
+        introStep = 6;
         render();
       });
     });
@@ -4358,7 +4392,7 @@
     controlsEl.innerHTML = `<button class="btn btn-primary" id="intro-continue" style="width:100%;">Continue</button>`;
     controlsEl.querySelector('#intro-continue').addEventListener('click', ()=>{
       state.originConfirmed = true;
-      introStep = 3;
+      introStep = 7;
       render();
     });
   }
@@ -4373,7 +4407,7 @@
       </div>`;
     controlsEl.innerHTML = `<button class="btn btn-primary" id="intro-continue" style="width:100%;">Continue</button>`;
     controlsEl.querySelector('#intro-continue').addEventListener('click', ()=>{
-      introStep = 4;
+      introStep = 8;
       render();
     });
   }
