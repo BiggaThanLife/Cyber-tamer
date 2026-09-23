@@ -367,6 +367,14 @@
   const TRAIN_GAIN_BY_TIER = { GREAT: 2, GOOD: 1, MISS: 0 };
   const TRAIN_CAP_PER_STAT = 10;
   const EVO_CREST_CAP = 3;
+  // Stat Drives: bought directly for the active partner (same "applies immediately on purchase"
+  // pattern as Evolution Crest), price doubling per use already taken ON THAT MONSTER so a new
+  // player can't drop under 1000 Bits for a meaningful boost. Capped at 5 uses/stat/monster (was
+  // 10 uses at a flat price) — tracked independently per stat via m.driveUses, separate from
+  // m.driveBonus (the actual applied bonus) so the price curve doesn't depend on the per-use
+  // amount differing between HP (+4) and STR/DEF/SPD (+1).
+  const DRIVE_CAP_USES = 5;
+  function driveNextPrice(basePrice, uses){ return Math.round(basePrice * Math.pow(2, uses)); }
   const WANTED_CAP = 5;
 
   function addToWanted(enemy){
@@ -859,10 +867,13 @@
     podOverclock: { name:'Pod Overclock',  icon:'🚀', price:350, group:'Supplies', usable:true,  desc:'Doubles Grow-Pod growth speed for 100 ticks of exploring. Stacks.' },
     expCapsule:   { name:'Exp Capsule',    icon:'💊', price:100, group:'Growth',   usable:true,  desc:'Instantly grants 250 XP to your partner.' },
     expCapsuleL:  { name:'Exp Capsule L',  icon:'💊', price:450, group:'Growth',   usable:true,  desc:'Instantly grants 1,500 XP to your partner.' },
-    hpDrive:      { name:'HP Drive',       icon:'❤',  price:120, group:'Growth',   usable:true,  drive:'hp',  amount:4, cap:40, desc:'Permanently +4 max HP (up to +40 per partner).' },
-    strDrive:     { name:'STR Drive',      icon:'🔺', price:200, group:'Growth',   usable:true,  drive:'str', amount:1, cap:10, desc:'Permanently +1 STR (up to +10 per partner).' },
-    defDrive:     { name:'DEF Drive',      icon:'🛡', price:200, group:'Growth',   usable:true,  drive:'def', amount:1, cap:10, desc:'Permanently +1 DEF (up to +10 per partner).' },
-    spdDrive:     { name:'SPD Drive',      icon:'💨', price:200, group:'Growth',   usable:true,  drive:'spd', amount:1, cap:10, desc:'Permanently +1 SPD (up to +10 per partner).' },
+    // Bought directly in the Shop for the active partner (see buyShopItem/DRIVE_CAP_USES), not
+    // stocked/used from Inventory — price/cap here are the STARTING price and the MAX total bonus;
+    // the live per-purchase price is computed from driveNextPrice() + that partner's driveUses.
+    hpDrive:      { name:'HP Drive',       icon:'❤',  price:120, drive:'hp',  amount:4, cap:DRIVE_CAP_USES*4, desc:'Permanently +4 max HP (up to +20 per partner). Price doubles with each use on that partner.' },
+    strDrive:     { name:'STR Drive',      icon:'🔺', price:200, drive:'str', amount:1, cap:DRIVE_CAP_USES*1, desc:'Permanently +1 STR (up to +5 per partner). Price doubles with each use on that partner.' },
+    defDrive:     { name:'DEF Drive',      icon:'🛡', price:200, drive:'def', amount:1, cap:DRIVE_CAP_USES*1, desc:'Permanently +1 DEF (up to +5 per partner). Price doubles with each use on that partner.' },
+    spdDrive:     { name:'SPD Drive',      icon:'💨', price:200, drive:'spd', amount:1, cap:DRIVE_CAP_USES*1, desc:'Permanently +1 SPD (up to +5 per partner). Price doubles with each use on that partner.' },
     overloadChip: { name:'Overload Chip',  icon:'💥', price:60,  group:'Battle Chips', usable:false, desc:'Battle chip: one typeless blast worth 2.2× STR. Single use, from the battle screen.' },
     firewallChip: { name:'Firewall Chip',  icon:'🧱', price:45,  group:'Battle Chips', usable:false, desc:'Battle chip: absorbs the enemy\'s next attack completely. Single use, from the battle screen.' },
   };
@@ -1450,6 +1461,7 @@
       gearSlots: [null, null],
       module: null,
       driveBonus: {hp:0,str:0,def:0,spd:0},
+      driveUses: {hp:0,str:0,def:0,spd:0},
       locked: false,
       personality: rollPersonality(),
     };
@@ -3650,7 +3662,7 @@
       { h:'Training Ground', b:'Unlocks after your first boss. Pick a stat and play a timing game; a good tap gains more. Each stat can be trained up to +10 per partner. It costs Energy and Hunger and puts that partner on a cooldown that shortens as you explore.' },
       { h:'Splice Lab', b:'Unlocks when your farm reaches a Server Shack. Pick two different monsters from the Network Registry and pay 50 Bits to splice their genomes. The reveal shows the new hybrid, then opens straight to its Inspect screen. Offspring inherit IVs from their parents.' },
       { h:'Modules', b:'Each monster holds one module. Timed modules burn one tick per step or dig, only while that monster is your active partner. A few are permanent, and Sync Link shares XP with benched monsters. Equip them from the Inventory or Storage.' },
-      { h:'Stat Drives and Capsules', b:'<b>Stat Drives</b> permanently add stats (capped at +10 STR/DEF/SPD and +40 HP per partner). <b>Exp Capsules</b> give a lump of XP.' },
+      { h:'Stat Drives and Capsules', b:'<b>Stat Drives</b> permanently add stats — bought directly in the Shop for your active partner, applying immediately like an Evolution Crest. Capped at 5 uses per stat per partner (+5 STR/DEF/SPD, +20 HP), and the price doubles with each use already taken on that partner, so stacking several at once gets expensive fast. <b>Exp Capsules</b> give a lump of XP.' },
       { h:'Gear', b:'Gear is found only in the Data Mine. Each monster has two gear slots; gear gives a stat bonus or a move any species can use. Extras can be sold.' },
     ]},
     { id:'economy', icon:'◈', title:'Bits, Shop & Farm', color:'var(--amber)', blurb:'Earning and spending Bits, jobs and the farm.', cards:[
@@ -5609,7 +5621,29 @@
   }
   function buyShopItem(id){
     const def = shopItemDef(id);
-    if(!def || state.bits < def.price) return;
+    if(!def) return;
+    if(def.drive){
+      // Stat Drives: bought directly for the active partner, like Evolution Crest — the price
+      // ISN'T def.price flat, it's driveNextPrice() scaled by how many this partner already has,
+      // so the generic `state.bits < def.price` guard below would be wrong here (too permissive
+      // once the live price has doubled past the base). Handled entirely in this branch instead.
+      const p = getActive();
+      if(!p.driveUses) p.driveUses = {hp:0,str:0,def:0,spd:0};
+      const uses = p.driveUses[def.drive] || 0;
+      if(uses >= DRIVE_CAP_USES){ logMsg(`${getForm(p).name} has already taken the maximum from ${def.name}s (${DRIVE_CAP_USES}/${DRIVE_CAP_USES}).`); render(); return; }
+      const price = driveNextPrice(def.price, uses);
+      if(state.bits < price) return;
+      state.bits -= price;
+      if(!p.driveBonus) p.driveBonus = {hp:0,str:0,def:0,spd:0};
+      const sup = SUPPLY_ITEMS[id];
+      p.driveBonus[def.drive] = Math.min(def.cap, (p.driveBonus[def.drive]||0) + sup.amount);
+      p.driveUses[def.drive] = uses + 1;
+      recalcStats(p, false);
+      logMsg(`${def.name} installed for ◈${price} — ${getForm(p).name} permanently gains +${sup.amount} ${def.drive.toUpperCase()} (now +${p.driveBonus[def.drive]}/${def.cap}, ${p.driveUses[def.drive]}/${DRIVE_CAP_USES} used).`);
+      render();
+      return;
+    }
+    if(state.bits < def.price) return;
     if(id === 'evoCrest'){
       const p = getActive();
       if((p.crestCount||0) >= EVO_CREST_CAP){ logMsg(`${getForm(p).name} has already hit the ${EVO_CREST_CAP}-crest limit.`); render(); return; }
@@ -5683,12 +5717,20 @@
         ${tab.ids.map(id => {
           const d = shopItemDef(id); if(!d) return '';
           let extra = `Owned: ${state.inventory[id]||0}`;
+          let displayPrice = d.price;
           let blocked = state.bits < d.price;
           if(id === 'evoCrest'){ const used = activePartner.crestCount||0; extra = `${used}/${EVO_CREST_CAP} used on ${getForm(activePartner).name}${used>=EVO_CREST_CAP?' (max reached)':''}`; if(used>=EVO_CREST_CAP) blocked = true; }
-          if(d.drive){ const cur = (activePartner.driveBonus && activePartner.driveBonus[d.drive])||0; extra += ` · ${getForm(activePartner).name}: +${cur}/${d.cap}`; }
+          if(d.drive){
+            const uses = (activePartner.driveUses && activePartner.driveUses[d.drive]) || 0;
+            const maxed = uses >= DRIVE_CAP_USES;
+            displayPrice = maxed ? d.price : driveNextPrice(d.price, uses);
+            const cur = (activePartner.driveBonus && activePartner.driveBonus[d.drive]) || 0;
+            extra = `${getForm(activePartner).name}: +${cur}/${d.cap} · ${uses}/${DRIVE_CAP_USES} used${maxed?' (max reached)':''}`;
+            blocked = maxed || state.bits < displayPrice;
+          }
           return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
             <div>
-              <div style="color:var(--amber)">${d.icon?d.icon+' ':''}${d.name} <span class="badge">◈${d.price}</span></div>
+              <div style="color:var(--amber)">${d.icon?d.icon+' ':''}${d.name} <span class="badge">◈${displayPrice}</span></div>
               <div style="font-size:9.5px; color:var(--ink-dim);">${d.desc} — ${extra}</div>
             </div>
             <button class="btn btn-amber" style="padding:6px 10px; font-size:11px; flex-shrink:0;" data-buy="${id}" ${blocked?'disabled':''}>Buy</button>
@@ -5781,15 +5823,6 @@
       const before = p.level;
       gainXpCore(p, xp);
       logMsg(`${nm} absorbed ${xp} XP${p.level>before?` and reached level ${p.level}!`:'.'}`);
-    } else if(SUPPLY_ITEMS[id] && SUPPLY_ITEMS[id].drive){
-      const def = SUPPLY_ITEMS[id], key = def.drive;
-      if(!p.driveBonus) p.driveBonus = {hp:0,str:0,def:0,spd:0};
-      const cur = p.driveBonus[key]||0;
-      if(cur >= def.cap) return refuse(`${nm} has already taken the maximum from ${def.name}s (+${def.cap}).`);
-      inv[id]--;
-      p.driveBonus[key] = Math.min(def.cap, cur + def.amount);
-      recalcStats(p, false);
-      logMsg(`${def.name} installed — ${nm} permanently gains +${p.driveBonus[key]-cur} ${key.toUpperCase()} (now +${p.driveBonus[key]}/${def.cap}).`);
     } else if(id === 'podOverclock'){
       inv.podOverclock--;
       state.farm.boostTicks = (state.farm.boostTicks||0) + 100;
@@ -5908,6 +5941,17 @@
     if(m.cosmetic && !m.ownedCosmetics.includes(m.cosmetic)) m.ownedCosmetics.push(m.cosmetic);
     if(!m.driveBonus || typeof m.driveBonus !== 'object') m.driveBonus = {hp:0,str:0,def:0,spd:0};
     ['hp','str','def','spd'].forEach(k => { if(typeof m.driveBonus[k] !== 'number' || m.driveBonus[k] < 0) m.driveBonus[k] = 0; });
+    if(!m.driveUses || typeof m.driveUses !== 'object') m.driveUses = {};
+    ['hp','str','def','spd'].forEach(k => {
+      if(typeof m.driveUses[k] !== 'number' || m.driveUses[k] < 0){
+        // Pre-v25.27 saves have no driveUses at all — infer it from however much bonus this
+        // monster already banked (under the OLD, higher cap), so a maxed-out old save correctly
+        // shows as already at the new cap too. The bonus itself is grandfathered, never shrunk.
+        const sup = SUPPLY_ITEMS[k+'Drive'];
+        const amt = (sup && sup.amount) || 1;
+        m.driveUses[k] = Math.min(DRIVE_CAP_USES, Math.ceil((m.driveBonus[k]||0) / amt));
+      }
+    });
     if(m.module && (!MODULES[m.module.id])) m.module = null;
     if(m.module){ const md = MODULES[m.module.id]; if(md.ticks == null) m.module.ticksLeft = null; else if(typeof m.module.ticksLeft !== 'number' || m.module.ticksLeft <= 0) m.module = null; }
     if(m.module === undefined) m.module = null;
@@ -6584,6 +6628,13 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.26', date:'2026-09-23', notes:[
+      'Playtest fixes: Inventory now leads with Databite and Medicine (the two you actually tap Use on there), not the capture programs.',
+      'The main screen box is noticeably bigger on tall phones — it was capped at 400px regardless of screen size.',
+      'The Recycle Entity button now shows exactly what it counts toward and your live progress, instead of only showing up in the log afterward.',
+      'Fixed: a monster caught already past its evolution level no longer shows a stale "Evolves at LvX" — it (and anyone one level away from evolving) now shows "Evolves next level-up".',
+      'The Server Farm\'s Grow-Pods are now paged 6 at a time instead of one long scroll.',
+    ]},
     { version:'25.25', date:'2026-09-22', notes:[
       'New: unlocking the next biome now takes three things, done in any order, all in the biome you\'re currently in — defeat its boss, Recycle Entity 10 monsters of its boss\'s type from the Network Registry, and find its Network Access Key by solving a Data Breach there.',
       'New Network Registry button: Recycle Entity — an alternative to Sell. It pays no Bits, but permanently counts toward that type\'s biome-unlock requirement (tracked for life, not reset).',
@@ -6680,14 +6731,11 @@
     ]},
   ];
   const BUILD = {
-    version: '25.26',
+    version: '25.27',
     date: '2026-09-23',
     notes: [
-      'Playtest fixes: Inventory now leads with Databite and Medicine (the two you actually tap Use on there), not the capture programs.',
-      'The main screen box is noticeably bigger on tall phones — it was capped at 400px regardless of screen size.',
-      'The Recycle Entity button now shows exactly what it counts toward and your live progress, instead of only showing up in the log afterward.',
-      'Fixed: a monster caught already past its evolution level no longer shows a stale "Evolves at LvX" — it (and anyone one level away from evolving) now shows "Evolves next level-up".',
-      'The Server Farm\'s Grow-Pods are now paged 6 at a time instead of one long scroll.',
+      'Rebalanced: Stat Drives (HP/STR/DEF/SPD) now apply directly to your active partner, like Evolution Crest, instead of sitting in Inventory. Capped at 5 uses per stat per partner (was 10), and the price doubles with each use already taken on that partner — the first is still affordable, but stacking several at once for under 1000 Bits is no longer possible.',
+      'Existing bonuses from before this change are kept in full — nothing already earned is taken away, but a partner already at the old higher cap can\'t buy any more of that Drive.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

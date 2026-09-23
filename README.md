@@ -110,7 +110,7 @@ Monsters gain XP from exploring and battles. Every species has a second, stronge
 - **Training Ground:** unlocks after your first boss. Pick a stat (STR, DEF or SPD) and play a timing game. Each stat can be trained up to +10 per partner. It costs Energy and Hunger and starts a cooldown that shortens as you explore.
 - **Splice Lab** (formerly Breeding Lab): unlocks when your farm reaches a **Server Shack**. Pick two different monsters and pay 50 Bits to splice their genomes. A full-screen reveal shows the new hybrid, then opens straight to its Inspect screen.
 - **Modules:** each monster holds one. Timed modules burn one tick per step or dig, only while that monster is your active partner. Sync Link is the exception and keeps running on the bench.
-- **Stat Drives:** permanent stats, capped per partner.
+- **Stat Drives:** bought directly in the Shop for your active partner, applying instantly like a Crest. Capped at 5 uses per stat per partner, and the price doubles with each use already taken on that partner — the first is cheap, fully maxing one stat is a real investment.
 - **Gear:** found only in the Data Mine. Each monster has two gear slots.
 
 ### Earning Bits
@@ -253,8 +253,8 @@ Beating boss #1 unlocks the Training Ground. Beating two unlocks the Data Mine. 
 |---|---|---|
 | Exp Capsule | 100 | +250 XP |
 | Exp Capsule L | 450 | +1,500 XP |
-| HP Drive | 120 | +4 max HP each, up to +40 per partner |
-| STR / DEF / SPD Drive | 200 | +1 to that stat each, up to +10 per partner |
+| HP Drive | 120, doubling per use | +4 max HP each, up to +20 per partner (5 uses max) — applies instantly to your active partner, doesn't sit in Inventory |
+| STR / DEF / SPD Drive | 200, doubling per use | +1 to that stat each, up to +5 per partner (5 uses max) — same instant-apply as HP Drive |
 
 **Battle chips (Shop, Battle tab)**
 
