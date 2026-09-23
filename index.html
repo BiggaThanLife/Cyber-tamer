@@ -4454,14 +4454,18 @@
     });
   }
 
+  // Deliberately doesn't name the specific species here — this scene plays for both a brand-new
+  // game (state.storage[0] really is the fresh starter, Sylvyx) AND a reset-flow replay of an
+  // existing save (state.storage[0] is just whatever happened to be first in that player's
+  // preserved roster, which is often NOT their active partner and isn't a fresh capture at all).
+  // Naming it caused a real mismatch — a returning player was told "Sylvyx is with you now" and
+  // then saw a Ripplet in Storage. Generic phrasing reads correctly either way.
   function renderIntroStarter(screenEl, controlsEl){
-    const starter = state.storage && state.storage[0];
-    const line = starter ? getForm(starter).name : 'something';
     screenEl.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:10px; padding:6px 2px;">
         <div class="pixel-font glow" style="font-size:10px; color:var(--phosphor);">CAPTURE.EXE — RESIDUAL PROCESS</div>
         <div style="font-size:11px; color:var(--ink); line-height:1.6;">
-          Something was already running when you connected. It doesn't fight the handshake — it answers to it. <b style="color:var(--phosphor);">${line}</b> is with you now.
+          Something was already running when you connected. It doesn't fight the handshake — it answers to it. <b style="color:var(--phosphor);">A monster</b> is with you now.
         </div>
         <div style="font-size:9.5px; color:var(--ink-dim);">Neon Haven is just ahead. Patch is already talking.</div>
       </div>`;
