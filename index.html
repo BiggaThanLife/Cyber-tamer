@@ -449,6 +449,7 @@
     recycleConfirmUid = null;
     logMsg(`♻ Recycled ${getForm(m).name} — ${type}-type progress: ${state.recycleCounts[type]}/${RECYCLE_QUOTA}.`);
     raiseTrace(2, true);
+    maybeShowRecycleFlavor(type);
     checkBiomeUnlocks();
     render();
   }
@@ -1614,6 +1615,7 @@
       trace_floor: 0,
       ending: null,
       public_port_enabled: false,
+      biomeStorySeen: BIOMES.map(()=>false), // Phase 5: per-biome flavor text, fires once per biome
     };
   }
 
@@ -2964,6 +2966,7 @@
       playTransition(`Entering<br>${biome.name}${layer===2?' — Layer 2':''}...`, biome.accentColor, ()=>{
         state.wild = generateWildMap(idx, undefined, seed, layer===2 ? {layer:2} : undefined);
         if(layer === 2) raiseTrace(8, true);
+        else maybeShowBiomeStoryText(idx); // Layer 2 remixes an already-seen biome, so no fresh flavor there
         recordVisitedSeed(idx, state.wild.seed);
         state.screen = 'wild';
         render();
@@ -4051,25 +4054,135 @@
     logMsg(`📡 Port Level ${level} — ${PORT_LEVEL_TEXT[level]}`);
   }
 
+  /* ---------------------------------------------------------
+     PER-BIOME STORY TEXT — Phase 5, the last planned story phase (the ending, Phase 6, is
+     intentionally not being built — see below). Two independent, light hooks, both pure flavor
+     with no mechanical effect:
+     (1) BIOME_STORY_TEXT: a neutral "tell" line plus an origin-tagged reaction (Section 9 of the
+         bible), logged once the first time the player ever steps into that biome's wilderness —
+         guarded by the new state.biomeStorySeen bool array (BIOMES.length, same shape as
+         bossDefeated/biomeKeyFound/layer2Defeated) since nothing else in the codebase tracks
+         "have I ever entered biome i" and Trace/Rosetta/Port all fire off CLEARING a biome, not
+         entering one, so they can't double as this trigger.
+     (2) RECYCLE_FLAVOR_BY_TYPE: Patch's one-line reaction to recycling each of the first four
+         bosses' types, keyed by type (not biome index) because recycleCounts is itself keyed by
+         type and recycling happens on the Network Registry screen with no "current biome" context
+         to hook into — reusing state.recycleCounts[type]===1 as the "first time" signal needs
+         no new state at all. Metal (the Foundry/Forgemaster type) is deliberately absent from that
+         table: per the bible, Patch stops making asides on Metal and asks a direct question
+         instead (showFoundryRecycleQuestion, Section 6.5) — a small reusable modal in the same
+         style as the origin-confirmation scene, with an origin-tagged reply line and one identical,
+         unjudging Patch response regardless of which reply is picked. Neither hook touches Trace,
+         Port, Rosetta or the biome-unlock chain.
+     --------------------------------------------------------- */
+  const BIOME_STORY_TEXT = [
+    { tell:'The Server Farm pods here are already tended, and nothing has been here in years.',
+      origin:{ witness:'The tended pods hit close to home. You find yourself thinking about water.',
+               insider:'You recognize the maintenance patterns immediately — someone automated this a long time ago.',
+               scavenger:'You clock the terrain for loot before anything else.',
+               keeper:'Something about the recycle count already sits wrong with you.' } },
+    { tell:'Creatures move heat and power on schedules, like a supply chain nobody\'s running anymore.',
+      origin:{ witness:'You call the trade routes what they are — a resource grab that outlived the people running it.',
+               insider:'You recognize the department codes on sight.',
+               scavenger:'The solar panels and hidden loot here are the best you\'ve seen yet.',
+               keeper:'The way these creatures guard heat reminds you of guarding a fire.' } },
+    { tell:'The cold slows everything down — for the first time, you can actually read an update queue mid-transit.',
+      origin:{ witness:'Frozen water, in a world this thirsty. You don\'t love the irony.',
+               insider:'You recognize the maintenance window the queue is waiting on.',
+               scavenger:'Dead circuitry, this well preserved, is a goldmine.',
+               keeper:'A frozen packet feels less like data and more like a preserved moment.' } },
+    { tell:'This layer is corrupted enough that the tiles change between passes — nothing here holds still.',
+      origin:{ witness:'The chain you\'re tracing is just a chain of costs, passed down and down.',
+               insider:'It\'s the org chart you left, rebuilt in code.',
+               scavenger:'You follow the routing table just to see where the resources actually go.',
+               keeper:'You notice the one node that no update ever reaches.' } },
+    { tell:'A furnace district, heat-vent tiles everywhere — and the logs here don\'t flatter you.',
+      origin:{ witness:'Heat, and dark Haven handles. This is a story you already know.',
+               insider:'You know exactly what a "courtesy notice" means.',
+               scavenger:'The "hostile" relabel reads like a price tag to you.',
+               keeper:'You can\'t stop thinking about the handles that went dark.' } },
+    { tell:'The map closes in behind you as you walk, like the server is half-remembering itself.', origin:null },
+  ];
+  function maybeShowBiomeStoryText(biomeIndex){
+    if(!Array.isArray(state.biomeStorySeen)) state.biomeStorySeen = BIOMES.map(()=>false);
+    if(state.biomeStorySeen[biomeIndex]) return;
+    state.biomeStorySeen[biomeIndex] = true;
+    const entry = BIOME_STORY_TEXT[biomeIndex];
+    if(!entry) return;
+    logMsg(`▸ ${entry.tell}`);
+    const reaction = entry.origin && entry.origin[state.origin];
+    if(reaction) logMsg(reaction);
+  }
+  const RECYCLE_FLAVOR_BY_TYPE = {
+    Earth: 'Patch: "Don\'t get attached to the extras."',
+    Fire: 'Patch: "That\'s a lot of heat you\'re deleting."',
+    Water: 'Patch: "That place was already frozen. Doesn\'t mean it\'s free."',
+    Void: 'Patch is quiet for a moment, then: "...just get it done."',
+  };
+  const FOUNDRY_RECYCLE_REPLIES = {
+    witness: 'Somebody\'s paying for this world either way. I\'d rather it be the ones who built it wrong.',
+    insider: 'It\'s maintenance. I\'ve signed off on worse. That\'s what bothers me.',
+    scavenger: 'Everything\'s a resource until it isn\'t. I\'m not sure which this is.',
+    keeper: 'No. But I keep every log of what we lose, so it isn\'t forgotten.',
+  };
+  function showFoundryRecycleQuestion(){
+    const overlay = document.getElementById('modal-overlay');
+    const box = document.getElementById('modal-box');
+    const reply = FOUNDRY_RECYCLE_REPLIES[state.origin] || 'I don\'t know yet.';
+    box.innerHTML = `
+      <div class="pixel-font glow" style="font-size:10px; color:var(--cyan); margin-bottom:8px;">PATCH</div>
+      <div style="font-size:11px; color:var(--ink); line-height:1.5; margin-bottom:12px;">"That's a lot of your own you've put through the grinder. Are you okay with this?"</div>
+      <div style="font-size:10.5px; color:var(--phosphor); line-height:1.5; margin-bottom:8px;">"${reply}"</div>
+      <button class="btn btn-primary" id="foundry-q-ok" style="width:100%;">Continue</button>`;
+    overlay.style.display = 'flex';
+    document.getElementById('foundry-q-ok').addEventListener('click', ()=>{ closeModal(); render(); });
+  }
+  // Called from recycleMonster() right after state.recycleCounts[type] is incremented — the
+  // ===1 check is the "first ever recycle of this type" signal, no extra state needed.
+  function maybeShowRecycleFlavor(type){
+    if(state.recycleCounts[type] !== 1) return;
+    if(type === 'Metal'){ showFoundryRecycleQuestion(); return; }
+    const line = RECYCLE_FLAVOR_BY_TYPE[type];
+    if(line) logMsg(line);
+  }
+
   // Reusable origin-card picker — used by the (future) intro's Scene 5 AND by "Not quite" below,
   // so there's exactly one place that renders the four origin cards.
   // One-time notice shown when a save flagged needsStoryReset (see migrateState/performStoryReset)
   // is loaded, whether via Continue or Import — a single "Continue" button, not a yes/no, since
   // this is happening either way; the point is making sure the player sees and understands it
   // before it does, not offering a way to keep the old save exactly as it was.
+  // Sized up well beyond every other modal in the game (which all share the same 340px
+  // #modal-box) — this is the one save-breaking update the game will ever ship at this scale
+  // (adding the whole story layer), so it gets a deliberately bigger, harder-to-skim-past
+  // presentation. box.style.maxWidth/fontSize are reset back to the shared defaults the moment
+  // this notice closes, since #modal-box is reused by every other modal in the game and none of
+  // them set their own size — leaving the override in place would inflate all of them afterward.
   function showStoryResetNotice(onConfirm){
     const overlay = document.getElementById('modal-overlay');
     const box = document.getElementById('modal-box');
+    box.style.maxWidth = '440px';
+    box.style.fontSize = '115%';
     box.innerHTML = `
-      <div class="pixel-font glow" style="font-size:10px; color:var(--amber); margin-bottom:10px;">⚠ ONE-TIME SAVE UPDATE</div>
-      <div style="font-size:11px; color:var(--ink); line-height:1.6; margin-bottom:14px;">
-        Cyber Tamer added a story layer, and this save is from before it existed. Continuing will reset your Bits, Inventory, unlocked biomes, Server Farm and other progress back to a fresh start.
-        <br><br><b style="color:var(--phosphor);">Every monster already in your Network Registry is kept in full.</b>
-        <br><br>This only happens once — it's a result of the game still being in active development.
+      <div class="pixel-font glow" style="font-size:14px; color:var(--amber); margin-bottom:14px; text-align:center;">⚠ ONE-TIME SAVE UPDATE</div>
+      <div style="font-size:13px; color:var(--ink); line-height:1.7; margin-bottom:16px;">
+        Cyber Tamer just added its full story layer — origins, the Trace, the Auditor, Rosetta.exe, the Port — and this save is from before any of it existed.
+        <br><br>Continuing will reset your Bits, Inventory, unlocked biomes, Server Farm and other progress back to a fresh start, so the story can begin from the intro like it does for every new save.
+        <br><br><b style="color:var(--phosphor); font-size:14px;">Every monster already in your Network Registry is kept in full.</b>
+        <br><br>This is a bigger reset than usual because it's a bigger update than usual — it only happens once, and it's a result of the game still being in active development.
       </div>
-      <button class="btn btn-primary" id="story-reset-ok" style="width:100%;">Continue</button>`;
+      <button class="btn btn-primary" id="story-reset-ok" style="width:100%; padding:10px; font-size:13px;">Continue</button>`;
     overlay.style.display = 'flex';
-    document.getElementById('story-reset-ok').addEventListener('click', ()=>{ closeModal(); onConfirm(); });
+    document.getElementById('story-reset-ok').addEventListener('click', ()=>{
+      // #modal-box's default 340px only ever exists as its own inline style attribute (not a CSS
+      // class), so clearing box.style.maxWidth to '' would remove it outright rather than restore
+      // it — every other modal after this one would render unconstrained-width. Set it back
+      // explicitly instead.
+      box.style.maxWidth = '340px';
+      box.style.fontSize = '';
+      closeModal();
+      onConfirm();
+    });
   }
 
   function showOriginPicker(onPicked){
@@ -6567,6 +6680,8 @@
     if(typeof s.trace_floor !== 'number') s.trace_floor = 0;
     if(s.ending !== 'dismantle' && s.ending !== 'preserve' && s.ending !== 'migrate') s.ending = null;
     if(typeof s.public_port_enabled !== 'boolean') s.public_port_enabled = false;
+    if(!Array.isArray(s.biomeStorySeen)) s.biomeStorySeen = BIOMES.map(()=>false);
+    else while(s.biomeStorySeen.length < BIOMES.length) s.biomeStorySeen.push(false);
     if(Array.isArray(s.storage)) s.storage.forEach(migrateMonster);
     if(s.battle && s.battle.enemy) migrateMonster(s.battle.enemy);
     if(s.battle && typeof s.battle.isBoss !== 'boolean') s.battle.isBoss = false;
