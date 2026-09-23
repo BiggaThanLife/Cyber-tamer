@@ -999,6 +999,11 @@
     return c;
   }
   function bitsBoost(n){ const p = getActive(); return (p && hasModule(p,'bitMagnet')) ? Math.round(n * 1.5) : n; }
+  // The Scavenger's origin perk: a small Bits bonus specifically from chests and Job Board
+  // payouts (not battles/bosses/breaches — those already go through bitsBoost() above, a
+  // deliberately separate, narrower hook per the story bible).
+  const SCAVENGER_BITS_MULT = 1.10;
+  function scavengerBitsBoost(n){ return state.origin === 'scavenger' ? Math.round(n * SCAVENGER_BITS_MULT) : n; }
 
   function equipModule(monUid, instUid){
     const m = state.storage.find(x => x.uid === monUid);
@@ -1589,7 +1594,48 @@
       perfectBest: 0,
       tools: { decrypter: false, packetTracer: false, portScanner: false, firewallBreaker: false },
       breach: null,
+      // --- Story layer (Cyber Tamer story bible) — see STORY.md-equivalent const tables below.
+      // Per-biome key/defeated/recycled flags are NOT duplicated here: state.biomeKeyFound,
+      // state.bossDefeated and state.recycleCounts already ARE those flags.
+      handle: '',
+      origin: null,
+      originConfirmed: false,
+      storyIntroDone: false,
+      needsStoryReset: false,
+      firstBattleDone: false, // drives the "after the tutorial fight" trigger for Patch's confirmation scene
+      port_level: 0,
+      translation_level: 0,
+      auditor_stage: 0,
+      trace: 0,
+      trace_floor: 0,
+      ending: null,
+      public_port_enabled: false,
     };
+  }
+
+  // One-time story-update reset for saves from before the story layer existed: a fully fresh
+  // defaultState() EXCEPT the monster roster is carried over in full (per explicit instruction —
+  // "keep the monsters they already have"). Rebuilds the Dex from that preserved roster via the
+  // same dexMarkCaught() every real catch already goes through, so Dex/Network Registry never
+  // disagree with each other. Temporarily points the closure's `state` at the new object so
+  // dexMarkCaught/getDexEntry (which both read/write `state` directly) work unmodified; the
+  // caller is expected to keep that assignment (this is only ever called right before `state =
+  // performStoryReset(...)` would happen anyway).
+  function performStoryReset(oldState){
+    const fresh = defaultState();
+    const oldStorage = Array.isArray(oldState && oldState.storage) ? oldState.storage : [];
+    if(oldStorage.length){
+      fresh.storage = oldStorage;
+      fresh.activeId = (oldState.activeId && oldStorage.some(m => m.uid === oldState.activeId))
+        ? oldState.activeId : oldStorage[0].uid;
+      fresh.dex = {};
+      const prevState = state;
+      state = fresh;
+      try{ oldStorage.forEach(m => { if(EVOLUTION_LINES[m.speciesId]) dexMarkCaught(m); }); }
+      finally{ state = prevState; }
+    }
+    fresh.needsStoryReset = false;
+    return fresh;
   }
 
   function save(){
@@ -2131,6 +2177,12 @@
       }
       lastRenderedScreen = state.screen;
       afterRenderFx(screenChanged, screenEl);
+      // Story layer: Patch's origin-confirmation scene, the first time the player is back in
+      // town after their first battle resolves. Checked here (not at each individual battle-exit
+      // call site — faint/flee/catch/flee-fail all end differently) so it can't be missed
+      // regardless of which path ended the fight; self-guards via originConfirmationShown so it
+      // never pops more than once even if town re-renders before it's answered.
+      if(state.screen === 'town') maybeShowOriginConfirmation();
     }catch(err){
       console.error('Render error:', err);
       renderFatalError(err);
@@ -2209,6 +2261,16 @@
       importErrorMsg = 'Your save file appears to be corrupted and could not be loaded. You can start a new game below, or try importing a backup file.';
     }
     render();
+    if(state && state.needsStoryReset){
+      showStoryResetNotice(()=>{
+        state = performStoryReset(state);
+        save();
+        render();
+        if(pendingTutorial){ pendingTutorial = false; showTutorial(0); }
+        else maybeShowWhatsNew();
+      });
+      return; // wait for the notice to resolve before the tutorial/what's-new can show
+    }
     if(pendingTutorial){ pendingTutorial = false; showTutorial(0); }
     else if(appMode === 'game') maybeShowWhatsNew();
   }
@@ -2237,6 +2299,9 @@
         lastRenderedScreen = null;
         logMsg('Save file imported successfully.');
         render();
+        if(state.needsStoryReset){
+          showStoryResetNotice(()=>{ state = performStoryReset(state); save(); render(); });
+        }
       }catch(err){
         console.error('Import error:', err);
         importErrorMsg = 'Import failed: ' + ((err && err.message) || 'invalid file') + '.';
@@ -2309,6 +2374,9 @@
           save();
           logMsg('Save file imported successfully.');
           render();
+          if(state.needsStoryReset){
+            showStoryResetNotice(()=>{ state = performStoryReset(state); save(); render(); });
+          }
         }catch(err){
           console.error('Import error:', err);
           showAlertModal('Import failed: ' + ((err && err.message) || 'invalid file'));
@@ -2319,8 +2387,14 @@
   }
 
   function renderSystemMenu(screenEl, controlsEl){
+    const originDef = state.origin && ORIGINS[state.origin];
     screenEl.innerHTML = `
       ${screenTitle('⚙ SYSTEM')}
+      ${originDef ? `<div class="card" style="margin-bottom:8px;">
+        <div style="color:var(--cyan);">${state.handle ? state.handle + ' — ' : ''}${originDef.name}</div>
+        <div style="font-size:9.5px; color:var(--ink-dim); margin-top:3px;">${originDef.story}</div>
+        <div style="font-size:9px; color:var(--amber); margin-top:3px;">Perk: ${originDef.perkText}</div>
+      </div>` : ''}
       <div class="card" style="margin-bottom:8px; font-size:11px; color:var(--ink-dim); line-height:1.6;">
         Export your save to a file you can keep as a backup or move to a different browser or device.
         Importing a file will overwrite your current progress on this device.
@@ -3073,6 +3147,7 @@
         if(pod.state === 'growing'){
           pod.growTicks++;
           if((state.farm.boostTicks||0) > 0) pod.growTicks++; // Pod Overclock: double speed
+          if(state.origin === 'witness' && Math.random() < WITNESS_FARM_BONUS_CHANCE) pod.growTicks++; // The Witness: pods grow slightly faster
           const crop = CROPS[pod.cropId];
           if(crop && pod.growTicks >= crop.growTicks){
             pod.state = 'ready';
@@ -3147,7 +3222,7 @@
       fx({k:'mapLoot'});
       questEvent('chest', 1);
       const roll = Math.random();
-      if(roll < 0.5){ const bits = 10+w.biomeIndex*8+Math.floor(Math.random()*30); state.bits += bits; logMsg(`Found a chest with ◈${bits} Bits!`); }
+      if(roll < 0.5){ const bits = scavengerBitsBoost(10+w.biomeIndex*8+Math.floor(Math.random()*30)); state.bits += bits; logMsg(`Found a chest with ◈${bits} Bits!`); }
       else { state.inventory.basicCapture++; logMsg('Found a chest with a Basic Capture.exe run!'); }
       render(); return;
     }
@@ -3408,6 +3483,7 @@
         const finishEscape = () => {
           b.offerWanted = false;
           const wasBossVictory = b.bossVictory;
+          state.firstBattleDone = true;
           state.battle = null;
           state.screen = wasBossVictory ? 'town' : (b.source === 'mine' ? (state.mine ? 'mine' : 'town') : (state.wild ? 'wild' : 'town'));
           if(wasBossVictory) state.wild = null;
@@ -3420,6 +3496,7 @@
       controlsEl.innerHTML = `<button class="btn btn-primary" id="continue" style="width:100%;">Continue</button>`;
       controlsEl.querySelector('#continue').addEventListener('click', ()=>{
         const wasBossVictory = b.bossVictory;
+        state.firstBattleDone = true;
         state.battle = null;
         state.screen = wasBossVictory ? 'town' : (b.source === 'mine' ? (state.mine ? 'mine' : 'town') : (state.wild ? 'wild' : 'town'));
         if(wasBossVictory) state.wild = null;
@@ -3468,6 +3545,7 @@
     if(program) chance *= program.mult;
     if(enemy.isAnomaly) chance += 0.15;
     if(enemy.isWanted) chance += 0.20;
+    if(enemy.isWanted && state.origin === 'keeper') chance += KEEPER_WANTED_CATCH_BONUS; // The Keeper: re-encounters are a little easier
     const ap = getActive();
     if(ap && hasModule(ap,'trapAssist')) chance *= 1.25;
     return Math.max(0.05, Math.min(0.95, chance));
@@ -3685,6 +3763,7 @@
       state.screen = 'town'; state.wild = null;
       if(b.source === 'mine') state.mine = null;
       markBattleOver(b);
+      state.firstBattleDone = true;
     }
   }
 
@@ -3804,6 +3883,115 @@
       <button class="btn" id="back">Town</button></div>`;
     controlsEl.querySelector('#help-topics').addEventListener('click', ()=>{ helpSection = null; render(); });
     controlsEl.querySelector('#back').addEventListener('click', ()=>{ helpSection = null; state.screen='town'; render(); });
+  }
+
+  /* ---------------------------------------------------------
+     STORY LAYER — Cyber Tamer story bible. Content lives in data tables like this one, not
+     hard-coded in logic; the story layer only ever READS existing mechanical state (bossDefeated,
+     recycleCounts, biomeKeyFound) and never shadows it with duplicate flags. It must never alter
+     combat/economy/progression math except the three explicit PvE perks below.
+     --------------------------------------------------------- */
+  const ORIGINS = {
+    witness:   { id:'witness',   name:'The Witness',   story:'Watched a data center drain their hometown.',
+      seesProblemsAs:'Someone did this, and can be held accountable.',
+      perkText:'Server Farm pods grow slightly faster.',
+      bootLine:'You know what a dry well sounds like.' },
+    insider:   { id:'insider',   name:'The Insider',   story:'Ex data center technician who quit.',
+      seesProblemsAs:'Systems with weak points.',
+      perkText:'Clean Logs — Trace gains from things you trigger are reduced about 15%.',
+      bootLine:'You know exactly what you\'re looking at.' },
+    scavenger: { id:'scavenger', name:'The Scavenger', story:'Stripped abandoned sites to survive.',
+      seesProblemsAs:'Things to use, sell, or survive.',
+      perkText:'A small Bits bonus from chests and Job Board payouts.',
+      bootLine:'One more site. One more score.' },
+    keeper:    { id:'keeper',    name:'The Keeper',    story:'Preserved dying servers and data.',
+      seesProblemsAs:'Something is being lost, and someone must remember.',
+      perkText:'Wanted Board re-encounters have slightly better capture odds.',
+      bootLine:'Somebody has to remember this place.' },
+  };
+  const ORIGIN_IDS = Object.keys(ORIGINS);
+  // Perk magnitudes — deliberately modest ("slightly"/"a small bonus" per the story bible).
+  const WITNESS_FARM_BONUS_CHANCE = 0.20; // ~20% chance of an extra grow-tick per tick, ≈20% faster on average
+  const KEEPER_WANTED_CATCH_BONUS = 0.05; // +5 percentage points on top of the existing +20% Wanted bonus
+  const INSIDER_TRACE_MULT = 0.85;        // Clean Logs: ~15% less Trace from player-triggered sources (wired when Trace exists)
+
+  // Reusable origin-card picker — used by the (future) intro's Scene 5 AND by "Not quite" below,
+  // so there's exactly one place that renders the four origin cards.
+  // One-time notice shown when a save flagged needsStoryReset (see migrateState/performStoryReset)
+  // is loaded, whether via Continue or Import — a single "Continue" button, not a yes/no, since
+  // this is happening either way; the point is making sure the player sees and understands it
+  // before it does, not offering a way to keep the old save exactly as it was.
+  function showStoryResetNotice(onConfirm){
+    const overlay = document.getElementById('modal-overlay');
+    const box = document.getElementById('modal-box');
+    box.innerHTML = `
+      <div class="pixel-font glow" style="font-size:10px; color:var(--amber); margin-bottom:10px;">⚠ ONE-TIME SAVE UPDATE</div>
+      <div style="font-size:11px; color:var(--ink); line-height:1.6; margin-bottom:14px;">
+        Cyber Tamer added a story layer, and this save is from before it existed. Continuing will reset your Bits, Inventory, unlocked biomes, Server Farm and other progress back to a fresh start.
+        <br><br><b style="color:var(--phosphor);">Every monster already in your Network Registry is kept in full.</b>
+        <br><br>This only happens once — it's a result of the game still being in active development.
+      </div>
+      <button class="btn btn-primary" id="story-reset-ok" style="width:100%;">Continue</button>`;
+    overlay.style.display = 'flex';
+    document.getElementById('story-reset-ok').addEventListener('click', ()=>{ closeModal(); onConfirm(); });
+  }
+
+  function showOriginPicker(onPicked){
+    const overlay = document.getElementById('modal-overlay');
+    const box = document.getElementById('modal-box');
+    box.innerHTML = `
+      <div class="pixel-font glow" style="font-size:10px; color:var(--phosphor); margin-bottom:10px;">WHAT BROUGHT YOU OUT HERE?</div>
+      <div style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;">
+        ${ORIGIN_IDS.map(id => { const o = ORIGINS[id]; return `
+          <button class="btn" style="text-align:left; padding:8px 10px;" data-origin-pick="${id}">
+            <div style="color:var(--phosphor);">${o.name}</div>
+            <div style="font-size:9px; color:var(--ink-dim); margin-top:2px;">${o.story}</div>
+            <div style="font-size:8.5px; color:var(--amber); margin-top:2px;">Perk: ${o.perkText}</div>
+          </button>`; }).join('')}
+      </div>`;
+    overlay.style.display = 'flex';
+    ORIGIN_IDS.forEach(id => {
+      const btn = box.querySelector(`[data-origin-pick="${id}"]`);
+      if(btn) btn.addEventListener('click', ()=>{ closeModal(); onPicked(id); });
+    });
+  }
+  // Transient, not persisted — guards against popping more than once per session even if the
+  // town screen happens to re-render again before the player answers.
+  let originConfirmationShown = false;
+  function maybeShowOriginConfirmation(){
+    if(originConfirmationShown) return;
+    if(!state.firstBattleDone || !state.origin || state.originConfirmed) return;
+    originConfirmationShown = true;
+    showOriginConfirmationScene();
+  }
+  function showOriginConfirmationScene(){
+    const o = ORIGINS[state.origin];
+    const overlay = document.getElementById('modal-overlay');
+    const box = document.getElementById('modal-box');
+    box.innerHTML = `
+      <div class="pixel-font glow" style="font-size:10px; color:var(--cyan); margin-bottom:8px;">PATCH</div>
+      <div style="font-size:11px; color:var(--ink); line-height:1.5; margin-bottom:6px;">"${o.story} ${o.seesProblemsAs} That still sound like you?"</div>
+      <div style="font-size:9.5px; color:var(--ink-dim); margin-bottom:14px;">Perk: ${o.perkText}</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <button class="btn" id="origin-no">Not quite</button>
+        <button class="btn btn-primary" id="origin-yes">That's me</button>
+      </div>`;
+    overlay.style.display = 'flex';
+    document.getElementById('origin-yes').addEventListener('click', ()=>{
+      state.originConfirmed = true;
+      closeModal();
+      logMsg(`Patch: "${o.bootLine}" Noted.`);
+      render();
+    });
+    document.getElementById('origin-no').addEventListener('click', ()=>{
+      closeModal();
+      showOriginPicker((newId)=>{
+        state.origin = newId;
+        state.originConfirmed = true;
+        logMsg(`Patch: "${ORIGINS[newId].bootLine}" Updated.`);
+        render();
+      });
+    });
   }
 
   const TUTORIAL_STEPS = [
@@ -5520,6 +5708,7 @@
         if(dist <= greatHalf){ tier='GREAT'; bits = Math.round(10 + statVal*1.5); xp = Math.round(4 + statVal*0.3); }
         else if(dist <= goodHalf){ tier='GOOD'; bits = Math.round(5 + statVal*0.7); xp = 2; }
         else { tier='MISS'; bits = 0; xp = 0; }
+        bits = scavengerBitsBoost(bits);
         registerTimingTier(tier);
         m.energy = Math.max(0, m.energy - JOB_ENERGY_COST);
         m.hunger = Math.max(0, m.hunger - JOB_HUNGER_COST);
@@ -6066,6 +6255,27 @@
   }
   function migrateState(s){
     if(!s) return s;
+    // Story layer: a save from before this existed never saw the intro cinematic or picked an
+    // origin. Rather than silently grandfathering it in, we flag it — the app-level load flow
+    // (continueGame/import) shows a mandatory one-time notice explaining that the save is being
+    // reset back to a fresh start (Bits, inventory, unlocked biomes, farm, Dex, everything) EXCEPT
+    // the monster roster, which is kept in full, then calls performStoryReset(). migrateState
+    // itself stays a pure function — it only detects and flags, never performs the reset (which
+    // needs to show UI and isn't idempotent the way ordinary field-backfilling is).
+    const preStorySave = typeof s.storyIntroDone !== 'boolean';
+    if(preStorySave) s.needsStoryReset = true;
+    if(typeof s.handle !== 'string') s.handle = '';
+    if(!ORIGINS[s.origin]) s.origin = null;
+    if(typeof s.originConfirmed !== 'boolean') s.originConfirmed = false;
+    if(typeof s.storyIntroDone !== 'boolean') s.storyIntroDone = false;
+    if(typeof s.firstBattleDone !== 'boolean') s.firstBattleDone = false;
+    if(typeof s.port_level !== 'number') s.port_level = 0;
+    if(typeof s.translation_level !== 'number') s.translation_level = 0;
+    if(typeof s.auditor_stage !== 'number') s.auditor_stage = 0;
+    if(typeof s.trace !== 'number') s.trace = 0;
+    if(typeof s.trace_floor !== 'number') s.trace_floor = 0;
+    if(s.ending !== 'dismantle' && s.ending !== 'preserve' && s.ending !== 'migrate') s.ending = null;
+    if(typeof s.public_port_enabled !== 'boolean') s.public_port_enabled = false;
     if(Array.isArray(s.storage)) s.storage.forEach(migrateMonster);
     if(s.battle && s.battle.enemy) migrateMonster(s.battle.enemy);
     if(s.battle && typeof s.battle.isBoss !== 'boolean') s.battle.isBoss = false;
