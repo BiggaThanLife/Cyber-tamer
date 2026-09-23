@@ -86,7 +86,7 @@ Some tiles block your way.
 
 ### Looking after your partner
 - **Hunger** and **Energy** drain as you explore.
-- Feed with **Prime Meat** from the Inventory (+40 Hunger). **Rest Partner** in town gives +35 Energy for a little Hunger.
+- Feed with a **Databite** from the Inventory (+40 Hunger). **Rest Partner** in town gives +35 Energy for a little Hunger.
 - **Play** is a short timing game that earns small amounts of Bits and XP. Every try costs Energy and Hunger, hit or miss, and only a few tries fit in a row before your partner needs a break. Exploring shortens the break.
 - Jobs and Training need a minimum amount of Energy.
 - Either bar glows red once it drops to 20% or below, so you get a warning before Hunger actually runs out and sends you home. If Hunger does hit 0, a popup explains what happened, on top of the log message.
@@ -237,7 +237,7 @@ Beating boss #1 unlocks the Training Ground. Beating two unlocks the Data Mine.
 | Advanced Capture.exe | 60 | Better odds than Basic |
 | Hunter.exe | 160 | Strong odds even against sturdy targets |
 | Containment.exe | 420 | About as close to a guarantee as it gets |
-| Prime Meat | 15 | Fills hunger, restores a little energy |
+| Databite | 15 | Fills hunger, restores a little energy |
 | Medicine | 25 | Restores HP to full |
 | Evolution Crest | 100 | Permanently boosts stats (max 3 per monster) |
 | Nano Patch | 12 | Restores 30% of max HP, also usable in battle |
@@ -301,7 +301,7 @@ Buy seeds, plant them in pods, and charge them to start growing. Crops grow as y
 | Crop | Seed price | Grows in | Gives |
 |---|---|---|---|
 | Bitshoot | 15 | 15 ticks | 40 Bits |
-| Byte Berry | 25 | 25 ticks | 3 Prime Meat |
+| Byte Berry | 25 | 25 ticks | 3 Databite |
 | Cache Crystal | 50 | 40 ticks | 2 Medicine |
 | Crest Shard | 120 | 70 ticks | 1 Evolution Crest |
 | Deepweed | Not sold (Data Mine only) | 30 ticks | 90 Bits |

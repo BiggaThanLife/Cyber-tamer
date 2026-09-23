@@ -1,7 +1,7 @@
 {
-  "version": "25.23",
+  "version": "25.24",
   "date": "2026-09-22",
   "notes": [
-    "Fixed: the Out of Hunger popup wrongly suggested Rest Partner as a fix — Rest Partner restores Energy and actually costs Hunger, so it made things worse, not better. It now just points you at feeding your partner."
+    "Renamed: Prime Meat is now Databite — fits the digital-creature theme better. Purely a name change; it still does the same thing."
   ]
 }

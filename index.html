@@ -757,7 +757,7 @@
     {id:'advancedCapture',   name:'Advanced Capture.exe',   price:60,  desc:'A tighter compression routine — clearly better odds than Basic.'},
     {id:'hunterExe',         name:'Hunter.exe',             price:160, desc:'Aggressive acquisition heuristics. Strong odds even against sturdy targets.'},
     {id:'containmentExe',    name:'Containment.exe',        price:420, desc:'Full containment suite. About as close to a guarantee as it gets.'},
-    {id:'primeMeat',  name:'Prime Meat',    price:15,  desc:'Fills hunger, restores a little energy.'},
+    {id:'primeMeat',  name:'Databite',    price:15,  desc:'Fills hunger, restores a little energy.'},
     {id:'medicine',   name:'Medicine',      price:25,  desc:'Restores HP to full instantly.'},
     {id:'evoCrest',   name:'Evolution Crest', price:100, desc:'Permanently hardens a partner\'s stats.'},
   ];
@@ -770,7 +770,7 @@
   // you to come harvest it — see the tick loop in advanceTickCore.
   const CROPS = {
     bitshoot:     { id:'bitshoot',     name:'Bitshoot',      icon:'🌱', color:'var(--phosphor)', seedPrice:15,  growTicks:15, witherTicks:40, yieldBits:40,  desc:'Fast-growing code sprout. Modest payout, quick turnaround.' },
-    byteberry:    { id:'byteberry',    name:'Byte Berry',    icon:'🍇', color:'var(--crimson)',  seedPrice:25,  growTicks:25, witherTicks:50, yieldItem:'primeMeat',  yieldAmount:3, desc:'Slow-ripening data fruit. Processes into Prime Meat.' },
+    byteberry:    { id:'byteberry',    name:'Byte Berry',    icon:'🍇', color:'var(--crimson)',  seedPrice:25,  growTicks:25, witherTicks:50, yieldItem:'primeMeat',  yieldAmount:3, desc:'Slow-ripening data fruit. Processes into Databite.' },
     cachecrystal: { id:'cachecrystal', name:'Cache Crystal', icon:'💎', color:'var(--cyan)',     seedPrice:50,  growTicks:40, witherTicks:60, yieldItem:'medicine',   yieldAmount:2, desc:'Rare crystallized cache. Condenses into Medicine.' },
     crestshard:   { id:'crestshard',   name:'Crest Shard',   icon:'🔷', color:'var(--violet)',   seedPrice:120, growTicks:70, witherTicks:90, yieldItem:'evoCrest',   yieldAmount:1, desc:'A slow-forming fragment. A patient, Bits-free path to an Evolution Crest.' },
     deepweed:     { id:'deepweed',     name:'Deepweed',      icon:'🌿', color:'var(--amber)',    seedPrice:null, growTicks:30, witherTicks:55, yieldBits:90,  desc:'A hardy strain found only in the mines — not sold anywhere.', mineOnly:true },
@@ -2321,11 +2321,11 @@
 
   function feedPartner(){
     const p = getActive();
-    if(state.inventory.primeMeat <= 0){ logMsg('No Prime Meat left — visit the shop.'); render(); return; }
+    if(state.inventory.primeMeat <= 0){ logMsg('No Databite left — visit the shop.'); render(); return; }
     state.inventory.primeMeat--;
     p.hunger = Math.min(100, p.hunger + 40);
     p.energy = Math.min(100, p.energy + 8);
-    logMsg(`Fed ${getForm(p).name} a Prime Meat.`);
+    logMsg(`Fed ${getForm(p).name} a Databite.`);
     questEvent('care', 1);
     render();
   }
@@ -2400,7 +2400,7 @@
     const parts = [];
     const bits = Math.round((r.bits||0) * (bitsMult||1));
     if(bits){ state.bits += bits; parts.push(`◈${bits}`); }
-    [['basicCapture','Basic Capture.exe'],['advancedCapture','Advanced Capture.exe'],['hunterExe','Hunter.exe'],['containmentExe','Containment.exe'],['primeMeat','Prime Meat'],['medicine','Medicine'],['evoCrest','Evolution Crest']].forEach(([k,label])=>{
+    [['basicCapture','Basic Capture.exe'],['advancedCapture','Advanced Capture.exe'],['hunterExe','Hunter.exe'],['containmentExe','Containment.exe'],['primeMeat','Databite'],['medicine','Medicine'],['evoCrest','Evolution Crest']].forEach(([k,label])=>{
       if(r[k]){ state.inventory[k] = (state.inventory[k]||0) + r[k]; parts.push(`${r[k]} ${label}`); }
     });
     if(r.seeds){
@@ -2415,7 +2415,7 @@
   function rewardPreview(r, bitsMult){
     const parts = [];
     if(r.bits) parts.push(`◈${Math.round(r.bits*(bitsMult||1))}`);
-    [['basicCapture','Basic Capture.exe'],['advancedCapture','Advanced Capture.exe'],['hunterExe','Hunter.exe'],['containmentExe','Containment.exe'],['primeMeat','Prime Meat'],['medicine','Medicine'],['evoCrest','Evo Crest']].forEach(([k,label])=>{ if(r[k]) parts.push(`${r[k]} ${label}`); });
+    [['basicCapture','Basic Capture.exe'],['advancedCapture','Advanced Capture.exe'],['hunterExe','Hunter.exe'],['containmentExe','Containment.exe'],['primeMeat','Databite'],['medicine','Medicine'],['evoCrest','Evo Crest']].forEach(([k,label])=>{ if(r[k]) parts.push(`${r[k]} ${label}`); });
     if(r.seeds) Object.keys(r.seeds).forEach(sid => parts.push(`${r.seeds[sid]} ${(CROPS[sid]&&CROPS[sid].name)||sid} seed`));
     return parts.join(' + ');
   }
@@ -3053,7 +3053,7 @@
       const pname = getForm(p).name;
       logMsg(`${pname} is starving and too weak to explore further! You head back to Neon Haven.`);
       state.screen='town'; render();
-      showAlertModal(`<span style="color:var(--crimson);">⚠ Out of Hunger</span><br><br>${pname} was too weak to keep exploring and you're back in Neon Haven. Feed them Prime Meat (or another food item) from the Inventory before heading out again.`);
+      showAlertModal(`<span style="color:var(--crimson);">⚠ Out of Hunger</span><br><br>${pname} was too weak to keep exploring and you're back in Neon Haven. Feed them a Databite (or another food item) from the Inventory before heading out again.`);
       return;
     }
     if(cell.role === 'open' && Math.random() < encounterChance(p)){
@@ -3541,7 +3541,7 @@
       { h:'STR — Strength', b:'Powers the damage of every move you use, before type effectiveness and the target\'s DEF.' },
       { h:'DEF — Defense', b:'Reduces damage taken from enemy attacks.' },
       { h:'SPD — Speed', b:'Improves your chance to dodge counterattacks and to flee successfully.' },
-      { h:'Hunger and Energy', b:'Exploring drains both. Feed a partner with <b>Prime Meat</b> from the Inventory (+40 Hunger), or use <b>Rest Partner</b> in town (+35 Energy, a little Hunger lost). <b>Play</b> is a short timing game that earns small Bits and XP, but every try costs Energy and Hunger (hit or miss) and only a few tries fit before your partner needs a break — explore to recover. Jobs and Training need a minimum Energy too. Either bar glows red once it drops to 20% or below, so you get a warning before Hunger actually runs out and sends you home. If Hunger does hit 0, a popup explains what happened on top of the log message.' },
+      { h:'Hunger and Energy', b:'Exploring drains both. Feed a partner with a <b>Databite</b> from the Inventory (+40 Hunger), or use <b>Rest Partner</b> in town (+35 Energy, a little Hunger lost). <b>Play</b> is a short timing game that earns small Bits and XP, but every try costs Energy and Hunger (hit or miss) and only a few tries fit before your partner needs a break — explore to recover. Jobs and Training need a minimum Energy too. Either bar glows red once it drops to 20% or below, so you get a warning before Hunger actually runs out and sends you home. If Hunger does hit 0, a popup explains what happened on top of the log message.' },
       { h:'Perfect streak', b:'Play, Job Board and Training Ground all use the same timing bar. Tapping in the bright green zone is a <b>Perfect</b> hit, which celebrates on the spot and extends a shared streak across all three. Miss the green zone and the streak resets. Beating your best streak ever logs a 🏆 in the Log.' },
       { h:'Levels and evolution', b:'Partners gain XP from exploring and battles. Many species evolve into a stronger form at a set level. The Dex shows each line\'s stages.' },
       { h:'IVs and Potential', b:'Every monster has hidden ±15% variance on each stat, fixed for life at capture or hatch. It\'s shown as a Potential star rating (☆ to ★★★★★). Breeding can pass IVs down, sometimes with a mutation.' },
@@ -3559,7 +3559,7 @@
       { h:'Earning Bits', b:'Win battles, open chests and shrines, do Jobs, play, complete Daily quests, harvest crops, or sell spare monsters from the Network Registry (your active partner can\'t be sold, and neither can your last monster).' },
       { h:'Job Board', b:'Send a partner on a job for an instant payout influenced by their stats. Each job costs Energy and Hunger and starts a cooldown; explore the wilderness to reduce it.' },
       { h:'Shop', b:'Five tabs: Supplies, Growth, Battle, Modules and Cosmetics. Each item explains its effect and shows how many you own.' },
-      { h:'Server Farm', b:'Buy seeds in the Shop and plant them in pods. Crops grow as you take steps, then wait — ripe and ready — for however long it takes you to come harvest them. Crops give Bits, Prime Meat, Medicine or even Evolution Crests. Upgrade the farm for more pods.' },
+      { h:'Server Farm', b:'Buy seeds in the Shop and plant them in pods. Crops grow as you take steps, then wait — ripe and ready — for however long it takes you to come harvest them. Crops give Bits, Databite, Medicine or even Evolution Crests. Upgrade the farm for more pods.' },
       { h:'Farm upgrades', b:'Vacant Plot (6 pods) → Server Shack (10) → Small Farm (16) → Farmhouse (24) → Large Estate (36). The Large Estate can unlock farm automation: Harvester, Drill and Autopilot.' },
     ]},
     { id:'mine', icon:'⛏', title:'The Data Mine', color:'var(--amber)', blurb:'Digging, depth, gear and signals.', cards:[
@@ -3619,7 +3619,7 @@
     { t:'Exploring', b:'Pick a biome, then use the arrow pad to walk the map. Each step costs Energy and Hunger and earns a little XP. Fog hides the map until you get close. Look for <b>▪</b> chests, <b>✦</b> shrines and the <b>⛩</b> gate back home. Tap <b>❓ Legend</b> for all the symbols.' },
     { t:'Battles', b:'Wild monsters can appear as you walk. Pick a move — <b>▲</b> means strong against that enemy, <b>▼</b> weak. Use <b>Medicine</b> to heal, or <b>Flee</b> if it\'s going badly. A running log of the fight appears under the monsters.' },
     { t:'Acquiring monsters', b:'Wear an enemy down, then run a <b>capture program</b> — start with <b>Basic Capture.exe</b>. The lower its HP, the better your odds; each program shows its chance. You start with 5 Basic Capture.exe runs; buy more (and better programs) in the Shop. Bosses can\'t be captured, only defeated.' },
-    { t:'Looking after your partner', b:'Watch the <b>Hunger</b> and <b>Energy</b> bars. Feed with Prime Meat from the Inventory, or use <b>Rest Partner</b> in town. If Hunger reaches 0 you can\'t keep exploring.' },
+    { t:'Looking after your partner', b:'Watch the <b>Hunger</b> and <b>Energy</b> bars. Feed with a Databite from the Inventory, or use <b>Rest Partner</b> in town. If Hunger reaches 0 you can\'t keep exploring.' },
     { t:'Your first steps', b:'Claim your <b>Daily</b> reward, then head out through the Wilderness Gate. Anytime you\'re unsure, open <b>❓ Help</b> in the town menu — it explains every system by topic, and you can replay this tutorial there.' },
   ];
   function showTutorial(step){
@@ -5590,7 +5590,7 @@
     advancedCapture: {name:'Advanced Capture.exe', icon:'💾', desc:'Better odds than Basic. Run it from the battle screen.', usableHere:false},
     hunterExe:       {name:'Hunter.exe',           icon:'🎯', desc:'Strong odds even against sturdy targets. Run it from the battle screen.', usableHere:false},
     containmentExe:  {name:'Containment.exe',      icon:'🔒', desc:'About as close to a guarantee as it gets. Run it from the battle screen.', usableHere:false},
-    primeMeat:  {name:'Prime Meat',  icon:'🍖', desc:'Fills hunger, restores a little energy.', usableHere:true},
+    primeMeat:  {name:'Databite',  icon:'🍖', desc:'Fills hunger, restores a little energy.', usableHere:true},
     medicine:   {name:'Medicine',    icon:'🩹', desc:'Restores your active partner\'s HP to full.', usableHere:true},
     evoCrest:   {name:'Evolution Crest', icon:'🔷', desc:'Permanently hardens a partner\'s stats. Buy from the Shop — applies immediately on purchase.', usableHere:false},
   };
@@ -5601,7 +5601,7 @@
     const refuse = (msg) => { logMsg(msg); render(); };
     if(id === 'primeMeat'){
       inv.primeMeat--; p.hunger = Math.min(100, p.hunger + 40); p.energy = Math.min(100, p.energy + 8);
-      logMsg(`Fed ${nm} a Prime Meat.`);
+      logMsg(`Fed ${nm} a Databite.`);
     } else if(id === 'medicine'){
       inv.medicine--; p.hp = p.maxHp;
       logMsg(`Used Medicine — ${nm}'s HP fully restored.`);
@@ -6415,6 +6415,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.23', date:'2026-09-22', notes:[
+      'Fixed: the Out of Hunger popup wrongly suggested Rest Partner as a fix — Rest Partner restores Energy and actually costs Hunger, so it made things worse, not better. It now just points you at feeding your partner.',
+    ]},
     { version:'25.22', date:'2026-09-22', notes:[
       'Improved: running out of Hunger while exploring now shows a popup explaining what happened, on top of the log message.',
       'Improved: the Hunger/Energy low-resource warning is now a red pulsing glow on the bar (plus the label itself turning red), instead of a subtle shake that was easy to miss.',
@@ -6499,10 +6502,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.23',
+    version: '25.24',
     date: '2026-09-22',
     notes: [
-      'Fixed: the Out of Hunger popup wrongly suggested Rest Partner as a fix — Rest Partner restores Energy and actually costs Hunger, so it made things worse, not better. It now just points you at feeding your partner.',
+      'Renamed: Prime Meat is now Databite — fits the digital-creature theme better. Purely a name change; it still does the same thing.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
