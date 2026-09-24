@@ -7610,6 +7610,15 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.29', date:'2026-09-24', notes:[
+      'New: a full story layer. A 10-scene cinematic intro plays on a fresh save — pick a handle and an origin, meet Patch, and jack in. Origins carry a small permanent perk.',
+      'New: a mysterious corporate "Auditor" reacts to your play over time (Trace), Rosetta.exe slowly translates the world\'s language as you find each biome\'s Network Access Key, and the Port fills in with more of Neon Haven as you go — all visible on the System menu once they start.',
+      'New: an Archive tab on the Dex screen — a running diary of what you\'ve pieced together, in the order you actually discovered it. Nothing locked ever shows early.',
+      'New: Replay Intro in the System menu — rewatch the opening scenes anytime without it touching your actual save.',
+      'Existing saves get a one-time reset to bring them into the story (Bits, Inventory, unlocked biomes and more reset to a fresh start) — every monster already in your Network Registry is kept in full. Explained in full the next time you load, and only happens once.',
+      'Rebalanced: daily login rewards now climb every day of the streak instead of dipping midweek.',
+      'Rebalanced: Exp Capsule prices roughly 4x — a level-1 partner could previously buy straight into several free levels before ever really exploring.',
+    ]},
     { version:'25.28', date:'2026-09-23', notes:[
       'New: Data Mine gear now comes in three rarity tiers — Common, Rare and Legendary — instead of one flat pool. Which tier you find is weighted by how deep you are: Rare starts showing up around depth 15-20, Legendary never appears before depth 25 and stays rare even past it.',
       '10 new gear items across Rare and Legendary, with mechanics the game hasn\'t had before: Type Wards (reduced damage from one type), dodge/flee gear, a same-type damage bonus, and a DEF spike when HP runs low.',
@@ -7722,16 +7731,14 @@
     ]},
   ];
   const BUILD = {
-    version: '25.29',
-    date: '2026-09-24',
+    version: '25.30',
+    date: '2026-09-25',
     notes: [
-      'New: a full story layer. A 10-scene cinematic intro plays on a fresh save — pick a handle and an origin, meet Patch, and jack in. Origins carry a small permanent perk.',
-      'New: a mysterious corporate "Auditor" reacts to your play over time (Trace), Rosetta.exe slowly translates the world\'s language as you find each biome\'s Network Access Key, and the Port fills in with more of Neon Haven as you go — all visible on the System menu once they start.',
-      'New: an Archive tab on the Dex screen — a running diary of what you\'ve pieced together, in the order you actually discovered it. Nothing locked ever shows early.',
-      'New: Replay Intro in the System menu — rewatch the opening scenes anytime without it touching your actual save.',
-      'Existing saves get a one-time reset to bring them into the story (Bits, Inventory, unlocked biomes and more reset to a fresh start) — every monster already in your Network Registry is kept in full. Explained in full the next time you load, and only happens once.',
-      'Rebalanced: daily login rewards now climb every day of the streak instead of dipping midweek.',
-      'Rebalanced: Exp Capsule prices roughly 4x — a level-1 partner could previously buy straight into several free levels before ever really exploring.',
+      'New: the Auditor has a final notice. Reaching the Ghost Server now spikes Trace to 100 and triggers a full target-lock message, followed by a cryptic warning from Patch. Trace itself is no longer affected by anything you do — it now climbs purely with story progress, so every playthrough hits the same beats at the same points.',
+      'Changed: the Insider origin\'s perk is now Systems Knowledge (Explorer Tools cost 15% less), replacing Clean Logs now that Trace can\'t be influenced by play.',
+      'New: a short scene the first time you\'re back in town after your first biome boss falls — the moment Rosetta.exe gets written. Players already past that point will see it too, next time they load in, with nothing about their save touched.',
+      'New: a red dot on the Dex button (and again on the Archive tab) whenever your diary has something new you haven\'t looked at yet — including anything added retroactively.',
+      'Changed: the Data Mine now runs on Energy instead of Hunger. Running out mid-dive disconnects you with a popup explaining why, same as running out of Hunger already does in the wilderness — your dive is paused, not lost.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
