@@ -921,8 +921,12 @@
     primeSirloin: { name:'Prime Sirloin',  icon:'🥩', price:45,  group:'Supplies', usable:true,  desc:'A premium cut: fills Hunger completely and restores 25 Energy.' },
     rebootKit:    { name:'Reboot Kit',     icon:'♻',  price:70,  group:'Supplies', usable:true,  desc:'Full reset: restores HP, Hunger and Energy to full.' },
     podOverclock: { name:'Pod Overclock',  icon:'🚀', price:350, group:'Supplies', usable:true,  desc:'Doubles Grow-Pod growth speed for 100 ticks of exploring. Stacks.' },
-    expCapsule:   { name:'Exp Capsule',    icon:'💊', price:100, group:'Growth',   usable:true,  desc:'Instantly grants 250 XP to your partner.' },
-    expCapsuleL:  { name:'Exp Capsule L',  icon:'💊', price:450, group:'Growth',   usable:true,  desc:'Instantly grants 1,500 XP to your partner.' },
+    // Prices raised 4x from their original 100/450 (same 4.5x ratio between the two) — unlike
+    // Stat Drives, capsules have no purchase cap, so at the old prices a level-1 partner could
+    // burn straight through the starting 150 Bits (or an early Job Board run) into several
+    // free levels before ever really exploring. Now buying even one takes real early-game income.
+    expCapsule:   { name:'Exp Capsule',    icon:'💊', price:400,  group:'Growth',   usable:true,  desc:'Instantly grants 250 XP to your partner.' },
+    expCapsuleL:  { name:'Exp Capsule L',  icon:'💊', price:1800, group:'Growth',   usable:true,  desc:'Instantly grants 1,500 XP to your partner.' },
     // Bought directly in the Shop for the active partner (see buyShopItem/DRIVE_CAP_USES), not
     // stocked/used from Inventory — price/cap here are the STARTING price and the MAX total bonus;
     // the live per-purchase price is computed from driveNextPrice() + that partner's driveUses.
