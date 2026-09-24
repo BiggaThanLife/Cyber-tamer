@@ -1616,6 +1616,7 @@
       ending: null,
       public_port_enabled: false,
       biomeStorySeen: BIOMES.map(()=>false), // Phase 5: per-biome flavor text, fires once per biome
+      archiveLog: [], // Archive/diary: entry ids in the order the player actually discovered them
     };
   }
 
@@ -2135,6 +2136,7 @@
 
       statusEl.style.display = '';
       dailyRefresh();
+      syncArchiveLog();
       renderStatusbar();
       const screenChanged = state.screen !== lastRenderedScreen;
       screenEl.innerHTML = '';
@@ -3959,13 +3961,13 @@
   --------------------------------------------------------- */
   const AUDITOR_REF = 'Ref. 7741-A';
   const BIOME_TRACE_FLOORS = [5, 15, 25, 40, 55]; // index i = floor set when biome i is cleared (entering biome i+1)
-  function auditorNoticeText(stage){
+  function auditorNoticeText(stage, handleOverride){
     switch(stage){
       case 1: return `An access event of unknown origin has been recorded. Standard verification procedures have been initiated. No action required at this time. ${AUDITOR_REF}`;
       case 2: return `An unregistered connection has been observed. No action required at this time. ${AUDITOR_REF}`;
       case 3: return `The connection persists. A review has been opened. ${AUDITOR_REF}`;
       case 4: return `Activity has been attributed to a single origin. Remediation is scheduled. ${AUDITOR_REF}`;
-      case 5: return `${state.handle || 'Unknown'}. Your port has been located. This notice is a courtesy. ${AUDITOR_REF}`;
+      case 5: return `${(handleOverride !== undefined ? handleOverride : state.handle) || 'Unknown'}. Your port has been located. This notice is a courtesy. ${AUDITOR_REF}`;
       default: return null;
     }
   }
@@ -4148,6 +4150,74 @@
     if(type === 'Metal'){ showFoundryRecycleQuestion(); return; }
     const line = RECYCLE_FLAVOR_BY_TYPE[type];
     if(line) logMsg(line);
+  }
+
+  /* ---------------------------------------------------------
+     ARCHIVE / DIARY — a Dex-screen tab that reads like the player's own running journal.
+     Deliberately builds NO new story content: every entry's body reuses text from the tables
+     already above (ORIGINS, BIOME_STORY_TEXT, auditorNoticeText, TRANSLATION_LEVEL_TEXT,
+     PORT_LEVEL_TEXT, RECYCLE_FLAVOR_BY_TYPE, FOUNDRY_RECYCLE_REPLIES) — editing any of THOSE
+     later automatically updates the archive too, nothing here needs touching.
+     state.archiveLog is an ordered array of entry ids, in the order the player actually
+     discovered them (a real diary, not a fixed checklist) — populated by archiveEntriesToAdd(),
+     called from render() every render (syncArchiveLog) and from migrateState() once on load (so
+     an existing save's already-true progress — Trace stage 3, Rosetta level 2, etc. from before
+     this feature existed — is grandfathered in rather than starting the diary empty). Never runs
+     during a view-only intro replay (introReplayMode), so replaying with a different origin can't
+     plant a false diary entry. Locked entries never appear at all — no "???" placeholders — the
+     screen only ever shows state.archiveLog, in that order.
+     --------------------------------------------------------- */
+  const ARCHIVE_ENTRIES = {
+    origin: { tag:'You', title:()=>'Who You Are',
+      unlocked:s=>!!s.origin && !!s.originConfirmed,
+      body:s=>{ const o=ORIGINS[s.origin]; return o ? `${o.story}\n\n"${o.bootLine}"\n\nPerk: ${o.perkText}` : ''; } },
+    jackin: { tag:'Access', title:()=>'Unrecognized Access',
+      unlocked:s=>!!s.storyIntroDone,
+      body:()=>'Whatever\'s on the other end let the connection through anyway. The grid opened up further than fog and static let me see.' },
+    starter: { tag:'Access', title:()=>'Capture.exe — Residual Process',
+      unlocked:s=>!!s.storyIntroDone,
+      body:()=>'Something was already running when I connected. It didn\'t fight the handshake — it answered to it. A monster is with me now.' },
+    foundry_question: { tag:'Patch', title:()=>'The Question',
+      unlocked:s=>!!(s.recycleCounts && s.recycleCounts.Metal >= 1),
+      body:s=>`"That's a lot of your own you've put through the grinder. Are you okay with this?"\n\n"${FOUNDRY_RECYCLE_REPLIES[s.origin] || 'I don\'t know yet.'}"` },
+  };
+  BIOMES.forEach((b,i)=>{
+    ARCHIVE_ENTRIES['biome_'+i] = { tag:b.name, title:()=>b.name,
+      unlocked:s=>!!(s.biomeStorySeen && s.biomeStorySeen[i]),
+      body:s=>{ const e=BIOME_STORY_TEXT[i]; if(!e) return ''; const r=e.origin && e.origin[s.origin]; return r ? `${e.tell}\n\n${r}` : e.tell; } };
+  });
+  Object.keys(RECYCLE_FLAVOR_BY_TYPE).forEach(type=>{
+    ARCHIVE_ENTRIES['recycle_'+type] = { tag:'Patch', title:()=>`Recycling — ${type}`,
+      unlocked:s=>!!(s.recycleCounts && s.recycleCounts[type] >= 1),
+      body:()=>RECYCLE_FLAVOR_BY_TYPE[type] };
+  });
+  for(let n=1;n<=5;n++){
+    ARCHIVE_ENTRIES['auditor_'+n] = { tag:'Auditor', title:()=>`Auditor Notice — Stage ${n}`,
+      unlocked:s=>(s.auditor_stage||0) >= n,
+      body:s=>auditorNoticeText(n, s.handle) };
+    ARCHIVE_ENTRIES['rosetta_'+n] = { tag:'Rosetta.exe', title:()=>`Rosetta.exe — Level ${n}`,
+      unlocked:s=>(s.translation_level||0) >= n,
+      body:()=>TRANSLATION_LEVEL_TEXT[n-1] };
+  }
+  for(let n=1;n<=6;n++){
+    ARCHIVE_ENTRIES['port_'+n] = { tag:'Port', title:()=>`Port — Level ${n}`,
+      unlocked:s=>(s.port_level||0) >= n,
+      body:()=>PORT_LEVEL_TEXT[n] };
+  }
+  // Declaration order doubles as the fallback chronological order used when several entries
+  // unlock in the very same render pass (e.g. a multi-biome unlock cascade) or during the
+  // migrateState grandfather pass, where true discovery order was never recorded.
+  const ARCHIVE_ENTRY_IDS = Object.keys(ARCHIVE_ENTRIES);
+  function archiveEntriesToAdd(s){
+    if(!Array.isArray(s.archiveLog)) s.archiveLog = [];
+    return ARCHIVE_ENTRY_IDS.filter(id => {
+      const def = ARCHIVE_ENTRIES[id];
+      return def && def.unlocked(s) && !s.archiveLog.includes(id);
+    });
+  }
+  function syncArchiveLog(){
+    if(!state || introReplayMode) return; // never record anything during a view-only replay
+    archiveEntriesToAdd(state).forEach(id => state.archiveLog.push(id));
   }
 
   // Reusable origin-card picker — used by the (future) intro's Scene 5 AND by "Not quite" below,
@@ -4511,7 +4581,20 @@
 
 
   let dexFilter = { status:'all', type:'all' }; // transient UI state, not persisted
+  let dexTab = 'species'; // transient UI state, not persisted — toggles the Dex screen's Species/Archive tabs
+  function dexTabToggleHtml(){
+    return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px;">
+      <button class="btn ${dexTab==='species'?'btn-cyan':''}" data-dex-tab="species">📖 Species</button>
+      <button class="btn ${dexTab==='archive'?'btn-cyan':''}" data-dex-tab="archive">🗒 Archive</button>
+    </div>`;
+  }
+  function bindDexTabToggle(screenEl){
+    screenEl.querySelectorAll('[data-dex-tab]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ dexTab = btn.getAttribute('data-dex-tab'); render(); });
+    });
+  }
   function renderDex(screenEl, controlsEl){
+    if(dexTab === 'archive'){ renderArchiveTab(screenEl, controlsEl); return; }
     const dex = state.dex || {};
     const totalLines = lineIds.length;
     const caughtLines = lineIds.filter(id => dexCaughtAny(dex[id])).length;
@@ -4565,6 +4648,7 @@
 
     screenEl.innerHTML = `
       ${screenTitle('📖 MONSTER DEX', 'var(--violet)')}
+      ${dexTabToggleHtml()}
       <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:10px;">${caughtLines}/${totalLines} lines caught (${pct}%) · encounter a species in the wild to log it, catch or hatch one to reveal it fully.</div>
       <div class="card" style="margin-bottom:10px; border-color:var(--amber);">
         <div style="font-size:10.5px; color:var(--amber); margin-bottom:6px;">🏆 Milestones</div>
@@ -4594,6 +4678,7 @@
         ${visible.length ? visible.map(cardFor).join('') : '<div class="card" style="font-size:10px; color:var(--ink-dim);">Nothing matches this filter yet.</div>'}
       </div>
     `;
+    bindDexTabToggle(screenEl);
     screenEl.querySelectorAll('[data-claim-ms]').forEach(btn=>{
       btn.addEventListener('click', ()=>claimDexMilestone(btn.getAttribute('data-claim-ms')));
     });
@@ -4602,6 +4687,31 @@
     });
     const typeSel = screenEl.querySelector('[data-dex-type]');
     if(typeSel) typeSel.addEventListener('change', ()=>{ dexFilter.type = typeSel.value; render(); });
+    controlsEl.innerHTML = `<button class="btn" id="back" style="width:100%;">← Back to Town</button>`;
+    controlsEl.querySelector('#back').addEventListener('click', ()=>{ state.screen='town'; render(); });
+  }
+
+  // Reads only state.archiveLog, in order — nothing here decides what's unlocked (that's
+  // ARCHIVE_ENTRIES/syncArchiveLog above); this is purely the diary's page-by-page display.
+  function renderArchiveTab(screenEl, controlsEl){
+    const log = Array.isArray(state.archiveLog) ? state.archiveLog : [];
+    const entries = log.map((id,i) => ({ n:i+1, id, def:ARCHIVE_ENTRIES[id] })).filter(e => e.def);
+    screenEl.innerHTML = `
+      ${screenTitle('📖 MONSTER DEX', 'var(--violet)')}
+      ${dexTabToggleHtml()}
+      <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:10px;">${entries.length ? `${entries.length} entr${entries.length===1?'y':'ies'} · your own record of what you've pieced together.` : 'Your diary is empty. Answers will accumulate here as you explore.'}</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${entries.map(e => `
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
+              <span style="font-size:10px; color:var(--phosphor);">Entry ${e.n} — ${e.def.title()}</span>
+              <span class="badge" style="font-size:8px;">${e.def.tag}</span>
+            </div>
+            <div style="font-size:10px; color:var(--ink); line-height:1.55; white-space:pre-line;">${e.def.body(state)}</div>
+          </div>`).join('')}
+      </div>
+    `;
+    bindDexTabToggle(screenEl);
     controlsEl.innerHTML = `<button class="btn" id="back" style="width:100%;">← Back to Town</button>`;
     controlsEl.querySelector('#back').addEventListener('click', ()=>{ state.screen='town'; render(); });
   }
@@ -6762,6 +6872,11 @@
     if(typeof s.public_port_enabled !== 'boolean') s.public_port_enabled = false;
     if(!Array.isArray(s.biomeStorySeen)) s.biomeStorySeen = BIOMES.map(()=>false);
     else while(s.biomeStorySeen.length < BIOMES.length) s.biomeStorySeen.push(false);
+    // Archive/diary: grandfather in any entries whose unlock condition is already true (Trace
+    // stage, Rosetta level, etc. from before this feature existed) so a returning player's diary
+    // isn't blank despite real story progress — safe to run every load, archiveEntriesToAdd()
+    // only ever returns ids not already present.
+    archiveEntriesToAdd(s).forEach(id => s.archiveLog.push(id));
     if(Array.isArray(s.storage)) s.storage.forEach(migrateMonster);
     if(s.battle && s.battle.enemy) migrateMonster(s.battle.enemy);
     if(s.battle && typeof s.battle.isBoss !== 'boolean') s.battle.isBoss = false;
