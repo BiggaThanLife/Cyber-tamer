@@ -1623,6 +1623,7 @@
       biomeStorySeen: BIOMES.map(()=>false), // Phase 5: per-biome flavor text, fires once per biome
       archiveLog: [], // Archive/diary: entry ids in the order the player actually discovered them
       archiveSeenCount: 0, // how many archiveLog entries have been viewed — drives the unread dot
+      rosettaSceneShown: false, // one-time "writing Rosetta.exe" scene, after the first biome boss falls
     };
   }
 
@@ -2197,7 +2198,7 @@
       // call site — faint/flee/catch/flee-fail all end differently) so it can't be missed
       // regardless of which path ended the fight; self-guards via originConfirmationShown so it
       // never pops more than once even if town re-renders before it's answered.
-      if(state.screen === 'town') maybeShowOriginConfirmation();
+      if(state.screen === 'town'){ maybeShowOriginConfirmation(); maybeShowRosettaWritingScene(); }
     }catch(err){
       console.error('Render error:', err);
       renderFatalError(err);
@@ -4031,6 +4032,55 @@
     logMsg(`🔤 Rosetta.exe reads deeper — Level ${level}: ${TRANSLATION_LEVEL_TEXT[level-1]}`);
   }
 
+  // The origin scene for Rosetta.exe itself — separate from raiseTranslationForBiomeKey's per-level
+  // flavor lines above (those keep firing independently as translation_level climbs; this is just
+  // the one-time "why the program exists at all" beat). Deliberately tied to the first biome's boss
+  // falling, NOT to the Outskirts key being found, since the three biome-unlock conditions (boss/
+  // recycle/key) can complete in any order and the moment wanted here is specifically the boss.
+  // Checked centrally in render() (maybeShowOriginConfirmation's exact pattern) rather than at the
+  // battle-victory call site, so it also catches players who already had bossDefeated[0] true
+  // before this shipped — they get the scene the next time they're back in town, no progress lost,
+  // no state touched besides rosettaSceneShown itself.
+  const ROSETTA_ORIGIN_SCENE = [
+    { speaker:'PATCH', color:'var(--cyan)', line:'"Hey — can you figure out what they’ve been saying? Some of this code, I mean."' },
+    { speaker:'YOU', color:'var(--phosphor)', line:'"Hold on. I have an idea."' },
+    { speaker:null, color:'var(--ink-dim)', line:'. . .' },
+  ];
+  let rosettaSceneShownThisSession = false;
+  function maybeShowRosettaWritingScene(){
+    if(rosettaSceneShownThisSession) return;
+    if(!state.bossDefeated || !state.bossDefeated[0] || state.rosettaSceneShown) return;
+    rosettaSceneShownThisSession = true;
+    showRosettaWritingScene(0);
+  }
+  function showRosettaWritingScene(step){
+    const overlay = document.getElementById('modal-overlay');
+    const box = document.getElementById('modal-box');
+    if(step < ROSETTA_ORIGIN_SCENE.length){
+      const s = ROSETTA_ORIGIN_SCENE[step];
+      box.innerHTML = `
+        ${s.speaker ? `<div class="pixel-font glow" style="font-size:10px; color:${s.color}; margin-bottom:8px;">${s.speaker}</div>` : ''}
+        <div style="font-size:11px; color:${s.speaker?'var(--ink)':s.color}; line-height:1.6; margin-bottom:14px;">${s.line}</div>
+        <button class="btn btn-primary" id="rosetta-scene-next" style="width:100%;">Continue</button>`;
+      document.getElementById('rosetta-scene-next').addEventListener('click', ()=>showRosettaWritingScene(step+1));
+    } else {
+      box.innerHTML = `
+        <div class="pixel-font glow" style="font-size:10px; color:var(--phosphor); margin-bottom:10px;">EXECUTING ROSETTA.EXE</div>
+        <div style="font-size:11px; color:var(--ink); line-height:1.6; margin-bottom:14px;">
+          A translation layer, written from scratch — something to turn the noise into words. Whatever's been running this place built its own language while nobody was watching, and it's been running long enough to mean something.
+          <br><br>This won't make sense of all of it. Not yet. It'll get better the more of their world you see.
+        </div>
+        <button class="btn btn-primary" id="rosetta-scene-done" style="width:100%;">Continue</button>`;
+      document.getElementById('rosetta-scene-done').addEventListener('click', ()=>{
+        state.rosettaSceneShown = true;
+        closeModal();
+        save();
+        render();
+      });
+    }
+    overlay.style.display = 'flex';
+  }
+
   /* ---------------------------------------------------------
      THE PORT — Phase 4, narrative-only per direct instruction ("reflect the mechanics we already
      have"). state.port_level (0-6, placeholder since Phase 1a) is flavor text riding on top of
@@ -4197,6 +4247,9 @@
     ghost_arrival: { tag:'Patch', title:()=>'Get Out',
       unlocked:s=>(s.auditor_stage||0) >= 6,
       body:()=>'"...they\'re not just watching anymore. I don\'t have time to explain — get out. Now. I\'ll tell you what I can when it\'s safe."' },
+    rosetta_writing: { tag:'Rosetta.exe', title:()=>'Executing Rosetta.exe',
+      unlocked:s=>!!s.rosettaSceneShown,
+      body:()=>'Patch: "Hey — can you figure out what they\'ve been saying? Some of this code, I mean."\nMe: "Hold on. I have an idea."\n\nA translation layer, written from scratch — something to turn the noise into words. Whatever\'s been running this place built its own language while nobody was watching, and it\'s been running long enough to mean something.\n\nThis won\'t make sense of all of it. Not yet. It\'ll get better the more of their world I see.' },
   };
   BIOMES.forEach((b,i)=>{
     ARCHIVE_ENTRIES['biome_'+i] = { tag:b.name, title:()=>b.name,
@@ -6900,6 +6953,7 @@
     if(!Array.isArray(s.biomeStorySeen)) s.biomeStorySeen = BIOMES.map(()=>false);
     else while(s.biomeStorySeen.length < BIOMES.length) s.biomeStorySeen.push(false);
     if(typeof s.archiveSeenCount !== 'number') s.archiveSeenCount = 0;
+    if(typeof s.rosettaSceneShown !== 'boolean') s.rosettaSceneShown = false;
     // Archive/diary: grandfather in any entries whose unlock condition is already true (Trace
     // stage, Rosetta level, etc. from before this feature existed) so a returning player's diary
     // isn't blank despite real story progress — safe to run every load, archiveEntriesToAdd()
