@@ -1622,6 +1622,7 @@
       public_port_enabled: false,
       biomeStorySeen: BIOMES.map(()=>false), // Phase 5: per-biome flavor text, fires once per biome
       archiveLog: [], // Archive/diary: entry ids in the order the player actually discovered them
+      archiveSeenCount: 0, // how many archiveLog entries have been viewed — drives the unread dot
     };
   }
 
@@ -2577,12 +2578,12 @@
       {label:'📦 Network Registry', cls:'', fn:()=>{ state.screen='storage'; render(); }},
       {label:'🎒 Inventory', cls:'', fn:()=>{ state.screen='inventory'; render(); }},
       {label:'🛒 Shop', cls:'btn-amber', fn:()=>{ state.screen='shop'; render(); }},
-      {label:'📖 Dex', cls:'btn-violet', fn:()=>{ state.screen='dex'; render(); }},
+      {label:`📖 Dex${archiveUnreadCount()>0 ? '<span style="position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--crimson);"></span>' : ''}`, cls:'btn-violet', style:'position:relative;', fn:()=>{ state.screen='dex'; render(); }},
       {label:'❓ Help', cls:'', fn:()=>{ helpSection=null; state.screen='statsGuide'; render(); }},
       {label:'⚙ System', cls:'', fn:()=>{ state.screen='system'; render(); }},
     ];
     controlsEl.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-      ${buttons.map((b,i)=>`<button class="btn ${b.cls}" data-i="${i}" style="${b.locked?'opacity:.5;':''}">${b.locked?'🔒 ':''}${b.label}</button>`).join('')}
+      ${buttons.map((b,i)=>`<button class="btn ${b.cls}" data-i="${i}" style="${b.locked?'opacity:.5;':''}${b.style||''}">${b.locked?'🔒 ':''}${b.label}</button>`).join('')}
     </div>`;
     buttons.forEach((b,i)=>{
       controlsEl.querySelector(`[data-i="${i}"]`).addEventListener('click', ()=>{
@@ -4237,6 +4238,12 @@
     if(!state || introReplayMode) return; // never record anything during a view-only replay
     archiveEntriesToAdd(state).forEach(id => state.archiveLog.push(id));
   }
+  // Drives the red unread dot on the town Dex button and the Archive tab itself. Cleared by
+  // actually opening the Archive tab (renderArchiveTab), not by opening Dex in general — a player
+  // browsing Species shouldn't silently dismiss a diary update they never looked at.
+  function archiveUnreadCount(){
+    return Math.max(0, (state.archiveLog||[]).length - (state.archiveSeenCount||0));
+  }
 
   // Reusable origin-card picker — used by the (future) intro's Scene 5 AND by "Not quite" below,
   // so there's exactly one place that renders the four origin cards.
@@ -4601,9 +4608,10 @@
   let dexFilter = { status:'all', type:'all' }; // transient UI state, not persisted
   let dexTab = 'species'; // transient UI state, not persisted — toggles the Dex screen's Species/Archive tabs
   function dexTabToggleHtml(){
+    const dot = archiveUnreadCount()>0 ? '<span style="position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--crimson);"></span>' : '';
     return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px;">
       <button class="btn ${dexTab==='species'?'btn-cyan':''}" data-dex-tab="species">📖 Species</button>
-      <button class="btn ${dexTab==='archive'?'btn-cyan':''}" data-dex-tab="archive">🗒 Archive</button>
+      <button class="btn ${dexTab==='archive'?'btn-cyan':''}" data-dex-tab="archive" style="position:relative;">🗒 Archive${dot}</button>
     </div>`;
   }
   function bindDexTabToggle(screenEl){
@@ -4713,6 +4721,7 @@
   // ARCHIVE_ENTRIES/syncArchiveLog above); this is purely the diary's page-by-page display.
   function renderArchiveTab(screenEl, controlsEl){
     const log = Array.isArray(state.archiveLog) ? state.archiveLog : [];
+    state.archiveSeenCount = log.length; // opening the Archive tab clears the unread dot
     const entries = log.map((id,i) => ({ n:i+1, id, def:ARCHIVE_ENTRIES[id] })).filter(e => e.def);
     screenEl.innerHTML = `
       ${screenTitle('📖 MONSTER DEX', 'var(--violet)')}
@@ -6890,6 +6899,7 @@
     if(typeof s.public_port_enabled !== 'boolean') s.public_port_enabled = false;
     if(!Array.isArray(s.biomeStorySeen)) s.biomeStorySeen = BIOMES.map(()=>false);
     else while(s.biomeStorySeen.length < BIOMES.length) s.biomeStorySeen.push(false);
+    if(typeof s.archiveSeenCount !== 'number') s.archiveSeenCount = 0;
     // Archive/diary: grandfather in any entries whose unlock condition is already true (Trace
     // stage, Rosetta level, etc. from before this feature existed) so a returning player's diary
     // isn't blank despite real story progress — safe to run every load, archiveEntriesToAdd()
