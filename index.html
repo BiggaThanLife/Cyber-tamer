@@ -5632,22 +5632,25 @@
     if(nx<0 || nx>=MINE_WIDTH || ny<0 || ny>=mine.grid.length) return;
     const cell = mine.grid[ny][nx];
     const p = getActive();
-    if(p.hunger <= 0){
-      logMsg(`${getForm(p).name} is too exhausted to keep digging.`);
-      render(); return;
+    if(p.energy <= 0){
+      const pname = getForm(p).name;
+      logMsg(`${pname}'s Energy is depleted and they can't keep digging. Disconnecting — your dive is paused, not lost.`);
+      state.screen = 'town'; render();
+      showAlertModal(`<span style="color:var(--crimson);">⚠ Out of Energy</span><br><br>${pname}'s Energy ran out, so you've been disconnected from the Data Mine and you're back in Neon Haven. Your dive is paused, not lost — rest ${pname} (or swap partners) and reconnect any time.`);
+      return;
     }
     if(cell.dug){
       enterMineCell(nx, ny);
-      p.hunger = Math.max(0, p.hunger - 1);
+      p.energy = Math.max(0, p.energy - 1);
       advanceTick();
       render();
       return;
     }
-    // Every hit costs a tick and a bit of Hunger, whether or not it's the
+    // Every hit costs a tick and a bit of Energy, whether or not it's the
     // one that breaks through — deeper rock takes more hits (up to 4), so
     // digging down is a real time/resource cost, not a single free tap.
     cell.hitsTaken = Math.min(cell.hitsRequired, (cell.hitsTaken||0) + (hasModule(p,'drillBit') ? 2 : 1));
-    p.hunger = Math.max(0, p.hunger - 1);
+    p.energy = Math.max(0, p.energy - 1);
     advanceTick();
     if(cell.hitsTaken < cell.hitsRequired){
       logMsg(`Chipping away... (${cell.hitsTaken}/${cell.hitsRequired})`);
