@@ -7577,7 +7577,10 @@
   // A quick "scanning the target" beat before an encounter, then hands off to playTransition's
   // usual name reveal. Skips straight to the reveal under reduced motion.
   function playScanTransition(revealMessage, accentColor, onDone){
-    if(!motionOn()){ playTransition(revealMessage, accentColor, onDone, 500); return; }
+    // The reveal message (e.g. "A wild X appeared!") needs to actually be readable — it used to
+    // show for only 450ms (500ms with motion off), too fast to read per direct feedback. Widened
+    // to 1.6s (motion on, after the scan animation) / 1.2s (motion off, no scan beat first).
+    if(!motionOn()){ playTransition(revealMessage, accentColor, onDone, 1200); return; }
     const screenEl = document.getElementById('screen'), controlsEl = document.getElementById('controls');
     screenEl.style.pointerEvents = 'none'; controlsEl.style.pointerEvents = 'none';
     clearTimeout(transitionTimer); clearTimeout(inputLockTimer);
@@ -7594,7 +7597,7 @@
       if(!el){ playTransition(revealMessage, accentColor, onDone, 300); return; }
       pct = Math.min(100, pct + 16 + Math.random()*26);
       el.textContent = Math.floor(pct) + '%';
-      transitionTimer = setTimeout(pct < 100 ? tick : () => playTransition(revealMessage, accentColor, onDone, 450), pct < 100 ? (55 + Math.random()*55) : 180);
+      transitionTimer = setTimeout(pct < 100 ? tick : () => playTransition(revealMessage, accentColor, onDone, 1600), pct < 100 ? (55 + Math.random()*55) : 180);
     };
     transitionTimer = setTimeout(tick, 140);
   }
