@@ -1406,7 +1406,16 @@
   }
   function potentialStars(ivs){
     const pct = ivPotential(ivs);
-    const filled = Math.max(1, Math.round(pct*5));
+    // Explicit bands rather than a plain round(pct*5): the 5-star band was previously half the width
+    // of every other band (pct>=0.9, a 10%-wide slice, vs. 20% for 1-4 stars) as an unintended side
+    // effect of rounding — widened here to pct>=0.85 (a 15%-wide slice) so 5-star is still clearly the
+    // rarest tier but not disproportionately so. 1-4 star boundaries are unchanged from the old rounding.
+    let filled;
+    if(pct >= 0.85) filled = 5;
+    else if(pct >= 0.7) filled = 4;
+    else if(pct >= 0.5) filled = 3;
+    else if(pct >= 0.3) filled = 2;
+    else filled = 1;
     return '★'.repeat(filled) + '☆'.repeat(5-filled);
   }
 
@@ -6561,7 +6570,10 @@
 
   function inheritIvs(a, b){
     const clamp = v => Math.max(IV_MIN, Math.min(IV_MAX, v));
-    const mix = (k) => clamp(((a.ivs?a.ivs[k]:1) + (b.ivs?b.ivs[k]:1))/2 + (Math.random()*0.06 - 0.03));
+    // Mutation nudge widened from ±0.03 to ±0.05 per stat — gives two already-strong parents (high
+    // Potential) meaningfully better odds at a 5-star child, without touching wild-capture IV odds
+    // at all (a mediocre pair still averages out mediocre; there's no free lunch for weak stock).
+    const mix = (k) => clamp(((a.ivs?a.ivs[k]:1) + (b.ivs?b.ivs[k]:1))/2 + (Math.random()*0.10 - 0.05));
     return { hp: mix('hp'), str: mix('str'), def: mix('def'), spd: mix('spd') };
   }
   function doBreed(){
