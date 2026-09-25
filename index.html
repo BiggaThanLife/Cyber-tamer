@@ -4089,11 +4089,11 @@
   const TRACE_BY_BIOME_CLEAR = [10, 25, 45, 70, 85];
   function auditorNoticeText(stage, handleOverride){
     switch(stage){
-      case 1: return `An access event of unknown origin has been recorded. Standard verification procedures have been initiated. No action required at this time. ${AUDITOR_REF}`;
-      case 2: return `An unregistered connection has been observed. No action required at this time. ${AUDITOR_REF}`;
-      case 3: return `The connection persists. A review has been opened. ${AUDITOR_REF}`;
-      case 4: return `Activity has been attributed to a single origin. Remediation is scheduled. ${AUDITOR_REF}`;
-      case 5: return `${(handleOverride !== undefined ? handleOverride : state.handle) || 'Unknown'}. Your port has been located. This notice is a courtesy. ${AUDITOR_REF}`;
+      case 1: return `An access event of unknown origin has been recorded. Standard verification procedures have been initiated. No action required at this time. Standard containment protocols are active at the source. ${AUDITOR_REF}`;
+      case 2: return `An unregistered connection has been observed. No action required at this time. Local countermeasures remain in effect pending review. ${AUDITOR_REF}`;
+      case 3: return `The connection persists. A review has been opened. Containment protocols have been escalated to match. ${AUDITOR_REF}`;
+      case 4: return `Activity has been attributed to a single origin. Remediation is scheduled. Resource allocation to affected systems has increased accordingly. ${AUDITOR_REF}`;
+      case 5: return `${(handleOverride !== undefined ? handleOverride : state.handle) || 'Unknown'}. Your port has been located. This notice is a courtesy. Full countermeasure deployment is authorized. ${AUDITOR_REF}`;
       case 6: return `Your position has been confirmed. Remediation is no longer scheduled — it has begun. ${AUDITOR_REF}`;
       default: return null;
     }
@@ -4250,27 +4250,31 @@
                insider:'You recognize the maintenance patterns immediately — someone automated this a long time ago.',
                scavenger:'You clock the terrain for loot before anything else.',
                keeper:'Something about the recycle count already sits wrong with you.' } },
-    { tell:'Creatures move heat and power on schedules, like a supply chain nobody\'s running anymore.',
-      origin:{ witness:'You call the trade routes what they are — a resource grab that outlived the people running it.',
-               insider:'You recognize the department codes on sight.',
-               scavenger:'The solar panels and hidden loot here are the best you\'ve seen yet.',
-               keeper:'The way these creatures guard heat reminds you of guarding a fire.' } },
-    { tell:'The cold slows everything down — for the first time, you can actually read an update queue mid-transit.',
-      origin:{ witness:'Frozen water, in a world this thirsty. You don\'t love the irony.',
-               insider:'You recognize the maintenance window the queue is waiting on.',
-               scavenger:'Dead circuitry, this well preserved, is a goldmine.',
-               keeper:'A frozen packet feels less like data and more like a preserved moment.' } },
-    { tell:'This layer is corrupted enough that the tiles change between passes — nothing here holds still.',
-      origin:{ witness:'The chain you\'re tracing is just a chain of costs, passed down and down.',
-               insider:'It\'s the org chart you left, rebuilt in code.',
-               scavenger:'You follow the routing table just to see where the resources actually go.',
-               keeper:'You notice the one node that no update ever reaches.' } },
-    { tell:'A furnace district, heat-vent tiles everywhere — and the logs here don\'t flatter you.',
-      origin:{ witness:'Heat, and dark Haven handles. This is a story you already know.',
-               insider:'You know exactly what a "courtesy notice" means.',
-               scavenger:'The "hostile" relabel reads like a price tag to you.',
-               keeper:'You can\'t stop thinking about the handles that went dark.' } },
-    { tell:'The map closes in behind you as you walk, like the server is half-remembering itself.', origin:null },
+    { tell:'Creatures move heat and power on schedules, like a supply chain nobody\'s running anymore. The Warden\'s old post looks touched. Not worn down — reinforced.',
+      origin:{ witness:'You call the trade routes what they are — a resource grab that outlived the people running it. That\'s not neglect. That\'s someone still watching.',
+               insider:'You recognize the department codes on sight. That\'s not decay. Somebody patched this.',
+               scavenger:'The solar panels and hidden loot here are the best you\'ve seen yet. Fresh patches on old gear — somebody\'s still funding this outpost.',
+               keeper:'The way these creatures guard heat reminds you of guarding a fire. Someone\'s still tending this place. You don\'t think it\'s for you.' } },
+    { tell:'The cold slows everything down — for the first time, you can actually read an update queue mid-transit. Whatever runs this place, it isn\'t slowing down. If anything, it\'s catching up.',
+      origin:{ witness:'Frozen water, in a world this thirsty. You don\'t love the irony. Somebody decided this was worth reinforcing. That\'s not an accident.',
+               insider:'You recognize the maintenance window the queue is waiting on. Escalation like this doesn\'t happen on its own.',
+               scavenger:'Dead circuitry, this well preserved, is a goldmine. Whoever\'s funding this isn\'t slowing down either.',
+               keeper:'A frozen packet feels less like data and more like a preserved moment. This isn\'t drift — someone\'s still writing new instructions here.' } },
+    { tell:'This layer is corrupted enough that the tiles change between passes — nothing here holds still. The deeper systems feel less like a ruin and more like a response.',
+      origin:{ witness:'The chain you\'re tracing is just a chain of costs, passed down and down. This isn\'t the system defending itself. Someone told it to.',
+               insider:'It\'s the org chart you left, rebuilt in code. This isn\'t drift. This is a countermeasure.',
+               scavenger:'You follow the routing table just to see where the resources actually go. This isn\'t rot. Somebody\'s actively maintaining a response.',
+               keeper:'You notice the one node that no update ever reaches. This isn\'t decay — somebody\'s still updating it, and recently.' } },
+    { tell:'A furnace district, heat-vent tiles everywhere — and the logs here don\'t flatter you. Every guardian here feels built for exactly what you are.',
+      origin:{ witness:'Heat, and dark Haven handles. This is a story you already know. They built this to stop you. Specifically.',
+               insider:'You know exactly what a "courtesy notice" means. They\'re not adapting to survive. They\'re being armed.',
+               scavenger:'The "hostile" relabel reads like a price tag to you. Every one of these was outfitted on purpose — someone\'s spending real resources here.',
+               keeper:'You can\'t stop thinking about the handles that went dark. They\'re not evolving. Somebody\'s arming them, one by one.' } },
+    { tell:'The map closes in behind you as you walk, like the server is half-remembering itself. For the first time, nothing here has been touched. Whatever\'s reaching the others hasn\'t reached this far.',
+      origin:{ witness:'The one place that isn\'t reinforced. That\'s not comfort — that\'s suspicious.',
+               insider:'This is the one place still running clean.',
+               scavenger:'Untouched. Which means whoever\'s watching hasn\'t needed to reach here — yet.',
+               keeper:'Nothing\'s been changed here. You don\'t know if that\'s better or worse.' } },
   ];
   function maybeShowBiomeStoryText(biomeIndex){
     if(!Array.isArray(state.biomeStorySeen)) state.biomeStorySeen = BIOMES.map(()=>false);
