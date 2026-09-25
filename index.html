@@ -7722,6 +7722,13 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.30', date:'2026-09-25', notes:[
+      'New: the Auditor has a final notice. Reaching the Ghost Server now spikes Trace to 100 and triggers a full target-lock message, followed by a cryptic warning from Patch. Trace itself is no longer affected by anything you do — it now climbs purely with story progress, so every playthrough hits the same beats at the same points.',
+      'Changed: the Insider origin\'s perk is now Systems Knowledge (Explorer Tools cost 15% less), replacing Clean Logs now that Trace can\'t be influenced by play.',
+      'New: a short scene the first time you\'re back in town after your first biome boss falls — the moment Rosetta.exe gets written. Players already past that point will see it too, next time they load in, with nothing about their save touched.',
+      'New: a red dot on the Dex button (and again on the Archive tab) whenever your diary has something new you haven\'t looked at yet — including anything added retroactively.',
+      'Changed: the Data Mine now runs on Energy instead of Hunger. Running out mid-dive disconnects you with a popup explaining why, same as running out of Hunger already does in the wilderness — your dive is paused, not lost.',
+    ]},
     { version:'25.29', date:'2026-09-24', notes:[
       'New: a full story layer. A 10-scene cinematic intro plays on a fresh save — pick a handle and an origin, meet Patch, and jack in. Origins carry a small permanent perk.',
       'New: a mysterious corporate "Auditor" reacts to your play over time (Trace), Rosetta.exe slowly translates the world\'s language as you find each biome\'s Network Access Key, and the Port fills in with more of Neon Haven as you go — all visible on the System menu once they start.',
@@ -7843,14 +7850,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.30',
+    version: '25.31',
     date: '2026-09-25',
     notes: [
-      'New: the Auditor has a final notice. Reaching the Ghost Server now spikes Trace to 100 and triggers a full target-lock message, followed by a cryptic warning from Patch. Trace itself is no longer affected by anything you do — it now climbs purely with story progress, so every playthrough hits the same beats at the same points.',
-      'Changed: the Insider origin\'s perk is now Systems Knowledge (Explorer Tools cost 15% less), replacing Clean Logs now that Trace can\'t be influenced by play.',
-      'New: a short scene the first time you\'re back in town after your first biome boss falls — the moment Rosetta.exe gets written. Players already past that point will see it too, next time they load in, with nothing about their save touched.',
-      'New: a red dot on the Dex button (and again on the Archive tab) whenever your diary has something new you haven\'t looked at yet — including anything added retroactively.',
-      'Changed: the Data Mine now runs on Energy instead of Hunger. Running out mid-dive disconnects you with a popup explaining why, same as running out of Hunger already does in the wilderness — your dive is paused, not lost.',
+      'New: 19 new Data Mine gear items with 6 mechanics never seen before — critical hits, life-steal, a second follow-up strike, counter-attacks, blocking, and a damage-over-time status (Overheat/Corruption). Each comes in Common, Rare and Legendary tiers, with the strongest versions found only deep in the mine.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
