@@ -846,6 +846,36 @@
     resonanceMatrix: { id:'resonanceMatrix', name:'Resonance Matrix',  icon:'🔮', color:'var(--violet)',   tier:'legendary', stab:0.20,                          desc:'+20% damage with moves matching your partner\'s own type while equipped.' },
     lastBastion:     { id:'lastBastion',     name:'Last Bastion',      icon:'🏰', color:'var(--cyan)',     tier:'legendary', hpThreshold:{below:0.3,mult:1.5},   desc:'DEF surges +50% while your partner\'s HP is below 30%.' },
     vortexEngine:    { id:'vortexEngine',    name:'Vortex Engine',     icon:'🌪', color:'var(--amber)',    tier:'legendary', dodgeBonus:0.15, fleeBonus:0.15,    desc:'+15% dodge AND +15% flee chance while equipped.' },
+
+    // --- New combat mechanics, one small family per mechanic, weakest at Common up to strongest
+    // at Legendary — same depth-gated rarity curve as everything else, nothing new to learn about
+    // where to find them. Crit/lifesteal/multi-hit/counter/block are plain per-hit rolls, computed
+    // fresh in battleAction/enemyTurn (see gearCritChance() etc. below), same pattern as dodge/flee/
+    // STAB gear. Status-on-hit (Overheat/Corruption) is the one exception — a real persistent DOT,
+    // only at Rare+Legendary (no Common tier) since it's the riskier of the two mechanic types to
+    // get right; Lag Spike/Power Surge (freeze/shock) are deliberately NOT included this pass —
+    // held back until this DOT system is proven out.
+    exploitKit:      { id:'exploitKit',      name:'Exploit Kit',       icon:'🪛', color:'var(--crimson)', tier:'common', critChance:0.05, desc:'+5% critical hit chance while equipped.' },
+    leechScript:     { id:'leechScript',     name:'Leech Script',      icon:'🩸', color:'var(--violet)',  tier:'common', lifesteal:0.08,  desc:'Heals 8% of damage dealt back to your partner.' },
+    packetSpam:      { id:'packetSpam',      name:'Packet Spam',       icon:'📨', color:'var(--amber)',   tier:'common', multiHitChance:0.10, desc:'10% chance to strike again for half damage.' },
+    snapbackCircuit: { id:'snapbackCircuit', name:'Snapback Circuit',  icon:'🪃', color:'var(--cyan)',    tier:'common', counterChance:0.15,  desc:'15% chance to strike back when hit.' },
+    barrierNode:     { id:'barrierNode',     name:'Barrier Node',      icon:'🚧', color:'var(--phosphor)',tier:'common', blockChance:0.08,    desc:'8% chance to block an incoming attack completely.' },
+
+    zeroDayExploit:  { id:'zeroDayExploit',  name:'Zero-Day Exploit',  icon:'🎯', color:'var(--crimson)', tier:'rare', critChance:0.10, desc:'+10% critical hit chance while equipped.' },
+    parasiteDaemon:  { id:'parasiteDaemon',  name:'Parasite Daemon',   icon:'🦠', color:'var(--violet)',  tier:'rare', lifesteal:0.15,  desc:'Heals 15% of damage dealt back to your partner.' },
+    burstProtocol:   { id:'burstProtocol',   name:'Burst Protocol',    icon:'💢', color:'var(--amber)',   tier:'rare', multiHitChance:0.20, desc:'20% chance to strike again for half damage.' },
+    feedbackLoop:    { id:'feedbackLoop',    name:'Feedback Loop',     icon:'🔁', color:'var(--cyan)',    tier:'rare', counterChance:0.25,  desc:'25% chance to strike back when hit.' },
+    deflectorArray:  { id:'deflectorArray',  name:'Deflector Array',   icon:'🛰', color:'var(--phosphor)',tier:'rare', blockChance:0.15,    desc:'15% chance to block an incoming attack completely.' },
+    thermalLance:    { id:'thermalLance',    name:'Thermal Lance',     icon:'🌡', color:'var(--crimson)', tier:'rare', statusOnHit:{name:'Overheat', chance:0.25, dmgPct:0.05, turns:2}, desc:'25% chance on hit to inflict Overheat — 5% max HP damage per turn for 2 turns.' },
+    corruptedPayload:{ id:'corruptedPayload',name:'Corrupted Payload', icon:'🧫', color:'var(--violet)',  tier:'rare', statusOnHit:{name:'Corruption', chance:0.25, dmgPct:0.05, turns:2}, desc:'25% chance on hit to inflict Corruption — 5% max HP damage per turn for 2 turns.' },
+
+    rootExploit:     { id:'rootExploit',     name:'Root Exploit',      icon:'💀', color:'var(--crimson)', tier:'legendary', critChance:0.18, desc:'+18% critical hit chance while equipped.' },
+    vampireProcess:  { id:'vampireProcess',  name:'Vampire Process',   icon:'🧛', color:'var(--violet)',  tier:'legendary', lifesteal:0.25,  desc:'Heals 25% of damage dealt back to your partner.' },
+    floodArray:      { id:'floodArray',      name:'Flood Array',       icon:'🌊', color:'var(--amber)',   tier:'legendary', multiHitChance:0.35, desc:'35% chance to strike again for half damage.' },
+    retaliationCore: { id:'retaliationCore', name:'Retaliation Core',  icon:'⚔',  color:'var(--cyan)',    tier:'legendary', counterChance:0.40,  desc:'40% chance to strike back when hit.' },
+    aegisProtocol:   { id:'aegisProtocol',   name:'Aegis Protocol',    icon:'🔰', color:'var(--phosphor)',tier:'legendary', blockChance:0.25,    desc:'25% chance to block an incoming attack completely.' },
+    meltdownCore:    { id:'meltdownCore',    name:'Meltdown Core',     icon:'☢',  color:'var(--crimson)', tier:'legendary', statusOnHit:{name:'Overheat', chance:0.40, dmgPct:0.08, turns:3}, desc:'40% chance on hit to inflict Overheat — 8% max HP damage per turn for 3 turns.' },
+    malwareInjector: { id:'malwareInjector', name:'Malware Injector',  icon:'🧟', color:'var(--violet)',  tier:'legendary', statusOnHit:{name:'Corruption', chance:0.40, dmgPct:0.08, turns:3}, desc:'40% chance on hit to inflict Corruption — 8% max HP damage per turn for 3 turns.' },
   };
   const GEAR_TIERS = ['common','rare','legendary'];
   // Weighted odds of each tier on a gear drop, by dive depth. Legendary is exactly 0 below the
@@ -898,6 +928,12 @@
       return parts.join(' · ');
     }
     if(g.grantMove){ const mv = MOVES[g.grantMove]; return mv ? `Grants ${mv.name} — ${mv.type} attack, ${mv.power}× power` : 'Grants a move'; }
+    if(g.critChance) return `+${Math.round(g.critChance*100)}% critical hit chance`;
+    if(g.lifesteal) return `Heals ${Math.round(g.lifesteal*100)}% of damage dealt`;
+    if(g.multiHitChance) return `${Math.round(g.multiHitChance*100)}% chance to strike twice`;
+    if(g.counterChance) return `${Math.round(g.counterChance*100)}% chance to counter-attack`;
+    if(g.blockChance) return `${Math.round(g.blockChance*100)}% chance to block an attack`;
+    if(g.statusOnHit) return `${Math.round(g.statusOnHit.chance*100)}% chance to inflict ${g.statusOnHit.name} (${Math.round(g.statusOnHit.dmgPct*100)}%/turn, ${g.statusOnHit.turns} turns)`;
     return '';
   }
   // Copies of a gear item you own that aren't currently equipped on anyone.
@@ -1293,6 +1329,15 @@
     const ratio = m.maxHp ? (m.hp / m.maxHp) : 1;
     return equippedGearDefs(m).reduce((mult,g) => (g.hpThreshold && ratio < g.hpThreshold.below) ? mult * g.hpThreshold.mult : mult, 1);
   }
+  // New combat-mechanic gear (crit/lifesteal/multi-hit/counter/block/status) — same additive-stack
+  // pattern as gearDodgeBonus/gearFleeBonus above, each read fresh in battleAction/enemyTurn.
+  function gearCritChance(m){ return equippedGearDefs(m).reduce((n,g) => n + (g.critChance||0), 0); }
+  function gearLifesteal(m){ return equippedGearDefs(m).reduce((n,g) => n + (g.lifesteal||0), 0); }
+  function gearMultiHitChance(m){ return equippedGearDefs(m).reduce((n,g) => n + (g.multiHitChance||0), 0); }
+  function gearCounterChance(m){ return equippedGearDefs(m).reduce((n,g) => n + (g.counterChance||0), 0); }
+  function gearBlockChance(m){ return equippedGearDefs(m).reduce((n,g) => n + (g.blockChance||0), 0); }
+  // Returns every statusOnHit def from equipped gear (usually 0 or 1 piece, but never assumed).
+  function gearStatusOnHitDefs(m){ return equippedGearDefs(m).map(g => g.statusOnHit).filter(Boolean); }
   function getBattleMoves(m){
     const granted = gearGrantedMoves(m);
     return [...(m.movesKnown||[]), ...granted.filter(mid => !(m.movesKnown||[]).includes(mid))];
@@ -3656,6 +3701,47 @@
     }
   }
 
+  // Shared by battleAction's post-move check and its pre-move status-DOT tick, since either one
+  // can be what actually brings the enemy to 0 HP. Returns true (and leaves b.over/rewards set)
+  // once the enemy is dead; false otherwise. Never calls render() itself — every call site already
+  // does that right after.
+  function resolveEnemyDefeat(b, p){
+    if(b.enemy.hp > 0) return false;
+    if(b.isBoss){
+      const isL2 = b.layer === 2;
+      const bits = bitsBoost((isL2 ? 260 : 150) + b.biomeIndex*80);
+      state.bits += bits;
+      gainXp(p, (isL2 ? 140 : 80) + b.enemy.level*8);
+      questEvent('win', 1, { type: getForm(b.enemy).type });
+      let unlockMsg = '';
+      if(isL2){
+        state.layer2Defeated[b.biomeIndex] = true;
+      } else {
+        state.bossDefeated[b.biomeIndex] = true;
+        checkBiomeUnlocks(); // may itself log a separate "path has opened" line if this was the last condition
+        const nextIdx = b.biomeIndex + 1;
+        if(nextIdx < BIOMES.length && state.unlockedBiomeIndex <= b.biomeIndex){
+          const st = biomeUnlockStatus(b.biomeIndex);
+          const remaining = [];
+          if(!st.recycle){ const left = RECYCLE_QUOTA - st.recycled; remaining.push(`Recycle ${left} more ${st.type}-type monster${left===1?'':'s'}`); }
+          if(!st.key) remaining.push('find the Network Access Key in a Data Breach here');
+          if(remaining.length) unlockMsg = ` To open the path to ${BIOMES[nextIdx].name}: ${remaining.join(', and ')}.`;
+        }
+      }
+      fx({k:'faint'});
+      logMsg(`${b.enemy.bossTitle} was defeated! +◈${bits} Bits.${unlockMsg}`);
+      b.over = true; b.bossVictory = true;
+      return true;
+    }
+    const bits = bitsBoost(Math.round((8 + b.enemy.level*3) * (b.enemy.isAnomaly ? 1.8 : 1)));
+    state.bits += bits;
+    fx({k:'faint'});
+    logMsg(`${getForm(b.enemy).name} was defeated! +${bits} Bits.`);
+    questEvent('win', 1, { type: getForm(b.enemy).type });
+    gainXp(p, Math.round((12 + b.enemy.level*6) * (b.enemy.isAnomaly ? 1.5 : 1)));
+    markBattleOver(b);
+    return true;
+  }
   function battleAction(action, moveId){
     const b = state.battle;
     const p = getActive();
@@ -3667,6 +3753,19 @@
       render(); return;
     }
 
+    // Status DOT (Overheat/Corruption gear) ticks at the start of the player's turn, before their
+    // action resolves — represents ongoing damage the enemy is taking regardless of what the
+    // player does this turn. Can finish the enemy off on its own, same reward path as any other kill.
+    if(b.enemy.status){
+      const st = b.enemy.status;
+      const dot = Math.max(1, Math.round(b.enemy.maxHp * st.dmgPct));
+      b.enemy.hp = Math.max(0, b.enemy.hp - dot);
+      logMsg(`${st.name} deals ${dot} damage to ${getForm(b.enemy).name}.`);
+      st.turnsLeft--;
+      if(st.turnsLeft <= 0){ b.enemy.status = null; logMsg(`${getForm(b.enemy).name}'s ${st.name} wears off.`); }
+      if(resolveEnemyDefeat(b, p)){ render(); return; }
+    }
+
     if(action === 'move'){
       const mv = MOVES[moveId];
       if(!mv){ console.error('Unknown move id:', moveId); render(); return; }
@@ -3674,10 +3773,41 @@
       // Resonance Matrix-style gear: bonus damage when the move's type matches the partner's own
       // type (typeless universal moves have no `mv.type`, so they never qualify).
       const stabMult = (mv.type && mv.type === getForm(p).type) ? (1 + gearStabBonus(p)) : 1;
-      const dmg = Math.max(1, Math.round(p.str * mv.power * mult * stabMult * (1 + Math.random()*0.25) - b.enemy.def*0.5));
+      const isCrit = Math.random() < gearCritChance(p);
+      const critMult = isCrit ? 1.6 : 1;
+      const dmg = Math.max(1, Math.round(p.str * mv.power * mult * stabMult * critMult * (1 + Math.random()*0.25) - b.enemy.def*0.5));
       b.enemy.hp = Math.max(0, b.enemy.hp - dmg);
-      fx({k:'hit', on:'enemy', dmg, mult});
-      logMsg(`${mv.name} hit for ${dmg} damage.${mult>1 ? ' Super effective!' : (mult<1 ? ' Not very effective...' : '')}`);
+      fx({k:'hit', on:'enemy', dmg, mult, big:isCrit});
+      logMsg(`${mv.name} hit for ${dmg} damage.${isCrit ? ' Critical hit!' : ''}${mult>1 ? ' Super effective!' : (mult<1 ? ' Not very effective...' : '')}`);
+      let totalDealt = dmg;
+
+      // Multi-hit gear: a second strike at half power, same type-mult/STAB context as the first.
+      if(b.enemy.hp > 0 && Math.random() < gearMultiHitChance(p)){
+        const dmg2 = Math.max(1, Math.round(p.str * mv.power * 0.5 * mult * stabMult * (1 + Math.random()*0.25) - b.enemy.def*0.5));
+        b.enemy.hp = Math.max(0, b.enemy.hp - dmg2);
+        fx({k:'hit', on:'enemy', dmg:dmg2, mult});
+        logMsg(`A second strike lands for ${dmg2} more damage!`);
+        totalDealt += dmg2;
+      }
+
+      // Life-steal gear: heals off the total damage actually dealt this action (both hits, if two landed).
+      const stealPct = gearLifesteal(p);
+      if(stealPct > 0 && totalDealt > 0){
+        const healed = Math.min(Math.max(1, Math.round(totalDealt * stealPct)), p.maxHp - p.hp);
+        if(healed > 0){ p.hp += healed; fx({k:'heal', amt:healed}); logMsg(`${getForm(p).name} drains ${healed} HP.`); }
+      }
+
+      // Status-on-hit gear (Overheat/Corruption): rolled independently per equipped piece, only
+      // while the enemy is still standing, and never stacked on top of an existing status.
+      if(b.enemy.hp > 0 && !b.enemy.status){
+        for(const st of gearStatusOnHitDefs(p)){
+          if(Math.random() < st.chance){
+            b.enemy.status = { name:st.name, dmgPct:st.dmgPct, turnsLeft:st.turns };
+            logMsg(`${getForm(b.enemy).name} is afflicted with ${st.name}!`);
+            break;
+          }
+        }
+      }
     }
     else if(action === 'medicine'){
       if(state.inventory.medicine <= 0){ logMsg('No Medicine left — visit the shop.'); render(); return; }
@@ -3711,40 +3841,7 @@
       } else { render(); return; }
     }
 
-    if(b.enemy.hp <= 0){
-      if(b.isBoss){
-        const isL2 = b.layer === 2;
-        const bits = bitsBoost((isL2 ? 260 : 150) + b.biomeIndex*80);
-        state.bits += bits;
-        gainXp(p, (isL2 ? 140 : 80) + b.enemy.level*8);
-        questEvent('win', 1, { type: getForm(b.enemy).type });
-        let unlockMsg = '';
-        if(isL2){
-          state.layer2Defeated[b.biomeIndex] = true;
-        } else {
-          state.bossDefeated[b.biomeIndex] = true;
-          checkBiomeUnlocks(); // may itself log a separate "path has opened" line if this was the last condition
-          const nextIdx = b.biomeIndex + 1;
-          if(nextIdx < BIOMES.length && state.unlockedBiomeIndex <= b.biomeIndex){
-            const st = biomeUnlockStatus(b.biomeIndex);
-            const remaining = [];
-            if(!st.recycle){ const left = RECYCLE_QUOTA - st.recycled; remaining.push(`Recycle ${left} more ${st.type}-type monster${left===1?'':'s'}`); }
-            if(!st.key) remaining.push('find the Network Access Key in a Data Breach here');
-            if(remaining.length) unlockMsg = ` To open the path to ${BIOMES[nextIdx].name}: ${remaining.join(', and ')}.`;
-          }
-        }
-        fx({k:'faint'});
-        logMsg(`${b.enemy.bossTitle} was defeated! +◈${bits} Bits.${unlockMsg}`);
-        b.over = true; b.bossVictory = true; render(); return;
-      }
-      const bits = bitsBoost(Math.round((8 + b.enemy.level*3) * (b.enemy.isAnomaly ? 1.8 : 1)));
-      state.bits += bits;
-      fx({k:'faint'});
-      logMsg(`${getForm(b.enemy).name} was defeated! +${bits} Bits.`);
-      questEvent('win', 1, { type: getForm(b.enemy).type });
-      gainXp(p, Math.round((12 + b.enemy.level*6) * (b.enemy.isAnomaly ? 1.5 : 1)));
-      markBattleOver(b); render(); return;
-    }
+    if(resolveEnemyDefeat(b, p)){ render(); return; }
     enemyTurn();
     render();
   }
@@ -3769,6 +3866,11 @@
     const p = getActive();
     if(b.over) return;
     if(b.shield){ b.shield = false; fx({k:'shield'}); logMsg('The Firewall absorbed the enemy\'s attack!'); return; }
+    if(Math.random() < gearBlockChance(p)){
+      fx({k:'shield'});
+      logMsg(`${getForm(p).name}'s barrier blocks the attack completely!`);
+      return;
+    }
     if(Math.random() < dodgeChance(p.spd, b.enemy.spd, p)){
       fx({k:'dodge'});
       logMsg(`${getForm(p).name} dodged the incoming strike!`);
@@ -3802,6 +3904,16 @@
       if(b.source === 'mine') state.mine = null;
       markBattleOver(b);
       state.firstBattleDone = true;
+      return;
+    }
+    // Counter-attack gear: only while the player is still standing and the fight isn't already
+    // decided — can finish the enemy off on its own, same reward path as any other kill.
+    if(!b.over && Math.random() < gearCounterChance(p)){
+      const counterDmg = Math.max(1, Math.round(p.str * 0.8 * (1 + Math.random()*0.2) - b.enemy.def*0.5));
+      b.enemy.hp = Math.max(0, b.enemy.hp - counterDmg);
+      fx({k:'hit', on:'enemy', dmg:counterDmg, mult:1});
+      logMsg(`${getForm(p).name} counters for ${counterDmg} damage!`);
+      resolveEnemyDefeat(b, p);
     }
   }
 
