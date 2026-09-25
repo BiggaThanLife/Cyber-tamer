@@ -667,7 +667,7 @@
   // (Storage/Jobs/Dex) otherwise redraw every canvas on every render.
   const spriteCache = new Map();
   function spriteDataUrl(m, form, cosmeticId){
-    const key = [m.speciesId, m.stage, m.uid||'', ivPotential(m.ivs).toFixed(4), m.marked?1:0, m.isAnomaly?1:0, m.isWanted?1:0, cosmeticId||'none'].join('|');
+    const key = [m.speciesId, m.stage, m.uid||'', ivPotential(m.ivs).toFixed(4), m.marked?1:0, m.spliceVariant?1:0, m.isAnomaly?1:0, m.isWanted?1:0, cosmeticId||'none'].join('|');
     let url = spriteCache.get(key);
     if(url) return url;
     url = spriteDataUrlRaw(m, form, cosmeticId);
@@ -728,20 +728,26 @@
     const potential = ivPotential(ivs); // 0-1
     const hueShift = (indivRand()-0.5) * 50;   // ±25°, the main per-individual color signal
     const satShift = (indivRand()-0.5) * 24;   // ±12 saturation points
+    // Spliced Variant picks its fixed palette off the same indivRand stream, AFTER the hue/sat
+    // shift draws above so a spliced individual's shape/pattern rolls elsewhere are unaffected —
+    // only consumed when actually needed (marked always wins outright, so this stays lazy).
+    const spliceVariant = (!m.marked && m.spliceVariant) ? SPLICE_VARIANT_PALETTES[Math.floor(indivRand()*SPLICE_VARIANT_PALETTES.length)] : null;
     let primaryColor;
     if(m.marked){
       primaryColor = '#fff44d';
+    } else if(spliceVariant){
+      primaryColor = spliceVariant.primary;
     } else {
       const hsl = hexToHsl(form.color);
       primaryColor = hslToHex(hsl.h + hueShift, hsl.s + satShift, hsl.l + (potential-0.5)*16);
     }
-    const secondaryColor = m.marked ? '#ff9df0' : shadeColor(primaryColor, -25);
-    const accentColor = m.isAnomaly ? '#ff4d9e' : (m.isWanted ? '#ffd93d' : (m.marked ? '#5be8ea' : shadeColor(primaryColor, 40)));
+    const secondaryColor = m.marked ? '#ff9df0' : (spliceVariant ? spliceVariant.secondary : shadeColor(primaryColor, -25));
+    const accentColor = m.isAnomaly ? '#ff4d9e' : (m.isWanted ? '#ffd93d' : (m.marked ? '#5be8ea' : (spliceVariant ? spliceVariant.accent : shadeColor(primaryColor, 40))));
     // A "status light" pixel in a fixed high-contrast palette, independent of
     // the (already hue-shifted) body color, so every individual gets a clear,
     // always-visible accent regardless of how close their body hue lands to
     // a sibling's. Reads thematically as a diagnostic light on a digital creature.
-    const coreLightColor = m.marked ? '#ffffff' : CORE_LIGHT_COLORS[Math.floor(indivRand()*CORE_LIGHT_COLORS.length)];
+    const coreLightColor = m.marked ? '#ffffff' : (spliceVariant ? spliceVariant.accent : CORE_LIGHT_COLORS[Math.floor(indivRand()*CORE_LIGHT_COLORS.length)]);
 
     const canvas = document.createElement('canvas');
     canvas.width = 12; canvas.height = 12;
@@ -771,6 +777,11 @@
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(1, 1, 1, 1);
       ctx.fillRect(10, 2, 1, 1);
+    } else if(spliceVariant){
+      // A different fixed tell (single corner pixels, not Marked's pair) so a Spliced Variant
+      // reads at a glance as its own thing, not a dimmer Marked.
+      ctx.fillStyle = spliceVariant.accent;
+      ctx.fillRect(10, 10, 1, 1);
     }
 
     return canvas.toDataURL();
@@ -778,8 +789,10 @@
   function spriteImgHtml(m, sizePx, cls){
     const form = getForm(m);
     const url = spriteDataUrl(m, form, m.cosmetic);
-    const glowColor = m.marked ? '#fff44d' : form.color;
-    return `<img src="${url}" width="${sizePx}" height="${sizePx}" style="width:${sizePx}px;height:${sizePx}px;image-rendering:pixelated;filter:drop-shadow(0 0 ${m.marked?8:5}px ${glowColor}${m.marked?'cc':'66'});vertical-align:middle;"${cls ? ` class="${cls}"` : ''} alt="${form.name}">`;
+    const isVariant = !m.marked && m.spliceVariant;
+    const glowColor = m.marked ? '#fff44d' : (isVariant ? '#ff2ec4' : form.color);
+    const glowStrong = m.marked || isVariant;
+    return `<img src="${url}" width="${sizePx}" height="${sizePx}" style="width:${sizePx}px;height:${sizePx}px;image-rendering:pixelated;filter:drop-shadow(0 0 ${glowStrong?8:5}px ${glowColor}${glowStrong?'cc':'66'});vertical-align:middle;"${cls ? ` class="${cls}"` : ''} alt="${form.name}">`;
   }
 
   const SHOP_ITEMS = [
@@ -1356,6 +1369,19 @@
 
   const IV_MIN = 0.85, IV_MAX = 1.15;
   const MARKED_CHANCE = 1/128; // odds a newly-created monster is a rare "marked" variant
+  // Spliced Variant: a second, independent cosmetic mutation — unlike Marked (rollable on ANY new
+  // monster, wild capture included), this one is exclusively rolled in doBreed(), never in
+  // newMonster() itself, so it stays a genuine splicing-only reward. Deliberately far more common
+  // than Marked (1/128) — "sometimes with a mutation" per the Help text should actually happen.
+  const SPLICE_VARIANT_CHANCE = 1/10;
+  // Fixed prismatic palettes, one picked per spliced individual (seeded off uid, stable across
+  // renders) — NOT a hue-shift off the species' own color like normal individual variance is, so a
+  // Spliced Variant reads as its own thing rather than an unusually saturated regular roll.
+  const SPLICE_VARIANT_PALETTES = [
+    { name:'Prism Shard',  primary:'#ff2ec4', secondary:'#7a1a7a', accent:'#2effc4' },
+    { name:'Deep Current', primary:'#2effc4', secondary:'#1a7a6e', accent:'#ff2ec4' },
+    { name:'Static Bloom', primary:'#c42eff', secondary:'#6e1a7a', accent:'#ffe873' },
+  ];
   function rollIv(){ return IV_MIN + Math.random()*(IV_MAX-IV_MIN); }
   function rollIvSet(){ return { hp: rollIv(), str: rollIv(), def: rollIv(), spd: rollIv() }; }
 
@@ -1601,6 +1627,7 @@
       trainCooldown: 0,
       nickname: null,
       marked: Math.random() < MARKED_CHANCE,
+      spliceVariant: false, // only ever set true by doBreed() itself, right after creation
       gearSlots: [null, null],
       module: null,
       driveBonus: {hp:0,str:0,def:0,spd:0},
@@ -3981,7 +4008,7 @@
     { id:'growth', icon:'💪', title:'Growing Stronger', color:'var(--violet)', blurb:'Crests, training, breeding, modules and gear.', cards:[
       { h:'Evolution Crests', b:'Bought in the Shop (or grown on the farm). They apply instantly and boost all four stats a little. Capped at <b>3 per monster</b>.' },
       { h:'Training Ground', b:'Unlocks after your first boss. Pick a stat and play a timing game; a good tap gains more. Each stat can be trained up to +10 per partner. It costs Energy and Hunger and puts that partner on a cooldown that shortens as you explore.' },
-      { h:'Splice Lab', b:'Unlocks when your farm reaches a Server Shack. Pick two different monsters from the Network Registry and pay 50 Bits to splice their genomes. The reveal shows the new hybrid, then opens straight to its Inspect screen. Offspring inherit IVs from their parents.' },
+      { h:'Splice Lab', b:'Unlocks when your farm reaches a Server Shack. Pick two different monsters from the Network Registry and pay 50 Bits to splice their genomes. The reveal shows the new hybrid, then opens straight to its Inspect screen. Offspring inherit IVs from their parents, with a chance of a mutation nudging a stat further than either parent had. There\'s also a 1-in-10 chance of a ❖ Spliced Variant — a distinct prismatic color pattern that only ever comes from splicing, never from a wild catch or hatch.' },
       { h:'Modules', b:'Each monster holds one module. Timed modules burn one tick per step or dig, only while that monster is your active partner. A few are permanent, and Sync Link shares XP with benched monsters. Equip them from the Inventory or Storage.' },
       { h:'Stat Drives and Capsules', b:'<b>Stat Drives</b> permanently add stats — bought directly in the Shop for your active partner, applying immediately like an Evolution Crest. Capped at 5 uses per stat per partner (+5 STR/DEF/SPD, +20 HP), and the price doubles with each use already taken on that partner, so stacking several at once gets expensive fast. <b>Exp Capsules</b> give a lump of XP.' },
       { h:'Gear', b:'Gear is found only in the Data Mine. Each monster has two gear slots. There are three rarity tiers, and which one you find is weighted by dive depth — Common is available from the surface, Rare starts showing up as you push past depth ~15-20, and Legendary never appears at all before depth 25 (and stays rare even past it). Common/Rare gear gives stat bonuses or a granted move; Rare also adds Type Wards (reduced damage from one type) and dodge/flee gear. Legendary gear is build-defining: a big all-stat piece, bonus damage on same-type moves, a DEF spike when HP runs low, or pure evasion. Extras can be sold — better tiers sell for more.' },
@@ -5029,7 +5056,7 @@
         <button data-lock="${m.uid}" title="${m.locked?'Unlock':'Lock (protects from selling)'}" style="all:unset; cursor:pointer; position:absolute; top:8px; right:10px; font-size:18px;">${m.locked?'🔒':'🔓'}</button>
         ${spriteImgHtml(m, 72)}
         <div style="color:${sp.color}; margin-top:6px; font-size:13px;">${m.nickname||sp.name} <span class="badge">Gen ${m.gen} · Lv${m.level}</span></div>
-        <div style="font-size:9.5px; color:var(--ink-dim); margin-top:2px;">${sp.type} type · Stage ${m.stage}/${line.length} · ${evolveHintText(m, nextReq)}${isActive?' · <span style="color:var(--phosphor);">Active partner</span>':''}${m.marked?' · <span style="color:#fff44d;">✦ Marked</span>':''}${m.locked?' · <span style="color:var(--crimson);">🔒 Locked</span>':''}</div>
+        <div style="font-size:9.5px; color:var(--ink-dim); margin-top:2px;">${sp.type} type · Stage ${m.stage}/${line.length} · ${evolveHintText(m, nextReq)}${isActive?' · <span style="color:var(--phosphor);">Active partner</span>':''}${m.marked?' · <span style="color:#fff44d;">✦ Marked</span>':''}${(!m.marked && m.spliceVariant)?' · <span style="color:#ff2ec4;">❖ Spliced Variant</span>':''}${m.locked?' · <span style="color:var(--crimson);">🔒 Locked</span>':''}</div>
       </div>
       <div class="card" style="margin-bottom:8px;">
         <div style="color:var(--phosphor); margin-bottom:6px;">Stats</div>
@@ -5090,7 +5117,7 @@
       <div class="card">
         <div style="display:flex; align-items:center; gap:6px; color:${sp.color}; min-width:0;">
           ${spriteImgHtml(m, 36)}
-          <div style="min-width:0; flex:1;">${m.nickname||sp.name} <span class="badge">Gen ${m.gen} · Lv${m.level}</span> ${isActive?'<span class="badge" style="color:var(--phosphor);border-color:var(--phosphor)">ACTIVE</span>':''} ${m.marked?'<span class="badge" style="color:#fff44d;border-color:#fff44d;">✦ MARKED</span>':''}</div>
+          <div style="min-width:0; flex:1;">${m.nickname||sp.name} <span class="badge">Gen ${m.gen} · Lv${m.level}</span> ${isActive?'<span class="badge" style="color:var(--phosphor);border-color:var(--phosphor)">ACTIVE</span>':''} ${m.marked?'<span class="badge" style="color:#fff44d;border-color:#fff44d;">✦ MARKED</span>':''}${(!m.marked && m.spliceVariant)?'<span class="badge" style="color:#ff2ec4;border-color:#ff2ec4;">❖ SPLICED</span>':''}</div>
           <button data-lock="${m.uid}" title="${m.locked?'Unlock':'Lock (protects from selling)'}" style="all:unset; cursor:pointer; flex-shrink:0; display:flex; align-items:center; gap:3px; font-size:16px; padding:2px 4px; color:var(--ink-dim);">${m.locked?'🔒':'🔓'}<span style="font-size:8.5px; letter-spacing:.5px;">${m.locked?'LOCKED':'UNLOCKED'}</span></button>
         </div>
         <div style="display:grid; grid-template-columns:${isActive?'1fr':'1fr 1fr'}; gap:6px; margin-top:6px;">
@@ -6586,10 +6613,14 @@
     const gen = Math.max(a.gen,b.gen)+1;
     const child = newMonster(childSpecies, gen, 1, inheritIvs(a,b));
     child.personality = Math.random()<0.5 ? a.personality : b.personality;
+    // Spliced Variant: rolled here only, never inside newMonster() itself, so it's exclusively a
+    // splicing reward. Marked (rolled inside newMonster like any other new monster) always wins if
+    // both happen to hit — spriteDataUrlRaw already gives it priority.
+    child.spliceVariant = Math.random() < SPLICE_VARIANT_CHANCE;
     recalcStats(child, true);
     state.storage.push(child);
     dexMarkCaught(child);
-    logMsg(`A hybrid was spliced: ${getForm(child).name} (Gen ${gen}, Potential ${potentialStars(child.ivs)})!`);
+    logMsg(`A hybrid was spliced: ${getForm(child).name} (Gen ${gen}, Potential ${potentialStars(child.ivs)})${(child.spliceVariant && !child.marked) ? ' — a Spliced Variant!' : ''}!`);
     state.breeding = {a:null,b:null};
     const finish = () => { inspectUid = child.uid; state.screen = 'inspect'; render(); };
     if(motionOn()) playSpliceReveal(a, b, child, finish); else finish();
@@ -7041,6 +7072,7 @@
     TRAIN_STATS.forEach(k => { if(typeof m.trainBonus[k] !== 'number') m.trainBonus[k] = 0; });
     if(typeof m.trainCooldown !== 'number') m.trainCooldown = 0;
     if(typeof m.marked !== 'boolean') m.marked = false;
+    if(typeof m.spliceVariant !== 'boolean') m.spliceVariant = false;
     if(!m.personality || !PERSONALITIES[m.personality]){ m.personality = rollPersonality(); recalcStats(m, false); }
     if(!Array.isArray(m.gearSlots)) m.gearSlots = Array(GEAR_SLOT_COUNT).fill(null);
     while(m.gearSlots.length < GEAR_SLOT_COUNT) m.gearSlots.push(null);
