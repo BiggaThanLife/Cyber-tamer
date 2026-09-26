@@ -1430,18 +1430,20 @@
     ['str','def','spd'].forEach(k=>{ if(ivs[k]>bestVal){ best=k; bestVal=ivs[k]; } });
     return best;
   }
-  function potentialStars(ivs){
+  function potentialStarCount(ivs){
     const pct = ivPotential(ivs);
     // Explicit bands rather than a plain round(pct*5): the 5-star band was previously half the width
     // of every other band (pct>=0.9, a 10%-wide slice, vs. 20% for 1-4 stars) as an unintended side
     // effect of rounding — widened here to pct>=0.85 (a 15%-wide slice) so 5-star is still clearly the
     // rarest tier but not disproportionately so. 1-4 star boundaries are unchanged from the old rounding.
-    let filled;
-    if(pct >= 0.85) filled = 5;
-    else if(pct >= 0.7) filled = 4;
-    else if(pct >= 0.5) filled = 3;
-    else if(pct >= 0.3) filled = 2;
-    else filled = 1;
+    if(pct >= 0.85) return 5;
+    if(pct >= 0.7) return 4;
+    if(pct >= 0.5) return 3;
+    if(pct >= 0.3) return 2;
+    return 1;
+  }
+  function potentialStars(ivs){
+    const filled = potentialStarCount(ivs);
     return '★'.repeat(filled) + '☆'.repeat(5-filled);
   }
 
@@ -1675,6 +1677,7 @@
       recentSeeds: [],
       dexMilestonesClaimed: [],
       listSort: { key:'default', dir:'asc' },
+      listFilter: { type:'all', minStars:1, maxStars:5 },
       daily: defaultDaily(),
       legacyUnlockAll: false,
       dex,
@@ -1818,6 +1821,69 @@
     if(dirBtn) dirBtn.addEventListener('click', ()=>{
       const cur = getListSort();
       state.listSort = { key:cur.key, dir: cur.dir==='asc' ? 'desc' : 'asc' };
+      render();
+    });
+  }
+  function getListFilter(){
+    const f = state && state.listFilter;
+    if(!f || typeof f !== 'object') return { type:'all', minStars:1, maxStars:5 };
+    return {
+      type: (f.type==='all' || TYPE_IDS.includes(f.type)) ? f.type : 'all',
+      minStars: (typeof f.minStars==='number' && f.minStars>=1 && f.minStars<=5) ? f.minStars : 1,
+      maxStars: (typeof f.maxStars==='number' && f.maxStars>=1 && f.maxStars<=5) ? f.maxStars : 5,
+    };
+  }
+  function isListFilterActive(f){
+    return f.type !== 'all' || f.minStars > 1 || f.maxStars < 5;
+  }
+  function matchesListFilter(m, f){
+    if(f.type !== 'all' && getForm(m).type !== f.type) return false;
+    const stars = potentialStarCount(m.ivs);
+    if(stars < f.minStars || stars > f.maxStars) return false;
+    return true;
+  }
+  function filterBarHtml(){
+    const f = getListFilter();
+    return `<div class="card" style="display:flex; gap:6px; align-items:center; padding:6px 8px; margin-bottom:8px; flex-wrap:wrap;">
+      <span style="font-size:9px; color:var(--ink-dim); letter-spacing:1px;">FILTER</span>
+      <select data-filter-type style="flex:1; min-width:90px; font-size:10px; background:#0a1f14; color:var(--ink); border:1px solid var(--phosphor-dim); border-radius:5px; padding:4px;">
+        <option value="all" ${f.type==='all'?'selected':''}>All Types</option>
+        ${TYPE_IDS.map(t=>`<option value="${t}" ${t===f.type?'selected':''}>${t[0].toUpperCase()+t.slice(1)}</option>`).join('')}
+      </select>
+      <select data-filter-min style="font-size:10px; background:#0a1f14; color:var(--ink); border:1px solid var(--phosphor-dim); border-radius:5px; padding:4px;">
+        ${[1,2,3,4,5].map(n=>`<option value="${n}" ${n===f.minStars?'selected':''}>${n}★+</option>`).join('')}
+      </select>
+      <select data-filter-max style="font-size:10px; background:#0a1f14; color:var(--ink); border:1px solid var(--phosphor-dim); border-radius:5px; padding:4px;">
+        ${[1,2,3,4,5].map(n=>`<option value="${n}" ${n===f.maxStars?'selected':''}>≤${n}★</option>`).join('')}
+      </select>
+      ${isListFilterActive(f) ? `<button class="btn" data-filter-clear style="padding:5px 8px; font-size:10px; flex-shrink:0;">Clear</button>` : ''}
+    </div>`;
+  }
+  function bindFilterBar(screenEl){
+    const typeSel = screenEl.querySelector('[data-filter-type]');
+    const minSel = screenEl.querySelector('[data-filter-min]');
+    const maxSel = screenEl.querySelector('[data-filter-max]');
+    const clearBtn = screenEl.querySelector('[data-filter-clear]');
+    if(typeSel) typeSel.addEventListener('change', ()=>{
+      state.listFilter = Object.assign(getListFilter(), { type: typeSel.value });
+      render();
+    });
+    if(minSel) minSel.addEventListener('change', ()=>{
+      const f = getListFilter();
+      let minStars = parseInt(minSel.value, 10);
+      let maxStars = Math.max(f.maxStars, minStars);
+      state.listFilter = { type:f.type, minStars, maxStars };
+      render();
+    });
+    if(maxSel) maxSel.addEventListener('change', ()=>{
+      const f = getListFilter();
+      let maxStars = parseInt(maxSel.value, 10);
+      let minStars = Math.min(f.minStars, maxStars);
+      state.listFilter = { type:f.type, minStars, maxStars };
+      render();
+    });
+    if(clearBtn) clearBtn.addEventListener('click', ()=>{
+      state.listFilter = { type:'all', minStars:1, maxStars:5 };
       render();
     });
   }
@@ -4952,14 +5018,21 @@
      NETWORK REGISTRY
   --------------------------------------------------------- */
   function renderStorage(screenEl, controlsEl){
+    const listFilter = getListFilter();
+    const filteredList = sortedMonsters().filter(m => matchesListFilter(m, listFilter));
+    const countLine = isListFilterActive(listFilter)
+      ? `Showing ${filteredList.length} of ${state.storage.length} monster${state.storage.length===1?'':'s'} in your network.`
+      : `${state.storage.length} monster${state.storage.length===1?'':'s'} in your network.`;
     screenEl.innerHTML = `
       ${screenTitle('📦 NETWORK REGISTRY')}
-      <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:6px;">${state.storage.length} monster${state.storage.length===1?'':'s'} in your network.</div>
+      <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:6px;">${countLine}</div>
       ${sortBarHtml()}
+      ${filterBarHtml()}
       <div style="display:flex; flex-direction:column; gap:8px;">
-        ${sortedMonsters().map(m => monsterCard(m, {showSell:true})).join('')}
+        ${filteredList.length ? filteredList.map(m => monsterCard(m, {showSell:true})).join('') : `<div class="card" style="text-align:center; color:var(--ink-dim); font-size:10.5px; padding:16px;">No monsters match this filter.</div>`}
       </div>
     `;
+    bindFilterBar(screenEl);
 
     controlsEl.innerHTML = `<button class="btn" id="back" style="width:100%;">← Back to Town</button>`;
     controlsEl.querySelector('#back').addEventListener('click', ()=>{ state.screen='town'; render(); });
@@ -7198,6 +7271,10 @@
     delete s.puzzle; // pre-v25.14 saves: the old Data Sorting puzzle no longer exists
     if(s.breach && (!Array.isArray(s.breach.grid) || typeof s.breach.x !== 'number' || typeof s.breach.y !== 'number')) s.breach = null;
     if(!s.listSort || typeof s.listSort.key !== 'string') s.listSort = { key:'default', dir:'asc' };
+    if(!s.listFilter || typeof s.listFilter !== 'object') s.listFilter = { type:'all', minStars:1, maxStars:5 };
+    if(s.listFilter.type !== 'all' && !TYPE_IDS.includes(s.listFilter.type)) s.listFilter.type = 'all';
+    if(typeof s.listFilter.minStars !== 'number' || s.listFilter.minStars < 1 || s.listFilter.minStars > 5) s.listFilter.minStars = 1;
+    if(typeof s.listFilter.maxStars !== 'number' || s.listFilter.maxStars < 1 || s.listFilter.maxStars > 5) s.listFilter.maxStars = 5;
     if(!s.dex){
       // Backfill: retroactively populate the Dex from monsters this save
       // already has, so existing players don't see an empty Dex.
