@@ -1163,50 +1163,50 @@
     { id:'outskirts', name:'Neon Outskirts', accentColor:'var(--phosphor)',
       desc:'Overgrown server farms humming at the edge of town — a gentle introduction to the wild grid.',
       tiles:{ open:{glyph:'·',bg:'#0d2a17',col:'#3a7a4d'}, blockA:{glyph:'▲',bg:'#2a2318',col:'#a6853f',name:'mountain crag'}, blockB:{glyph:'≈',bg:'#0c2733',col:'#3ad6d1',name:'river current'} },
-      favored:['terrabit','sylvyx','ferrocog'],
+      favored:['terrabit','sylvyx','ferrocog'], levelRange:[1,16],
       bossSpecies:'terrabit', bossLevel:14, bossMult:1.3, bossTitle:'The Crag Warden',
-      layer2:{ levelOffset:8, bossLevel:34, bossMult:1.55, bossTitle:'The Crag Warden, Rebuilt',
+      layer2:{ levelOffset:8, levelRange:[22,40], bossLevel:34, bossMult:1.55, bossTitle:'The Crag Warden, Rebuilt',
         desc:'The same server farms, gutted and rebuilt tougher after your first pass through. Nothing here forgives a mistake twice.' } },
     { id:'wastes', name:'Sunbaked Wastes', accentColor:'var(--amber)',
       desc:'Cracked solar-panel dunes ripple with heat shimmer. Data mirages flicker on the horizon.',
       tiles:{ open:{glyph:'·',bg:'#2a1c0a',col:'#c98f3f'}, blockA:{glyph:'▲',bg:'#3a2410',col:'#e0a94f',name:'sand dune'}, blockB:{glyph:'☼',bg:'#4a1a08',col:'#ff6b3a',name:'scorched vent'} },
-      favored:['pyrelix','volteon','glitchling'],
+      favored:['pyrelix','volteon','glitchling'], levelRange:[8,24],
       bossSpecies:'pyrelix', bossLevel:20, bossMult:1.35, bossTitle:'The Cinder Sovereign',
-      layer2:{ levelOffset:10, bossLevel:40, bossMult:1.6, bossTitle:'The Cinder Sovereign, Reforged',
+      layer2:{ levelOffset:10, levelRange:[28,46], bossLevel:40, bossMult:1.6, bossTitle:'The Cinder Sovereign, Reforged',
         desc:'The dunes have baked harder since your last visit. The heat shimmer hides more than mirages now.' } },
     { id:'tundra', name:'Frostbyte Tundra', accentColor:'var(--cyan)',
       desc:'A frozen expanse of dead circuitry. The cold slows even the fastest packets.',
       tiles:{ open:{glyph:'·',bg:'#0a1f28',col:'#5fb8d6'}, blockA:{glyph:'▲',bg:'#132c38',col:'#a9dbee',name:'ice ridge'}, blockB:{glyph:'❄',bg:'#0a2530',col:'#c8f0ff',name:'frozen lake'} },
-      favored:['hydrune','ferrocog','nyxbyte'],
+      favored:['hydrune','ferrocog','nyxbyte'], levelRange:[14,30],
       bossSpecies:'hydrune', bossLevel:26, bossMult:1.4, bossTitle:'The Glacial Tyrant',
-      layer2:{ levelOffset:12, bossLevel:46, bossMult:1.65, bossTitle:'The Glacial Tyrant, Unbound',
+      layer2:{ levelOffset:12, levelRange:[34,52], bossLevel:46, bossMult:1.65, bossTitle:'The Glacial Tyrant, Unbound',
         desc:'Something under the ice has thawed just enough to move again. The cold here bites harder than it did before.' } },
     { id:'undergrid', name:'The Undergrid', accentColor:'var(--violet)',
       desc:'A corrupted core layer beneath the network. Reality flickers between passes.',
       tiles:{ open:{glyph:'·',bg:'#1a0c22',col:'#b07fff'}, blockA:{glyph:'▓',bg:'#26102e',col:'#ff6bd6',name:'firewall shard'}, blockB:{glyph:'≡',bg:'#160a1e',col:'#8f4dff',name:'datastream surge'} },
-      favored:['nyxbyte','glitchling','volteon'],
+      favored:['nyxbyte','glitchling','volteon'], levelRange:[20,38],
       bossSpecies:'nyxbyte', bossLevel:32, bossMult:1.5, bossTitle:'The Kernel Corruptor',
-      layer2:{ levelOffset:14, bossLevel:52, bossMult:1.75, bossTitle:'The Kernel Corruptor, Recompiled',
+      layer2:{ levelOffset:14, levelRange:[40,58], bossLevel:52, bossMult:1.75, bossTitle:'The Kernel Corruptor, Recompiled',
         desc:'The core has patched its own wounds. Reality flickers faster here, and less of it holds still.' } },
     { id:'foundry', name:'Overclocked Foundry', accentColor:'var(--crimson)',
       desc:'A furnace-district of runaway processors. The floor glows, and the vents never sleep.',
       mechanic:'♨ Heat vents scorch your partner when stepped on. Fire types are immune, Metal/Earth resist, Water/Nature suffer extra. Vents never faint you (they stop at 1 HP).',
       tiles:{ open:{glyph:'·',bg:'#1f0d08',col:'#a04a2a'}, blockA:{glyph:'▲',bg:'#2b0d05',col:'#e0561f',name:'slag heap'}, blockB:{glyph:'║',bg:'#1a1410',col:'#8c7b6b',name:'coolant pipe'},
               hazard:{glyph:'♨',bg:'#4a1405',col:'#ff9a3d',name:'heat vent'} },
-      favored:[], mapSize:15, levelOffset:6, anomalyIncludesHabitat:true,
+      favored:[], mapSize:15, levelOffset:6, anomalyIncludesHabitat:true, levelRange:[28,46],
       hazard:{ density:0.11, dmgPct:0.07, typeMult:{Fire:0, Metal:0.5, Earth:0.5, Water:1.5, Nature:1.5} },
       bossSpecies:'ferrocog', bossLevel:40, bossLevelOffset:2, bossMult:1.4, bossTitle:'The Forgemaster',
-      layer2:{ levelOffset:16, bossLevel:60, bossLevelOffset:4, bossMult:1.65, bossTitle:'The Forgemaster, Overclocked',
+      layer2:{ levelOffset:16, levelRange:[46,66], bossLevel:60, bossLevelOffset:4, bossMult:1.65, bossTitle:'The Forgemaster, Overclocked',
         desc:'Every processor here is running past spec. The vents never stopped burning after last time — if anything, there are more of them now.',
         hazard:{ density:0.18, dmgPct:0.07, typeMult:{Fire:0, Metal:0.5, Earth:0.5, Water:1.5, Nature:1.5} } } },
     { id:'ghostserver', name:'The Ghost Server', accentColor:'var(--violet)',
       desc:'An abandoned host that half-remembers itself. The map forgets you the moment you look away.',
       mechanic:'👁 Fading signal: you only see 2 tiles around you and explored ground is forgotten. A ghost signal hints at where the boss lurks.',
       tiles:{ open:{glyph:'·',bg:'#080a14',col:'#3d4a86'}, blockA:{glyph:'▒',bg:'#0d1020',col:'#5a6bb8',name:'null-pointer wall'}, blockB:{glyph:'░',bg:'#0a0c18',col:'#7f8fd6',name:'static fog bank'} },
-      favored:[], mapSize:15, levelOffset:8, anomalyIncludesHabitat:true,
+      favored:[], mapSize:15, levelOffset:8, anomalyIncludesHabitat:true, levelRange:[36,54],
       fadeFog:{ radius:2 }, bossSignal:true,
       bossSpecies:'glitchling', bossLevel:48, bossLevelOffset:4, bossMult:1.5, bossTitle:'The Ghost Admin',
-      layer2:{ levelOffset:18, bossLevel:68, bossLevelOffset:6, bossMult:1.75, bossTitle:'The Ghost Admin, Reawakened',
+      layer2:{ levelOffset:18, levelRange:[52,74], bossLevel:68, bossLevelOffset:6, bossMult:1.75, bossTitle:'The Ghost Admin, Reawakened',
         desc:'It remembers you this time. The signal fades faster here, and whatever\'s left of the Admin is angrier for having been beaten once.',
         fadeFog:{ radius:1 } } },
   ];
@@ -3511,7 +3511,7 @@
     const pool = encounterPool(biome, w.layer||1);
     const lineId = pool[Math.floor(Math.random()*pool.length)];
     const p = getActive();
-    const lvl = Math.max(1, p.level + biomeLevelOffset(biome, w.biomeIndex) + Math.floor(Math.random()*3) - 1);
+    const lvl = clampToLevelRange(Math.max(1, p.level + biomeLevelOffset(biome, w.biomeIndex) + Math.floor(Math.random()*3) - 1), biome);
     const enemy = newMonster(lineId, 1, lvl);
     const enemyName = getForm(enemy).name;
     dexMarkSeen(enemy.speciesId, enemy.stage);
@@ -3557,7 +3557,7 @@
     const marked = rng() < MARKED_CHANCE;
     const personality = rollPersonality(rng); // appended after marked — never reorders the existing draws
     const p = getActive();
-    const lvl = Math.max(1, p.level + biomeLevelOffset(biome, biomeIndex) + 2 + Math.floor(Math.random()*3)); // difficulty, not identity — stays unseeded
+    const lvl = clampToLevelRange(Math.max(1, p.level + biomeLevelOffset(biome, biomeIndex) + 2 + Math.floor(Math.random()*3)), biome); // difficulty, not identity — stays unseeded
     const enemy = newMonster(lineId, 1, lvl, ivs);
     enemy.marked = marked;
     enemy.personality = personality;
@@ -3580,9 +3580,23 @@
   // Levels for wild spawns are relative to your active partner. Older biomes use idx*2;
   // newer ones set levelOffset explicitly. Late bosses also scale off the partner.
   function biomeLevelOffset(biome, idx){ return biome.levelOffset != null ? biome.levelOffset : idx*2; }
+  // Every biome's levelRange is a hard floor/ceiling on top of the partner-relative math above —
+  // without it, a deep biome visited with a low-level partner rolled encounters (and, worse, a boss)
+  // far below what that biome is supposed to represent, and an over-leveled partner could push a
+  // boss arbitrarily high. This keeps "how deep you are" the dominant signal, partner level a
+  // secondary nudge within that band, same relationship the rest of the game already has to depth.
+  function biomeLevelRange(biome){
+    return (Array.isArray(biome.levelRange) && biome.levelRange.length===2) ? biome.levelRange : [1, 999];
+  }
+  function clampToLevelRange(lvl, biome){
+    const [min, max] = biomeLevelRange(biome);
+    return Math.max(min, Math.min(max, lvl));
+  }
   function createBoss(biome){
+    const ap = getActive();
     let bossLvl = biome.bossLevel;
-    if(biome.bossLevelOffset != null){ const ap = getActive(); if(ap) bossLvl = Math.max(bossLvl, ap.level + biome.bossLevelOffset); }
+    if(ap) bossLvl = Math.max(bossLvl, ap.level + (biome.bossLevelOffset != null ? biome.bossLevelOffset : 4));
+    bossLvl = clampToLevelRange(bossLvl, biome);
     const boss = newMonster(biome.bossSpecies, 2, bossLvl);
     boss.stage = Math.min(2, EVOLUTION_LINES[biome.bossSpecies].length);
     recalcStats(boss, true);
