@@ -7957,6 +7957,14 @@
     { version:'25.10', date:'2026-09-22', notes:[
       'You can now lock a monster in the Network Registry — tap the 🔓/🔒 icon on its card or Inspect screen to protect it from being sold by mistake, with a little animation on the lock itself.',
     ]},
+    { version:'25.32', date:'2026-09-25', notes:[
+      'New: the Network Registry now has a filter, alongside sort — narrow your roster down by type, or by Potential star range (min and max), with a Clear button to reset.',
+      'Changed: boss and wild-encounter levels are now bounded to a level range per biome. A boss no longer stays stuck at a fixed level while wild encounters around it scale up with a stronger partner, and a low-level partner deep into a biome no longer sees encounters far below what that biome is meant to represent.',
+      'New: the Auditor and boss-difficulty escalation now read as connected — a few extra lines in each biome\'s first-entry text and the Auditor\'s notices hint that reinforcement and containment are the same story.',
+      'Changed: 5-star Potential is a bit more attainable, and splicing two strong parents has better odds of producing a 5-star child.',
+      'New: splicing can now produce a Spliced Variant — a prismatic color mutation that can only come from the Splice Lab.',
+      'Changed: the wild-encounter reveal message ("A wild X appeared!") stays on screen longer so it\'s actually readable before battle starts.',
+    ]},
     { version:'25.9', date:'2026-09-21', notes:[
       'Fixed: the Perfect streak celebration wasn\'t showing on Job Board or Training Ground — both used to jump back to their list the instant you tapped, before the animation had anywhere to play. They now show the result on the same screen (frozen marker, streak, reward), with a button to head back when you\'re ready.',
     ]},
@@ -7995,15 +8003,11 @@
     ]},
   ];
   const BUILD = {
-    version: '25.32',
-    date: '2026-09-25',
+    version: '25.33',
+    date: '2026-09-26',
     notes: [
-      'New: the Network Registry now has a filter, alongside sort — narrow your roster down by type, or by Potential star range (min and max), with a Clear button to reset.',
-      'Changed: boss and wild-encounter levels are now bounded to a level range per biome. A boss no longer stays stuck at a fixed level while wild encounters around it scale up with a stronger partner, and a low-level partner deep into a biome no longer sees encounters far below what that biome is meant to represent.',
-      'New: the Auditor and boss-difficulty escalation now read as connected — a few extra lines in each biome\'s first-entry text and the Auditor\'s notices hint that reinforcement and containment are the same story.',
-      'Changed: 5-star Potential is a bit more attainable, and splicing two strong parents has better odds of producing a 5-star child.',
-      'New: splicing can now produce a Spliced Variant — a prismatic color mutation that can only come from the Splice Lab.',
-      'Changed: the wild-encounter reveal message ("A wild X appeared!") stays on screen longer so it\'s actually readable before battle starts.',
+      'Fixed: the Auto-Harvester upgrade description still mentioned clearing withered crops, left over from before crops stopped withering. It now just says what it does — harvests every ripe pod.',
+      'Fixed: the Help hub\'s Gear card never mentioned critical hits, life-steal, multi-hit strikes, block chance, counter-attacks, or the Overheat/Corruption status effect, even though gear can roll any of them. It now does.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
