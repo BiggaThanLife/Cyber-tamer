@@ -1,8 +1,7 @@
 {
-  "version": "25.33",
-  "date": "2026-09-26",
+  "version": "25.34",
+  "date": "2026-09-27",
   "notes": [
-    "Fixed: the Auto-Harvester upgrade description still mentioned clearing withered crops, left over from before crops stopped withering. It now just says what it does — harvests every ripe pod.",
-    "Fixed: the Help hub's Gear card never mentioned critical hits, life-steal, multi-hit strikes, block chance, counter-attacks, or the Overheat/Corruption status effect, even though gear can roll any of them. It now does."
+    "New: a proper icon for saved bookmarks and Add to Home Screen, instead of the browser's generic default. On iOS it also now launches full-screen, without browser chrome."
   ]
 }
