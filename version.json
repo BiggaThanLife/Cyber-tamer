@@ -1,7 +1,11 @@
 {
-  "version": "25.34",
-  "date": "2026-09-27",
+  "version": "25.35",
+  "date": "2026-09-28",
   "notes": [
-    "New: a proper icon for saved bookmarks and Add to Home Screen, instead of the browser's generic default. On iOS it also now launches full-screen, without browser chrome."
+    "New: the walk between points of interest has more texture now. Maps occasionally roll a \"condition\" — a bit more shrine-rich, a vault day, or just plain loot-dense — with a small chance of bonus loot near the Gate either way.",
+    "New: rare, quiet moments while exploring open ground — a short flavor line and a small guaranteed reward, no battle, no minigame.",
+    "New: Seed Landmarks — a small chance any map clusters several of the same find together instead of scattering them: a run of vaults, a web of Locked Nodes, an anomaly pocket with better odds at something Marked, and biome-specific finds in Frostbyte Tundra and the Ghost Server. Rare enough to be worth hunting and sharing a seed for.",
+    "Changed: Packet Tracer and Port Scanner now also have a passive use — they'll let you know if a map has one of these rare finds on it (never what or where).",
+    "New: on rare Layer 1 maps, a biome's own Layer 2 hazard can show up faintly — a few more heat vents, a touch tighter fog — never enough to feel like Layer 2 itself."
   ]
 }
