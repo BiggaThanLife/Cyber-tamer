@@ -1,7 +1,7 @@
 {
-  "version": "25.37",
+  "version": "25.38",
   "date": "2026-09-28",
   "notes": [
-    "Fixed: a multi-stage Locked Node's progress reset back to stage 1 if you left and came back to the same seed. Progress toward a node now sticks around properly until you finish it."
+    "New: the Recently Visited list on Biome Select can now be minimized, and you can remove entries you don't want cluttering it."
   ]
 }
