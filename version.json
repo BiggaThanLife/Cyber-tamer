@@ -1,7 +1,7 @@
 {
-  "version": "25.36",
+  "version": "25.37",
   "date": "2026-09-28",
   "notes": [
-    "Changed: Data Breach — Locked Nodes deeper into the world now take more than one clear to fully breach (Frostbyte Tundra and the Undergrid need 2, Overclocked Foundry and the Ghost Server need 3; the first two biomes are unchanged at 1). Every stage is the same difficulty, just more of them — a failed attempt only retries that stage, no progress lost. The full reward — Bits, capture programs, and the Network Access Key on your first breach in a biome — pays out on the final clear, scaled up to match the extra effort."
+    "Fixed: a multi-stage Locked Node's progress reset back to stage 1 if you left and came back to the same seed. Progress toward a node now sticks around properly until you finish it."
   ]
 }

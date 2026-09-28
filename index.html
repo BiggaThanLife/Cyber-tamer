@@ -8302,6 +8302,9 @@
       'Changed: Packet Tracer and Port Scanner now also have a passive use — they\'ll let you know if a map has one of these rare finds on it (never what or where).',
       'New: on rare Layer 1 maps, a biome\'s own Layer 2 hazard can show up faintly — a few more heat vents, a touch tighter fog — never enough to feel like Layer 2 itself.',
     ]},
+    { version:'25.36', date:'2026-09-28', notes:[
+      'Changed: Data Breach — Locked Nodes deeper into the world now take more than one clear to fully breach (Frostbyte Tundra and the Undergrid need 2, Overclocked Foundry and the Ghost Server need 3; the first two biomes are unchanged at 1). Every stage is the same difficulty, just more of them — a failed attempt only retries that stage, no progress lost. The full reward — Bits, capture programs, and the Network Access Key on your first breach in a biome — pays out on the final clear, scaled up to match the extra effort.',
+    ]},
     { version:'25.2', date:'2026-09-21', notes:[
       'Play now costs Energy and Hunger on every try, hit or miss, and only allows a few tries in a row before a short break. It no longer refills Hunger or Energy.',
       'New: the game tells you when an update is available, and shows what changed after you update.',
@@ -8316,10 +8319,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.36',
+    version: '25.37',
     date: '2026-09-28',
     notes: [
-      'Changed: Data Breach — Locked Nodes deeper into the world now take more than one clear to fully breach (Frostbyte Tundra and the Undergrid need 2, Overclocked Foundry and the Ghost Server need 3; the first two biomes are unchanged at 1). Every stage is the same difficulty, just more of them — a failed attempt only retries that stage, no progress lost. The full reward — Bits, capture programs, and the Network Access Key on your first breach in a biome — pays out on the final clear, scaled up to match the extra effort.',
+      'Fixed: a multi-stage Locked Node\'s progress reset back to stage 1 if you left and came back to the same seed. Progress toward a node now sticks around properly until you finish it.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
