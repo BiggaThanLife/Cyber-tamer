@@ -1381,6 +1381,7 @@
 
   const IV_MIN = 0.85, IV_MAX = 1.15;
   const MARKED_CHANCE = 1/128; // odds a newly-created monster is a rare "marked" variant
+  const MARKED_NEST_CHANCE = MARKED_CHANCE * 8; // wild encounters on a Marked Nest landmark's pocket tiles
   // Spliced Variant: a second, independent cosmetic mutation — unlike Marked (rollable on ANY new
   // monster, wild capture included), this one is exclusively rolled in doBreed(), never in
   // newMonster() itself, so it stays a genuine splicing-only reward. Deliberately far more common
@@ -1622,7 +1623,7 @@
     return leveled;
   }
 
-  function newMonster(speciesId, gen, level, ivsOverride){
+  function newMonster(speciesId, gen, level, ivsOverride, markedChance){
     const m = {
       uid: 'm' + Math.random().toString(36).slice(2,10),
       speciesId, gen, stage: 1, level: level || 1,
@@ -1640,7 +1641,7 @@
       trainBonus: {str:0, def:0, spd:0},
       trainCooldown: 0,
       nickname: null,
-      marked: Math.random() < MARKED_CHANCE,
+      marked: Math.random() < (typeof markedChance === 'number' ? markedChance : MARKED_CHANCE),
       spliceVariant: false, // only ever set true by doBreed() itself, right after creation
       gearSlots: [null, null],
       module: null,
@@ -2056,6 +2057,18 @@
     { text:'A discarded data fragment catches your scanner. Nothing dangerous, just leftover salvage.', reward:'item' },
   ];
 
+  // Seed Landmarks — a rare (~1 in 10) per-seed roll that clusters several instances of EXISTING
+  // tile types together instead of scattering them, so a favorited seed can occasionally be worth
+  // hunting/sharing for a specific find. Placement-weight change only, reusing existing roles —
+  // no new tile art, no new mechanics beyond `markedBoost` (a plain flag read by startEncounter)
+  // and `memoryPocket` (read by applyFog). Three generic types fit any biome; Tundra and the Ghost
+  // Server each get one extra biome-flavored option in their own roll. The Wastes' "Mirage Cluster"
+  // idea from the spec was skipped — it depends on a "data-mirage" tile type that doesn't exist
+  // anywhere in this codebase (the Wastes' mirage imagery is flavor text only).
+  const LANDMARK_ROLL_CHANCE = 0.10;
+  const LANDMARK_GENERIC_TYPES = ['vaultCluster', 'markedNest', 'breachWeb'];
+  const LANDMARK_BIOME_TYPES = { tundra: 'deadCircuit', ghostserver: 'memoryPocket' };
+
   // A wild map's entire layout is a pure function of (biomeIndex, size, seed),
   // via a seeded PRNG (mulberry32) — so the same seed always regenerates the
   // identical tile layout. Passing no seed rolls a fresh random one. Fog/opened
@@ -2238,6 +2251,90 @@
       }
     }
 
+    // Seed Landmarks — see the LANDMARK_ROLL_CHANCE comment above. Own derived PRNG, own roll,
+    // placed after Walk Texture so it clusters around whatever's still 'open'/wall at that point;
+    // never touches the gate/boss/anomaly/key/vault cells already placed by base generation above.
+    let landmark = null;
+    {
+      const lmRng = mulberry32((mapSeed ^ 0x1b873593) >>> 0);
+      if(lmRng() < LANDMARK_ROLL_CHANCE){
+        const pool = LANDMARK_GENERIC_TYPES.slice();
+        const flavor = LANDMARK_BIOME_TYPES[biomeDef.id];
+        if(flavor) pool.push(flavor);
+        const type = pool[Math.floor(lmRng()*pool.length)];
+        const cheb = ([x,y]) => Math.max(Math.abs(x-cx), Math.abs(y-cy));
+        const minDist = Math.max(3, Math.floor(size/3));
+        const openCand = [];
+        for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+          if(grid[y][x].role === 'open' && cheb([x,y]) >= minDist) openCand.push([x,y]);
+        }
+        shuffleArray(openCand, lmRng);
+        const byDistanceTo = (center, pool) => pool.slice().sort((a,b) =>
+          Math.max(Math.abs(a[0]-center[0]),Math.abs(a[1]-center[1])) - Math.max(Math.abs(b[0]-center[0]),Math.abs(b[1]-center[1])));
+
+        if((type === 'vaultCluster' || type === 'markedNest' || type === 'breachWeb') && openCand.length){
+          const center = openCand[0];
+          const nearest = byDistanceTo(center, openCand);
+          const tiles = [];
+          if(type === 'vaultCluster'){
+            const pairs = 3 + (lmRng() < 0.5 ? 1 : 0); // 3-4 pairs
+            const need = nearest.slice(0, pairs*2);
+            need.forEach(([x,y], i) => {
+              grid[y][x] = { role: i%2===0 ? 'key' : 'vault', opened:false };
+              tiles.push([x,y]);
+            });
+            hasKeyPair = need.length >= 2;
+          } else if(type === 'breachWeb'){
+            const count = 3 + (lmRng() < 0.5 ? 1 : 0); // 3-4 nodes
+            nearest.slice(0, count).forEach(([x,y]) => {
+              grid[y][x] = { role:'locked', opened:false };
+              tiles.push([x,y]);
+            });
+          } else if(type === 'markedNest'){
+            const alreadyHasAnomaly = grid.some(row => row.some(c => c.role === 'anomaly'));
+            if(!alreadyHasAnomaly){
+              const [ax,ay] = center;
+              grid[ay][ax] = { role:'anomaly', opened:false };
+              tiles.push([ax,ay]);
+              nearest.slice(1, 4).forEach(([x,y]) => {
+                if(grid[y][x].role === 'open'){ grid[y][x].markedBoost = true; tiles.push([x,y]); }
+              });
+            }
+          }
+          if(tiles.length) landmark = { type, tiles };
+        } else if(type === 'deadCircuit'){
+          const wallCand = [];
+          for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+            if((grid[y][x].role === 'blockA' || grid[y][x].role === 'blockB') && cheb([x,y]) >= minDist) wallCand.push([x,y]);
+          }
+          if(wallCand.length){
+            shuffleArray(wallCand, lmRng);
+            const center = wallCand[0];
+            const nearest = byDistanceTo(center, wallCand);
+            const count = 2 + (lmRng() < 0.5 ? 1 : 0); // 2-3 barriers
+            const usedTypes = [];
+            const tiles = [];
+            nearest.slice(0, count).forEach(([x,y]) => {
+              let reqType;
+              do { reqType = TYPE_IDS[Math.floor(lmRng()*TYPE_IDS.length)]; } while(usedTypes.includes(reqType) && usedTypes.length < TYPE_IDS.length);
+              usedTypes.push(reqType);
+              grid[y][x] = { role:'barrier', opened:false, reqType };
+              tiles.push([x,y]);
+            });
+            if(tiles.length) landmark = { type, tiles };
+          }
+        } else if(type === 'memoryPocket' && openCand.length){
+          const center = openCand[0];
+          const tiles = [];
+          for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+            const x = center[0]+dx, y = center[1]+dy;
+            if(x>=0 && y>=0 && x<size && y<size) tiles.push([x,y]);
+          }
+          landmark = { type, tiles };
+        }
+      }
+    }
+
     // Power Surge — Layer 2 only, on top of whatever hazard the biome already has (Foundry keeps
     // its heat vents AND gets surges). Its own derived PRNG placed last, so Layer 1 maps and
     // biomes without a layer2 entry never see it.
@@ -2251,7 +2348,7 @@
     const fog = grid.map(row => row.map(()=>false));
     revealFog(fog, cx, cy, size, 1);
     return { size, grid, fog, px:cx, py:cy, steps:0, biomeIndex, layer, hasKey:false, keyPairPresent:hasKeyPair, seed:useSeed,
-             daily: !!(opts && opts.daily), dailyDay: (opts && opts.daily && opts.day) || null, condition: condition.id };
+             daily: !!(opts && opts.daily), dailyDay: (opts && opts.daily && opts.day) || null, condition: condition.id, landmark, landmarkHinted:false };
   }
 
   // Remembers the most recent maps you've walked into (regardless of whether
@@ -2309,7 +2406,15 @@
   // except the gate each time you move, and only show a wider radius around your position.
   function applyFog(w, biome){
     if(biome.fadeFog){
-      w.fog.forEach(r => r.fill(false));
+      // Memory Pocket landmark: its tiles are deliberately exempted from the wipe below, so once
+      // seen they stay visible instead of being forgotten on the very next step like everywhere
+      // else in a fading-signal biome.
+      const pocket = (w.landmark && w.landmark.type === 'memoryPocket')
+        ? new Set(w.landmark.tiles.map(([x,y]) => `${x},${y}`)) : null;
+      w.fog.forEach((row,y) => row.forEach((v,x) => {
+        if(pocket && pocket.has(`${x},${y}`)) return;
+        row[x] = false;
+      }));
       const c = Math.floor(w.size/2);
       w.fog[c][c] = true; // the exit is always known
       revealFog(w.fog, w.px, w.py, w.size, biome.fadeFog.radius);
@@ -3208,6 +3313,13 @@
         state.wild = generateWildMap(idx, undefined, seed, layer===2 ? {layer:2} : undefined);
         const walkCond = walkConditionDef(state.wild.condition);
         if(walkCond.label) logMsg(walkCond.label);
+        // Landmark detection: Packet Tracer/Port Scanner already exist as one-time tools; this is
+        // their passive second use — confirms a landmark exists, never what or where. Fire-once per
+        // map (landmarkHinted), no reveal beyond the single log line.
+        if(state.wild.landmark && !state.wild.landmarkHinted && (hasTool('packetTracer') || hasTool('portScanner'))){
+          state.wild.landmarkHinted = true;
+          logMsg('📡 Unusual signal density detected.');
+        }
         if(layer !== 2){ maybeShowBiomeStoryText(idx); maybeTriggerGhostServerArrival(idx); } // Layer 2 remixes an already-seen biome, so no fresh flavor there
         recordVisitedSeed(idx, state.wild.seed);
         state.screen = 'wild';
@@ -3608,7 +3720,8 @@
     const lineId = pool[Math.floor(Math.random()*pool.length)];
     const p = getActive();
     const lvl = clampToLevelRange(Math.max(1, p.level + biomeLevelOffset(biome, w.biomeIndex) + Math.floor(Math.random()*3) - 1), biome);
-    const enemy = newMonster(lineId, 1, lvl);
+    const hereCell = w.grid[w.py] && w.grid[w.py][w.px];
+    const enemy = newMonster(lineId, 1, lvl, undefined, (hereCell && hereCell.markedBoost) ? MARKED_NEST_CHANCE : undefined);
     const enemyName = getForm(enemy).name;
     dexMarkSeen(enemy.speciesId, enemy.stage);
     playScanTransition(`A wild<br>${enemyName}<br>appeared!`, 'var(--crimson)', ()=>{
@@ -7519,6 +7632,8 @@
       if(typeof s.wild.hasKey !== 'boolean') s.wild.hasKey = false;
       if(typeof s.wild.seed !== 'number') s.wild.seed = Math.floor(Math.random()*4294967296);
       if(typeof s.wild.condition !== 'string') s.wild.condition = 'normal';
+      if(!('landmark' in s.wild)) s.wild.landmark = null;
+      if(typeof s.wild.landmarkHinted !== 'boolean') s.wild.landmarkHinted = false;
       if(Array.isArray(s.wild.grid)) s.wild.grid.forEach(row => row.forEach(migrateWildCell));
     }
     return s;
