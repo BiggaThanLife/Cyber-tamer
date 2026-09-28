@@ -1292,6 +1292,7 @@
   let appMode = 'boot'; // 'boot' (title screen) | 'game'
   let importErrorMsg = null;
   let wildLegendOpen = false; // transient UI-only toggle, not persisted
+  let recentSeedsOpen = true; // transient UI-only toggle, not persisted — Biome Select's Recently Visited card
   let farmPodPage = 0; // transient UI-only, not persisted — clamped to range on every render
 
   function formStats(speciesId, stage, gen, level, ivs){
@@ -3282,7 +3283,11 @@
       ${screenTitle('🌐 CHOOSE A BIOME', 'var(--cyan)')}
       ${recent.length ? `
         <div class="card" style="margin-bottom:8px; border-color:var(--cyan);">
-          <div style="font-size:10.5px; color:var(--cyan); margin-bottom:6px;">🕐 Recently Visited <span style="color:var(--ink-dim); font-weight:normal;">— forgot to save one? It's still here.</span></div>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:${recentSeedsOpen?'6px':'0'};">
+            <div style="font-size:10.5px; color:var(--cyan);">🕐 Recently Visited <span style="color:var(--ink-dim); font-weight:normal;">${recentSeedsOpen?'— forgot to save one? It\'s still here.':`(${recent.length})`}</span></div>
+            <button class="btn" id="recent-toggle" style="padding:2px 8px; font-size:9px;">${recentSeedsOpen?'▾ Hide':'▸ Show'}</button>
+          </div>
+          ${recentSeedsOpen ? `
           <div style="display:flex; flex-direction:column; gap:4px;">
             ${recent.map((r,ri) => {
               const rb = BIOMES[r.biomeIndex];
@@ -3293,9 +3298,11 @@
                 </div>
                 <button class="btn btn-cyan" style="padding:3px 8px; font-size:9px;" data-recent-enter="${ri}">Go</button>
                 <button class="btn ${fav?'btn-amber':''}" style="padding:3px 8px; font-size:9px;" data-recent-fav="${ri}">${fav?'★':'☆'}</button>
+                <button class="btn btn-crimson" style="padding:3px 6px; font-size:9px;" data-recent-remove="${ri}">🗑</button>
               </div>`;
             }).join('')}
           </div>
+          ` : ''}
         </div>
       ` : ''}
       <div style="display:flex; flex-direction:column; gap:8px;">
@@ -3431,6 +3438,20 @@
         const r = recent[parseInt(btn.getAttribute('data-recent-fav'),10)];
         if(r) toggleFavoriteSeed(r.seed, r.biomeIndex);
       });
+    });
+    screenEl.querySelectorAll('[data-recent-remove]').forEach(btn=>{
+      btn.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        const r = recent[parseInt(btn.getAttribute('data-recent-remove'),10)];
+        if(r) state.recentSeeds = state.recentSeeds.filter(x => x !== r);
+        render();
+      });
+    });
+    const recentToggleBtn = screenEl.querySelector('#recent-toggle');
+    if(recentToggleBtn) recentToggleBtn.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      recentSeedsOpen = !recentSeedsOpen;
+      render();
     });
     controlsEl.innerHTML = `<button class="btn" id="back" style="width:100%;">← Back to Town</button>`;
     controlsEl.querySelector('#back').addEventListener('click', ()=>{ state.screen='town'; render(); });
