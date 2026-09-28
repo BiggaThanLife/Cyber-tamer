@@ -1,11 +1,7 @@
 {
-  "version": "25.35",
+  "version": "25.36",
   "date": "2026-09-28",
   "notes": [
-    "New: the walk between points of interest has more texture now. Maps occasionally roll a \"condition\" — a bit more shrine-rich, a vault day, or just plain loot-dense — with a small chance of bonus loot near the Gate either way.",
-    "New: rare, quiet moments while exploring open ground — a short flavor line and a small guaranteed reward, no battle, no minigame.",
-    "New: Seed Landmarks — a small chance any map clusters several of the same find together instead of scattering them: a run of vaults, a web of Locked Nodes, an anomaly pocket with better odds at something Marked, and biome-specific finds in Frostbyte Tundra and the Ghost Server. Rare enough to be worth hunting and sharing a seed for.",
-    "Changed: Packet Tracer and Port Scanner now also have a passive use — they'll let you know if a map has one of these rare finds on it (never what or where).",
-    "New: on rare Layer 1 maps, a biome's own Layer 2 hazard can show up faintly — a few more heat vents, a touch tighter fog — never enough to feel like Layer 2 itself."
+    "Changed: Data Breach — Locked Nodes deeper into the world now take more than one clear to fully breach (Frostbyte Tundra and the Undergrid need 2, Overclocked Foundry and the Ghost Server need 3; the first two biomes are unchanged at 1). Every stage is the same difficulty, just more of them — a failed attempt only retries that stage, no progress lost. The full reward — Bits, capture programs, and the Network Access Key on your first breach in a biome — pays out on the final clear, scaled up to match the extra effort."
   ]
 }
