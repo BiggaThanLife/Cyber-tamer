@@ -1,8 +1,7 @@
 {
-  "version": "25.40",
+  "version": "25.41",
   "date": "2026-09-28",
   "notes": [
-    "The town menu is now grouped into sections — NETWORK, LAB, HAVEN, INFO and SETTINGS — instead of one long list of buttons.",
-    "The tutorial and Help hub's \"Getting Started\" topic now describe the new grouped town menu."
+    "Catching a monster is now a moment: a short SIGNAL LOCKED / CAPTURE SUCCESSFUL / NEW ENTITY REGISTERED sequence shows the new arrival's sprite, Potential and Personality — with extra flair if it's Marked."
   ]
 }

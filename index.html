@@ -4092,7 +4092,9 @@
       logMsg((enemy.marked ? '✦ MARKED! ' : '') + (wasWanted ? `${program.name} re-linked ${getForm(enemy).name} — the one that got away! +${bits} Bits.` : `${program.name} complete — ${getForm(enemy).name} added to your Network Registry! +${bits} Bits.`));
       gainXp(getActive(), Math.round((6 + enemy.level*3) * (enemy.isAnomaly ? 1.5 : 1)));
       fireAuditorStage(1); // "After first capture (Outskirts)" — a no-op after the first real capture
-      b.over = true; render(); return;
+      b.over = true; render();
+      playCaptureReveal(caught, () => {});
+      return;
     }
     fx({k:'escape'});
     logMsg(`${program.name} failed — the connection was severed.`);
@@ -8005,6 +8007,80 @@
     tick();
   }
 
+  // The post-capture "entity registered" beat — capturing is the game's central reward, and up to
+  // now the payoff was just a log line. Runs right after playCapture's own acquisition animation
+  // (or instantly, if motion is off/skipped), before the battle screen shows the capture succeeded.
+  // Same tap-to-skip/tap-to-continue pattern as playSpliceReveal/playNextEvolution — never blocks
+  // input forever, always has a fallback timer.
+  function playCaptureReveal(caught, done){
+    const f = getForm(caught);
+    const ov = document.createElement('div');
+    ov.id = 'capreg-overlay';
+    ov.style.cssText = 'position:fixed; inset:0; z-index:955; display:flex; flex-direction:column; align-items:center; justify-content:center; background:radial-gradient(ellipse at 50% 45%, #0e2418 0%, #020a06 75%); color:#dff7e6; text-align:center; padding:24px; cursor:pointer;';
+    const badges = [];
+    if(caught.marked) badges.push('<span class="badge" style="color:#fff44d;border-color:#fff44d;">✦ MARKED</span>');
+    if(!caught.marked && caught.spliceVariant) badges.push('<span class="badge" style="color:#ff2ec4;border-color:#ff2ec4;">❖ SPLICED</span>');
+    const pDef = personalityDef(caught);
+    ov.innerHTML = `
+      <div id="capreg-beat" class="pixel-font glow" style="font-size:12px; letter-spacing:2px; color:var(--phosphor); min-height:22px; margin-bottom:18px;"></div>
+      <div id="capreg-card" style="position:relative; opacity:0; display:flex; flex-direction:column; align-items:center;">
+        <div style="filter:drop-shadow(0 0 16px ${f.color});">${spriteImgHtml(caught, 120)}</div>
+        <div class="pixel-font glow" style="margin-top:12px; font-size:13px; color:${f.color};">${escapeHtml(caught.nickname || f.name)}</div>
+        <div style="margin-top:4px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">${badges.join('')}</div>
+        <div style="margin-top:10px; font-size:11px; color:var(--ink-dim); line-height:1.7;">
+          Potential <span style="color:var(--amber);">${potentialStars(caught.ivs)}</span><br>
+          ${pDef ? `Personality: <span style="color:var(--ink);">${escapeHtml(pDef.name)}</span>` : ''}
+        </div>
+      </div>
+      <div id="capreg-hint" style="margin-top:16px; font-size:11px; color:#86ad96; opacity:0;">Tap to continue</div>
+    `;
+    document.body.appendChild(ov);
+    const $ = id => ov.querySelector('#'+id);
+    const beat = $('capreg-beat'), card = $('capreg-card'), hint = $('capreg-hint');
+    const timers = [];
+    const at = (ms, fn) => timers.push(setTimeout(() => { if(document.body.contains(ov)) fn(); }, ms));
+    const shown = Date.now();
+    let done_ = false;
+    const showFinal = () => {
+      done_ = true;
+      timers.forEach(clearTimeout);
+      ov.getAnimations && ov.getAnimations({subtree:true}).forEach(a => a.cancel());
+      beat.textContent = 'NEW ENTITY REGISTERED';
+      card.style.opacity = '1';
+      hint.style.opacity = '1';
+    };
+    const close = () => {
+      const a = animate(ov, [{opacity:1},{opacity:0}], {duration:220, fill:'forwards'});
+      const end = () => { ov.remove(); done(); };
+      if(a) a.onfinish = end; else end();
+      setTimeout(() => { if(document.body.contains(ov)) end(); }, 500);
+    };
+    ov.addEventListener('click', () => {
+      if(Date.now() - shown < 400) return;
+      if(done_) close(); else showFinal();
+    });
+    if(!motionOn()){ showFinal(); at(1400, close); return; }
+
+    // ---- full sequence (~2.4s) ----
+    animate(ov, [{opacity:0},{opacity:1}], {duration:250});
+    beat.textContent = 'SIGNAL LOCKED';
+    animate(beat, [{opacity:0},{opacity:1}], {duration:300});
+    at(550, () => { beat.textContent = 'Capture program deployed...'; animate(beat, [{opacity:0},{opacity:1}], {duration:250}); });
+    at(1150, () => {
+      beat.textContent = 'CAPTURE SUCCESSFUL'; beat.style.color = 'var(--phosphor)';
+      animate(beat, [{transform:'scale(.7)', opacity:0},{transform:'scale(1)', opacity:1}], {duration:350, easing:'ease-out'});
+      flashEl(ov, 'brightness(1.6)', 260);
+      burst(beat, caught.marked ? '#fff44d' : f.color, caught.marked ? 22 : 14, 90);
+    });
+    at(1750, () => {
+      beat.textContent = 'NEW ENTITY REGISTERED';
+      card.style.opacity = '1';
+      animate(card, [{transform:'scale(.85)', opacity:0},{transform:'scale(1)', opacity:1}], {duration:400, easing:'ease-out'});
+    });
+    at(2350, () => { done_ = true; animate(hint, [{opacity:0},{opacity:1}], {duration:300}); hint.style.opacity = '1'; });
+    at(6000, close); // hard fallback: never leave the overlay stuck
+  }
+
   // A quick "scanning the target" beat before an encounter, then hands off to playTransition's
   // usual name reveal. Skips straight to the reveal under reduced motion.
   function playScanTransition(revealMessage, accentColor, onDone){
@@ -8204,6 +8280,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.40', date:'2026-09-28', notes:[
+      'The town menu is now grouped into sections — NETWORK, LAB, HAVEN, INFO and SETTINGS — instead of one long list of buttons.',
+      'The tutorial and Help hub\'s "Getting Started" topic now describe the new grouped town menu.',
+    ]},
     { version:'25.39', date:'2026-09-28', notes:[
       'New: Recently Visited entries now show whether they were Layer 1 or Layer 2, and Go actually takes you back into the layer you visited instead of always Layer 1.',
     ]},
@@ -8369,11 +8449,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.40',
+    version: '25.41',
     date: '2026-09-28',
     notes: [
-      'The town menu is now grouped into sections — NETWORK, LAB, HAVEN, INFO and SETTINGS — instead of one long list of buttons.',
-      'The tutorial and Help hub\'s "Getting Started" topic now describe the new grouped town menu.',
+      'Catching a monster is now a moment: a short SIGNAL LOCKED / CAPTURE SUCCESSFUL / NEW ENTITY REGISTERED sequence shows the new arrival\'s sprite, Potential and Personality — with extra flair if it\'s Marked.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
