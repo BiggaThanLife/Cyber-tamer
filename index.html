@@ -1060,6 +1060,10 @@
     let c = 0.20;
     if(hasModule(p,'stealthMask')) c *= 0.5;
     if(hasModule(p,'signalLure')) c *= 1.6;
+    if(state.wild && state.wild.condition){
+      const cond = walkConditionDef(state.wild.condition);
+      if(cond.encounterMult) c *= cond.encounterMult;
+    }
     return c;
   }
   function bitsBoost(n){ const p = getActive(); return (p && hasModule(p,'bitMagnet')) ? Math.round(n * 1.5) : n; }
@@ -2021,6 +2025,24 @@
     }
   }
 
+  // Walk Texture — a named "condition" rolled once per map (deterministic off the seed, same as
+  // everything else here) that nudges the mix of what's already there, purely a flavor/placement
+  // variant, never a difficulty change. 'normal' is deliberately the heaviest weight so most maps
+  // still look and feel exactly like they always have; only ~1 in 3 rolls something else.
+  const WALK_CONDITIONS = [
+    { id:'normal',     weight:6, label:null },
+    { id:'shrineRich', weight:1, label:'Sensors read this sector as unusually quiet — more shrines nearby, fewer wild signals.', bonus:{shrine:2}, encounterMult:0.85 },
+    { id:'vaultDay',   weight:1, label:'Sensors are picking up more encrypted caches than usual here.', bonus:{chest:1}, extraVaultChance:0.5 },
+    { id:'lootHeavy',  weight:1, label:'This sector reads dense with salvage.', bonus:{chest:2, shrine:1} },
+  ];
+  function rollWalkCondition(rng){
+    const total = WALK_CONDITIONS.reduce((n,c)=>n+c.weight, 0);
+    let r = rng() * total;
+    for(const c of WALK_CONDITIONS){ if(r < c.weight) return c; r -= c.weight; }
+    return WALK_CONDITIONS[0];
+  }
+  function walkConditionDef(id){ return WALK_CONDITIONS.find(c => c.id === id) || WALK_CONDITIONS[0]; }
+
   // A wild map's entire layout is a pure function of (biomeIndex, size, seed),
   // via a seeded PRNG (mulberry32) — so the same seed always regenerates the
   // identical tile layout. Passing no seed rolls a fresh random one. Fog/opened
@@ -2167,6 +2189,42 @@
       }
     }
 
+    // Walk Texture — see the WALK_CONDITIONS comment above. Two independent, purely additive
+    // pieces on their own derived PRNGs, run after every pass above: (1) the condition roll itself,
+    // and (2) a small bonus-loot placement that both applies the condition's mix AND biases toward
+    // the Gate (nearest still-open cell first) so the first few steps of any map read a little
+    // richer than its outer edge, purely a texture change — never anomaly/boss/key/vault placement
+    // above, never wild monster level or the encounter roll's base rate (only shrineRich nudges it,
+    // and only by a flat multiplier, same mechanism modules already use).
+    const wtRng = mulberry32((mapSeed ^ 0x2545f491) >>> 0);
+    const condition = rollWalkCondition(wtRng);
+    {
+      const cheb = ([x,y]) => Math.max(Math.abs(x-cx), Math.abs(y-cy));
+      const cand = [];
+      for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+        if(grid[y][x].role === 'open') cand.push([x,y]);
+      }
+      shuffleArray(cand, wtRng);
+      const bonus = condition.bonus || {};
+      const wants = [];
+      for(let i=0;i<(bonus.chest||0);i++) wants.push('chest');
+      for(let i=0;i<(bonus.shrine||0);i++) wants.push('shrine');
+      for(const kind of wants){
+        cand.sort((a,b) => cheb(a) - cheb(b)); // nearest-to-gate still-open cell first
+        const cell = cand.shift();
+        if(!cell) break;
+        grid[cell[1]][cell[0]] = { role: kind, opened:false };
+      }
+      if(condition.extraVaultChance && wtRng() < condition.extraVaultChance){
+        const kc = cand.shift(), vc = cand.shift();
+        if(kc && vc){
+          grid[kc[1]][kc[0]] = { role:'key', opened:false };
+          grid[vc[1]][vc[0]] = { role:'vault', opened:false };
+          hasKeyPair = true;
+        }
+      }
+    }
+
     // Power Surge — Layer 2 only, on top of whatever hazard the biome already has (Foundry keeps
     // its heat vents AND gets surges). Its own derived PRNG placed last, so Layer 1 maps and
     // biomes without a layer2 entry never see it.
@@ -2180,7 +2238,7 @@
     const fog = grid.map(row => row.map(()=>false));
     revealFog(fog, cx, cy, size, 1);
     return { size, grid, fog, px:cx, py:cy, steps:0, biomeIndex, layer, hasKey:false, keyPairPresent:hasKeyPair, seed:useSeed,
-             daily: !!(opts && opts.daily), dailyDay: (opts && opts.daily && opts.day) || null };
+             daily: !!(opts && opts.daily), dailyDay: (opts && opts.daily && opts.day) || null, condition: condition.id };
   }
 
   // Remembers the most recent maps you've walked into (regardless of whether
@@ -3135,6 +3193,8 @@
       const biome = BIOMES[idx];
       playTransition(`Entering<br>${biome.name}${layer===2?' — Layer 2':''}...`, biome.accentColor, ()=>{
         state.wild = generateWildMap(idx, undefined, seed, layer===2 ? {layer:2} : undefined);
+        const walkCond = walkConditionDef(state.wild.condition);
+        if(walkCond.label) logMsg(walkCond.label);
         if(layer !== 2){ maybeShowBiomeStoryText(idx); maybeTriggerGhostServerArrival(idx); } // Layer 2 remixes an already-seen biome, so no fresh flavor there
         recordVisitedSeed(idx, state.wild.seed);
         state.screen = 'wild';
@@ -7430,6 +7490,7 @@
       if(typeof s.wild.biomeIndex !== 'number') s.wild.biomeIndex = 0;
       if(typeof s.wild.hasKey !== 'boolean') s.wild.hasKey = false;
       if(typeof s.wild.seed !== 'number') s.wild.seed = Math.floor(Math.random()*4294967296);
+      if(typeof s.wild.condition !== 'string') s.wild.condition = 'normal';
       if(Array.isArray(s.wild.grid)) s.wild.grid.forEach(row => row.forEach(migrateWildCell));
     }
     return s;
