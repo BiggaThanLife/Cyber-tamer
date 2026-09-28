@@ -1728,6 +1728,7 @@
       archiveLog: [], // Archive/diary: entry ids in the order the player actually discovered them
       archiveSeenCount: 0, // how many archiveLog entries have been viewed — drives the unread dot
       rosettaSceneShown: false, // one-time "writing Rosetta.exe" scene, after the first biome boss falls
+      memoryFragmentsFound: [], // Memory Fragments (mem_<biomeIndex>_<n>): shrine-found story collectibles
     };
   }
 
@@ -3691,6 +3692,7 @@
       state.bits += bits;
       gainXp(p, 8);
       logMsg(`A quiet shrine hums with old code. You feel steadier. +◈${bits} Bits and a flicker of insight.`);
+      maybeAwardMemoryFragment(w.biomeIndex);
       render(); return;
     }
     if(cell.role === 'key' && !cell.opened){
@@ -4347,7 +4349,7 @@
     { id:'explore', icon:'⛩', title:'Exploring the Wilderness', color:'var(--cyan)', blurb:'Maps, fog, tiles, chests and biomes.', cards:[
       { h:'Moving', b:'Use the arrow pad to step around the map. Each step costs <b>1 Energy</b> and <b>2 Hunger</b> and gives your partner <b>1 XP</b>. A step onto open ground has about a 20% chance of starting a wild encounter. If Hunger hits 0 your partner is too weak to explore and you return to town.' },
       { h:'Fog and seeds', b:'Only tiles near you are shown; the rest is fog that clears as you move. Every map has a <b>seed</b> number. The same seed always builds the same layout, so ☆ favorite a seed to come back to a map you liked. Tap ⧉ to copy it, or Enter Seed to type one in.' },
-      { h:'Map symbols', b:'<b>⛩</b> gate (exit to town) · <b>▪</b> chest (Bits or a capture program) · <b>✦</b> shrine (Bits and XP) · <b>⚷</b> key, opens a <b>▣</b> vault (Bits and capture programs) · <b>✕</b> anomaly (a stronger, charged monster in a fixed spot) · <b>☠</b> the boss · <b>♨</b> heat vent · <b>✪</b> daily cache. Tap ❓ Legend on the map to see these. Some tiles block the way.' },
+      { h:'Map symbols', b:'<b>⛩</b> gate (exit to town) · <b>▪</b> chest (Bits or a capture program) · <b>✦</b> shrine (Bits and XP — and sometimes a memory fragment for the Dex\'s Memories tab) · <b>⚷</b> key, opens a <b>▣</b> vault (Bits and capture programs) · <b>✕</b> anomaly (a stronger, charged monster in a fixed spot) · <b>☠</b> the boss · <b>♨</b> heat vent · <b>✪</b> daily cache. Tap ❓ Legend on the map to see these. Some tiles block the way.' },
       { h:'Biome bosses', b:'Each biome has a boss. Bosses can\'t be caught — you have to defeat them. Beating boss #1 unlocks the Training Ground, beating two unlocks the Data Mine.' },
       { h:'Unlocking the next biome', b:'Opening the next biome takes <b>three</b> things, done in any order, all in the biome you\'re currently in: defeat its boss, <b>Recycle Entity</b> 10 monsters of its boss\'s type from the Network Registry (an alternative to Sell — no Bits, but it counts toward this), and find that biome\'s <b>Network Access Key</b> by solving a Data Breach there (only the first solve grants it; more give the usual Bits and capture program). The Biome Select screen shows a checklist for whichever biome is next. Recycle progress is tracked for life per type, so catches and recycles from well before you needed them still count.' },
       { h:'Special biomes', b:'<b>Overclocked Foundry:</b> heat vents hurt your partner (Fire types are immune, Metal and Earth take half, Water and Nature take extra). Vents never faint you. <b>The Ghost Server:</b> fog closes back in behind you, and a hint tells you how close the boss is.' },
@@ -4741,6 +4743,83 @@
   }
 
   /* ---------------------------------------------------------
+     MEMORY FRAGMENTS — a second, purely-narrative collectible, separate from the Archive/diary's
+     system-progress entries above. 5 per biome (30 total), found one at a time from shrines
+     (`cell.role === 'shrine'` in moveWild), in fixed order per biome — no RNG involved, so this
+     never touches the seeded-map invariant. Each biome's 5 build toward one theme, per the story
+     bible's "what does this world's stillness actually mean" framing:
+       0 Neon Outskirts — the world looks abandoned, but isn't.
+       1 Sunbaked Wastes — the world runs on a schedule.
+       2 Frostbyte Tundra — the world reacts to you specifically.
+       3 The Undergrid — the world has a chain of command.
+       4 Overclocked Foundry — the world is being armed against you.
+       5 The Ghost Server — the world stops fighting you.
+     Registered into ARCHIVE_ENTRIES below (same unlocked/title/body/tag shape as every other
+     entry there), so a found fragment automatically flows through the existing archiveLog/
+     syncArchiveLog/unread-dot machinery with no new plumbing — this table only needs to describe
+     content, not wire up discovery tracking a second time.
+  --------------------------------------------------------- */
+  const MEMORY_FRAGMENTS = [
+    [ // 0 — Neon Outskirts
+      { title:'A Tended Pod', body:'A Grow-Pod out past the tree line is still damp — someone or something watered it recently. There\'s no one else out here. Or there wasn\'t supposed to be.' },
+      { title:'Not Missing — Replaced', body:'A chest sits open, its seal already broken. What\'s inside isn\'t what should be there — it\'s been swapped, deliberately, for something else. Whoever did it wanted it found this way.' },
+      { title:'Corrupted Inscription', body:'The shrine\'s inscription reads as noise the first time through — broken characters, no clean sentence. It might mean something later. It doesn\'t yet.' },
+      { title:'A Wide Berth', body:'Every wild monster near here gives one particular tile a wide, consistent berth. There\'s nothing visibly wrong with it. They know something the fog isn\'t showing.' },
+      { title:'Maintenance Log, Post-Abandonment', body:'A maintenance log near the Warden\'s post is dated well after this site was supposedly abandoned. Someone was still doing rounds after everyone else stopped.' },
+    ],
+    [ // 1 — Sunbaked Wastes
+      { title:'A Worn Path', body:'A dried supply route cuts a visible line between two points in the dunes — not erosion, a path. Something uses it, on a schedule, still.' },
+      { title:'The Same Kind of Nothing', body:'A cluster of mirages out here all hide the exact same kind of shape underneath — not random noise, a pattern. Whatever generates them isn\'t guessing.' },
+      { title:'Manifest, Not a Name', body:'A chest carries a shipping-manifest label instead of a name — a routing code, a destination, a date. Something was supposed to pick this up.' },
+      { title:'Repaired Since Last Visit', body:'The Warden\'s old post at the Outskirts border looks different from a distance — patched, reinforced, visibly maintained since you last passed through. Nobody asked it to fix itself.' },
+      { title:'Touched, Not Worn Down', body:'This stretch of the Wastes doesn\'t read as decayed so much as reinforced — like something keeps coming back to shore it up, not let it fall apart.' },
+    ],
+    [ // 2 — Frostbyte Tundra
+      { title:'A Packet, Mid-Transit', body:'A single data packet sits frozen mid-transit, visible and motionless in the ice. Walking up to it changes nothing — it\'s just been stopped here, on its way to somewhere, for who knows how long.' },
+      { title:'It Answers Faster, Now', body:'This shrine logged slower the first time you found it. The second visit, it responds almost immediately — like it\'s used to you now.' },
+      { title:'A Barrier That Wasn\'t Here', body:'A Field Barrier blocks a path that was open on a previous visit to this exact seed. The map remembers you were here. It changed anyway.' },
+      { title:'Not On Its Own', body:'Whatever\'s escalating out here isn\'t happening by accident, and isn\'t happening on its own. Someone, or something, is choosing the pace.' },
+      { title:'An Old Notice, Frozen in Place', body:'A notice fragment sits frozen mid-broadcast, legible at a glance without needing Rosetta at all — old enough, or plain enough, that it never needed translating.' },
+    ],
+    [ // 3 — The Undergrid
+      { title:'A Reporting Line, Unsigned', body:'A log references a "reporting line" without ever naming who\'s at the top of it. Whoever wrote this assumed the reader already knew — or knew better than to write it down.' },
+      { title:'Flickers Between Two States', body:'One tile looks different every time you come back to this exact seed — same location, same layout, a different state each visit. Nothing else on the map does this.' },
+      { title:'Access Control, Not Defense', body:'A chest here isn\'t guarded by a monster — it\'s sealed behind a Restricted Zone instead, framed less like a trap and more like a permissions check. Someone decided who gets in.' },
+      { title:'A Response, Not a Ruin', body:'This place doesn\'t read like something that fell apart. It reads like something built on purpose, in reaction to something else. Less a ruin. More a response.' },
+      { title:'Doesn\'t Match', body:'One structure here doesn\'t match the corporate-copy aesthetic of anything around it — different materials, a different hand entirely. Nothing explains it yet.' },
+    ],
+    [ // 4 — Overclocked Foundry
+      { title:'Under Active Repair', body:'A guardian structure near the boss\'s post is visibly mid-repair — sparks, fresh plating, work still in progress. Whatever\'s doing the repairing isn\'t done.' },
+      { title:'The Vents Route Around It', body:'The heat-vent pattern here consistently avoids one specific tile, like the whole layout was built to keep that one spot untouched. Nothing about it looks special from the surface.' },
+      { title:'Relabeled: Neutral to Hostile', body:'A log fragment shows an edit in progress — something\'s classification changed from neutral to hostile, and the edit itself is still visible, half-applied.' },
+      { title:'Built For Exactly What You Are', body:'The guardians here don\'t feel generic. They feel built for exactly what you are — your type, your approach, your habits. That\'s not a coincidence anyone wants to explain.' },
+      { title:'A Dead Signal, Facing Home', body:'One marker here points back toward Neon Haven — a dead signal, or a dark handle, aimed at the town rather than at you. Whatever\'s building here isn\'t only thinking about the Foundry.' },
+    ],
+    [ // 5 — The Ghost Server
+      { title:'Where the Fog Doesn\'t Reach', body:'There\'s a pocket here the fading signal never wipes, unlike anywhere else in the game world. Something wanted at least one place to stay visible.' },
+      { title:'Already Knows Your Handle', body:'A record here already contains your handle, filed before you ever gave it to anyone. Nothing explains how it got there first.' },
+      { title:'The Silence Is the Tell', body:'Nothing here reads like the corporate reassurance-language that\'s followed you everywhere else. Not one line of it. The absence is louder than the pattern ever was.' },
+      { title:'Confirmed, Not Foreshadowed', body:'This structure doesn\'t just fail to match the corporate-copy look of everywhere else — it\'s confirmed now, unmistakably, whatever it actually is.' },
+      { title:'No Notice At All', body:'An Auditor notice should have fired by now. It doesn\'t. The silence itself is the message — maybe the last one anyone\'s going to send.' },
+    ],
+  ];
+  const MEMORY_FRAGMENT_TOTAL = MEMORY_FRAGMENTS.reduce((n, arr) => n + arr.length, 0);
+  function memoryFragmentId(biomeIndex, n){ return `mem_${biomeIndex}_${n}`; }
+  // Called from the shrine tile handler in moveWild, after its existing Bits/XP reward — finds
+  // the next not-yet-found fragment for this biome (fixed order, no RNG) and records it. Once all
+  // 5 for a biome are found, shrines there just give the normal reward with no extra line.
+  function maybeAwardMemoryFragment(biomeIndex){
+    const list = MEMORY_FRAGMENTS[biomeIndex];
+    if(!list) return;
+    if(!Array.isArray(state.memoryFragmentsFound)) state.memoryFragmentsFound = [];
+    const n = list.findIndex((_, i) => !state.memoryFragmentsFound.includes(memoryFragmentId(biomeIndex, i)));
+    if(n < 0) return;
+    const id = memoryFragmentId(biomeIndex, n);
+    state.memoryFragmentsFound.push(id);
+    const found = state.memoryFragmentsFound.filter(fid => fid.startsWith(`mem_${biomeIndex}_`)).length;
+    logMsg(`📼 Memory fragment recovered: "${list[n].title}" (${found}/${list.length} — ${BIOMES[biomeIndex].name})`);
+  }
+  /* ---------------------------------------------------------
      ARCHIVE / DIARY — a Dex-screen tab that reads like the player's own running journal.
      Deliberately builds NO new story content: every entry's body reuses text from the tables
      already above (ORIGINS, BIOME_STORY_TEXT, auditorNoticeText, TRANSLATION_LEVEL_TEXT,
@@ -4784,6 +4863,14 @@
     ARCHIVE_ENTRIES['recycle_'+type] = { tag:'Patch', title:()=>`Recycling — ${type}`,
       unlocked:s=>!!(s.recycleCounts && s.recycleCounts[type] >= 1),
       body:()=>RECYCLE_FLAVOR_BY_TYPE[type] };
+  });
+  MEMORY_FRAGMENTS.forEach((list, bi) => {
+    list.forEach((frag, n) => {
+      const id = memoryFragmentId(bi, n);
+      ARCHIVE_ENTRIES[id] = { tag:BIOMES[bi].name, title:()=>frag.title,
+        unlocked:s=>!!(s.memoryFragmentsFound && s.memoryFragmentsFound.includes(id)),
+        body:()=>frag.body };
+    });
   });
   for(let n=1;n<=6;n++){
     ARCHIVE_ENTRIES['auditor_'+n] = { tag:'Auditor', title:()=>`Auditor Notice — Stage ${n}`,
@@ -5183,12 +5270,13 @@
 
 
   let dexFilter = { status:'all', type:'all' }; // transient UI state, not persisted
-  let dexTab = 'species'; // transient UI state, not persisted — toggles the Dex screen's Species/Archive tabs
+  let dexTab = 'species'; // transient UI state, not persisted — toggles the Dex screen's Species/Archive/Memories tabs
   function dexTabToggleHtml(){
     const dot = archiveUnreadCount()>0 ? '<span style="position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--crimson);"></span>' : '';
-    return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px;">
+    return `<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:10px;">
       <button class="btn ${dexTab==='species'?'btn-cyan':''}" data-dex-tab="species">📖 Species</button>
       <button class="btn ${dexTab==='archive'?'btn-cyan':''}" data-dex-tab="archive" style="position:relative;">🗒 Archive${dot}</button>
+      <button class="btn ${dexTab==='memories'?'btn-cyan':''}" data-dex-tab="memories">📼 Memories</button>
     </div>`;
   }
   function bindDexTabToggle(screenEl){
@@ -5198,6 +5286,7 @@
   }
   function renderDex(screenEl, controlsEl){
     if(dexTab === 'archive'){ renderArchiveTab(screenEl, controlsEl); return; }
+    if(dexTab === 'memories'){ renderMemoriesTab(screenEl, controlsEl); return; }
     const dex = state.dex || {};
     const totalLines = lineIds.length;
     const caughtLines = lineIds.filter(id => dexCaughtAny(dex[id])).length;
@@ -5313,6 +5402,44 @@
             </div>
             <div style="font-size:10px; color:var(--ink); line-height:1.55; white-space:pre-line;">${e.def.body(state)}</div>
           </div>`).join('')}
+      </div>
+    `;
+    bindDexTabToggle(screenEl);
+    controlsEl.innerHTML = `<button class="btn" id="back" style="width:100%;">← Back to Town</button>`;
+    controlsEl.querySelector('#back').addEventListener('click', ()=>{ state.screen='town'; render(); });
+  }
+
+  // Same underlying data as the Archive tab's mem_* entries, grouped by biome instead of flat
+  // chronological order — the per-biome "3/5" counts are the whole point of this view, and a flat
+  // diary list can't show that at a glance. Locked fragments never appear at all (no "???" rows),
+  // same self-discovery pattern as the Archive tab.
+  function renderMemoriesTab(screenEl, controlsEl){
+    const found = Array.isArray(state.memoryFragmentsFound) ? state.memoryFragmentsFound : [];
+    const totalFound = found.length;
+    screenEl.innerHTML = `
+      ${screenTitle('📖 MONSTER DEX', 'var(--violet)')}
+      ${dexTabToggleHtml()}
+      <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:10px;">📼 ${totalFound}/${MEMORY_FRAGMENT_TOTAL} memory fragments recovered. Shrines hold them — five per biome.</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        ${BIOMES.map((b,bi) => {
+          const list = MEMORY_FRAGMENTS[bi];
+          const gotIds = list.map((_,n) => memoryFragmentId(bi,n)).filter(id => found.includes(id));
+          return `
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+              <span style="font-size:10.5px; color:${b.accentColor};">${b.name}</span>
+              <span class="badge" style="font-size:8px;">${gotIds.length}/${list.length}</span>
+            </div>
+            ${gotIds.length ? gotIds.map(id => {
+              const n = parseInt(id.split('_')[2],10);
+              const frag = list[n];
+              return `<div style="margin-bottom:6px;">
+                <div style="font-size:9.5px; color:var(--phosphor);">${frag.title}</div>
+                <div style="font-size:9.5px; color:var(--ink); line-height:1.5;">${frag.body}</div>
+              </div>`;
+            }).join('') : `<div style="font-size:9.5px; color:var(--ink-dim);">No fragments recovered here yet.</div>`}
+          </div>`;
+        }).join('')}
       </div>
     `;
     bindDexTabToggle(screenEl);
@@ -7540,6 +7667,7 @@
     else while(s.biomeStorySeen.length < BIOMES.length) s.biomeStorySeen.push(false);
     if(typeof s.archiveSeenCount !== 'number') s.archiveSeenCount = 0;
     if(typeof s.rosettaSceneShown !== 'boolean') s.rosettaSceneShown = false;
+    if(!Array.isArray(s.memoryFragmentsFound)) s.memoryFragmentsFound = [];
     // Archive/diary: grandfather in any entries whose unlock condition is already true (Trace
     // stage, Rosetta level, etc. from before this feature existed) so a returning player's diary
     // isn't blank despite real story progress — safe to run every load, archiveEntriesToAdd()
@@ -8280,6 +8408,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.41', date:'2026-09-28', notes:[
+      'Catching a monster is now a moment: a short SIGNAL LOCKED / CAPTURE SUCCESSFUL / NEW ENTITY REGISTERED sequence shows the new arrival\'s sprite, Potential and Personality — with extra flair if it\'s Marked.',
+    ]},
     { version:'25.40', date:'2026-09-28', notes:[
       'The town menu is now grouped into sections — NETWORK, LAB, HAVEN, INFO and SETTINGS — instead of one long list of buttons.',
       'The tutorial and Help hub\'s "Getting Started" topic now describe the new grouped town menu.',
@@ -8449,10 +8580,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.41',
+    version: '25.42',
     date: '2026-09-28',
     notes: [
-      'Catching a monster is now a moment: a short SIGNAL LOCKED / CAPTURE SUCCESSFUL / NEW ENTITY REGISTERED sequence shows the new arrival\'s sprite, Potential and Personality — with extra flair if it\'s Marked.',
+      'New: Memory Fragments — 30 story collectibles (5 per biome) found from shrines. Track them on the Dex\'s new Memories tab, organized by biome with a found/total count for each.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

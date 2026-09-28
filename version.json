@@ -1,7 +1,7 @@
 {
-  "version": "25.41",
+  "version": "25.42",
   "date": "2026-09-28",
   "notes": [
-    "Catching a monster is now a moment: a short SIGNAL LOCKED / CAPTURE SUCCESSFUL / NEW ENTITY REGISTERED sequence shows the new arrival's sprite, Potential and Personality — with extra flair if it's Marked."
+    "New: Memory Fragments — 30 story collectibles (5 per biome) found from shrines. Track them on the Dex's new Memories tab, organized by biome with a found/total count for each."
   ]
 }
