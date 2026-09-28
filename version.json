@@ -1,7 +1,7 @@
 {
-  "version": "25.38",
+  "version": "25.39",
   "date": "2026-09-28",
   "notes": [
-    "New: the Recently Visited list on Biome Select can now be minimized, and you can remove entries you don't want cluttering it."
+    "New: Recently Visited entries now show whether they were Layer 1 or Layer 2, and Go actually takes you back into the layer you visited instead of always Layer 1."
   ]
 }

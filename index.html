@@ -2395,11 +2395,14 @@
   // Remembers the most recent maps you've walked into (regardless of whether
   // you favorited them), so a seed you forgot to save isn't gone the moment
   // you leave or generate a new map — you can still find and favorite it here.
-  function recordVisitedSeed(biomeIndex, seed){
+  function recordVisitedSeed(biomeIndex, seed, layer){
     if(!Array.isArray(state.recentSeeds)) state.recentSeeds = [];
+    const lv = layer === 2 ? 2 : 1;
     const last = state.recentSeeds[0];
-    if(last && last.seed === seed && last.biomeIndex === biomeIndex) return; // don't spam re-entries of the same spot
-    state.recentSeeds.unshift({ seed, biomeIndex, enteredAt: Date.now() });
+    // Layer 1 and Layer 2 of the same seed are different playthroughs — only skip if the layer
+    // also matches, so going Layer 1 -> Layer 2 -> Layer 1 on one seed still logs each visit.
+    if(last && last.seed === seed && last.biomeIndex === biomeIndex && (last.layer||1) === lv) return;
+    state.recentSeeds.unshift({ seed, biomeIndex, layer: lv, enteredAt: Date.now() });
     state.recentSeeds = state.recentSeeds.slice(0, 6);
   }
 
@@ -3292,9 +3295,10 @@
             ${recent.map((r,ri) => {
               const rb = BIOMES[r.biomeIndex];
               const fav = isSeedFavorited(r.seed, r.biomeIndex);
+              const isL2 = r.layer === 2;
               return `<div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.03); border:1px solid var(--glass-border); border-radius:6px; padding:4px 6px;">
                 <div style="flex:1; font-size:9.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                  <span style="color:${rb.accentColor};">${rb.name}</span> <span style="color:var(--ink-dim);">#${r.seed} · ${relativeTime(r.enteredAt)}</span>
+                  <span style="color:${rb.accentColor};">${rb.name}</span> <span class="badge" style="color:${isL2?'var(--crimson)':'var(--ink-dim)'}; border-color:${isL2?'var(--crimson)':'var(--glass-border)'};">${isL2?'Layer 2':'Layer 1'}</span> <span style="color:var(--ink-dim);">#${r.seed} · ${relativeTime(r.enteredAt)}</span>
                 </div>
                 <button class="btn btn-cyan" style="padding:3px 8px; font-size:9px;" data-recent-enter="${ri}">Go</button>
                 <button class="btn ${fav?'btn-amber':''}" style="padding:3px 8px; font-size:9px;" data-recent-fav="${ri}">${fav?'★':'☆'}</button>
@@ -3369,7 +3373,7 @@
           logMsg('📡 Unusual signal density detected.');
         }
         if(layer !== 2){ maybeShowBiomeStoryText(idx); maybeTriggerGhostServerArrival(idx); } // Layer 2 remixes an already-seen biome, so no fresh flavor there
-        recordVisitedSeed(idx, state.wild.seed);
+        recordVisitedSeed(idx, state.wild.seed, layer);
         state.screen = 'wild';
         render();
       });
@@ -3429,7 +3433,7 @@
     screenEl.querySelectorAll('[data-recent-enter]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const r = recent[parseInt(btn.getAttribute('data-recent-enter'),10)];
-        if(r) enterBiome(r.biomeIndex, r.seed);
+        if(r) enterBiome(r.biomeIndex, r.seed, r.layer === 2 ? 2 : undefined);
       });
     });
     screenEl.querySelectorAll('[data-recent-fav]').forEach(btn=>{
@@ -7590,6 +7594,7 @@
     s.wanted.forEach(w => { if(typeof w.marked !== 'boolean') w.marked = false; });
     if(!Array.isArray(s.savedSeeds)) s.savedSeeds = [];
     if(!Array.isArray(s.recentSeeds)) s.recentSeeds = [];
+    s.recentSeeds.forEach(r => { if(r.layer !== 2) r.layer = 1; }); // pre-existing entries predate layer tagging; Layer 1 is the safe default
     if(!Array.isArray(s.dexMilestonesClaimed)) s.dexMilestonesClaimed = [];
     if(typeof s.tutorialDone !== 'boolean') s.tutorialDone = true; // saves that predate the tutorial skip it
     if(typeof s.perfectStreak !== 'number' || s.perfectStreak < 0) s.perfectStreak = 0;
@@ -8329,6 +8334,9 @@
     { version:'25.37', date:'2026-09-28', notes:[
       'Fixed: a multi-stage Locked Node\'s progress reset back to stage 1 if you left and came back to the same seed. Progress toward a node now sticks around properly until you finish it.',
     ]},
+    { version:'25.38', date:'2026-09-28', notes:[
+      'New: the Recently Visited list on Biome Select can now be minimized, and you can remove entries you don\'t want cluttering it.',
+    ]},
     { version:'25.2', date:'2026-09-21', notes:[
       'Play now costs Energy and Hunger on every try, hit or miss, and only allows a few tries in a row before a short break. It no longer refills Hunger or Energy.',
       'New: the game tells you when an update is available, and shows what changed after you update.',
@@ -8343,10 +8351,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.38',
+    version: '25.39',
     date: '2026-09-28',
     notes: [
-      'New: the Recently Visited list on Biome Select can now be minimized, and you can remove entries you don\'t want cluttering it.',
+      'New: Recently Visited entries now show whether they were Layer 1 or Layer 2, and Go actually takes you back into the layer you visited instead of always Layer 1.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
