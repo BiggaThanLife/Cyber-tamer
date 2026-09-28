@@ -2941,27 +2941,42 @@
     `;
     const trainingUnlocked = isTrainingUnlocked();
     const breedingUnlocked = isBreedingUnlocked();
-    const buttons = [
-      {label:'⛩ Wilderness Gate', cls:'btn-primary', fn:()=>{ state.screen='biomes'; render(); }},
-      {label:'⛏ Data Mine', cls:'', locked:!isMiningUnlocked(), lockMsg:'Defeat 2 biome bosses to unlock the Data Mine.', fn:()=>{ state.screen='mine'; render(); }},
-      {label:'📋 Wanted Board', cls:'', fn:()=>{ state.screen='wanted'; render(); }},
-      {label:`📅 Daily${dailyClaimableCount() ? ' ('+dailyClaimableCount()+')' : ''}`, cls:'btn-amber', fn:()=>{ state.screen='daily'; render(); }},
-      {label:'💼 Job Board', cls:'', fn:()=>{ state.screen='jobs'; render(); }},
-      {label:'🌾 Server Farm', cls:'', fn:()=>{ state.screen='farm'; render(); }},
-      {label:'🏋 Training Ground', cls:'', locked:!trainingUnlocked, lockMsg:'Defeat a biome boss to unlock the Training Ground.', fn:()=>{ state.screen='training'; render(); }},
-      {label:'🧬 Splice Lab', cls:'btn-cyan', locked:!breedingUnlocked, lockMsg:'Upgrade your farm to a Server Shack to unlock the Splice Lab.', fn:()=>{ state.breeding={a:null,b:null}; state.screen='breeding'; render(); }},
-      {label:'🎮 Play', cls:'btn-cyan', fn:()=>{ state.screen='play'; render(); }},
-      {label:'💤 Rest Partner', cls:'', fn:()=>restPartner()},
-      {label:'📦 Network Registry', cls:'', fn:()=>{ state.screen='storage'; render(); }},
-      {label:'🎒 Inventory', cls:'', fn:()=>{ state.screen='inventory'; render(); }},
-      {label:'🛒 Shop', cls:'btn-amber', fn:()=>{ state.screen='shop'; render(); }},
-      {label:`📖 Dex${archiveUnreadCount()>0 ? '<span style="position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--crimson);"></span>' : ''}`, cls:'btn-violet', style:'position:relative;', fn:()=>{ state.screen='dex'; render(); }},
-      {label:'❓ Help', cls:'', fn:()=>{ helpSection=null; state.screen='statsGuide'; render(); }},
-      {label:'⚙ System', cls:'', fn:()=>{ state.screen='system'; render(); }},
+    const sections = [
+      { label:'NETWORK', buttons: [
+        {label:'⛩ Wilderness Gate', cls:'btn-primary', fn:()=>{ state.screen='biomes'; render(); }},
+        {label:'⛏ Data Mine', cls:'', locked:!isMiningUnlocked(), lockMsg:'Defeat 2 biome bosses to unlock the Data Mine.', fn:()=>{ state.screen='mine'; render(); }},
+        {label:`📅 Daily${dailyClaimableCount() ? ' ('+dailyClaimableCount()+')' : ''}`, cls:'btn-amber', fn:()=>{ state.screen='daily'; render(); }},
+        {label:'📋 Wanted Board', cls:'', fn:()=>{ state.screen='wanted'; render(); }},
+      ]},
+      { label:'LAB', buttons: [
+        {label:'📦 Network Registry', cls:'', fn:()=>{ state.screen='storage'; render(); }},
+        {label:'🏋 Training Ground', cls:'', locked:!trainingUnlocked, lockMsg:'Defeat a biome boss to unlock the Training Ground.', fn:()=>{ state.screen='training'; render(); }},
+        {label:'🧬 Splice Lab', cls:'btn-cyan', locked:!breedingUnlocked, lockMsg:'Upgrade your farm to a Server Shack to unlock the Splice Lab.', fn:()=>{ state.breeding={a:null,b:null}; state.screen='breeding'; render(); }},
+        {label:'🎒 Inventory', cls:'', fn:()=>{ state.screen='inventory'; render(); }},
+      ]},
+      { label:'HAVEN', buttons: [
+        {label:'🌾 Server Farm', cls:'', fn:()=>{ state.screen='farm'; render(); }},
+        {label:'💼 Job Board', cls:'', fn:()=>{ state.screen='jobs'; render(); }},
+        {label:'🛒 Shop', cls:'btn-amber', fn:()=>{ state.screen='shop'; render(); }},
+        {label:'🎮 Play', cls:'btn-cyan', fn:()=>{ state.screen='play'; render(); }},
+        {label:'💤 Rest Partner', cls:'', fn:()=>restPartner()},
+      ]},
+      { label:'INFO', buttons: [
+        {label:`📖 Dex${archiveUnreadCount()>0 ? '<span style="position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--crimson);"></span>' : ''}`, cls:'btn-violet', style:'position:relative;', fn:()=>{ state.screen='dex'; render(); }},
+        {label:'❓ Help', cls:'', fn:()=>{ helpSection=null; state.screen='statsGuide'; render(); }},
+      ]},
+      { label:'SETTINGS', buttons: [
+        {label:'⚙ System', cls:'', fn:()=>{ state.screen='system'; render(); }},
+      ]},
     ];
-    controlsEl.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-      ${buttons.map((b,i)=>`<button class="btn ${b.cls}" data-i="${i}" style="${b.locked?'opacity:.5;':''}${b.style||''}">${b.locked?'🔒 ':''}${b.label}</button>`).join('')}
-    </div>`;
+    const buttons = [];
+    sections.forEach(s => s.buttons.forEach(b => buttons.push(b)));
+    controlsEl.innerHTML = sections.map(s => `
+      <div style="font-size:9.5px; letter-spacing:1px; color:var(--ink-dim); margin:10px 0 6px; border-top:1px solid var(--glass-border); padding-top:8px;">${s.label}</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        ${s.buttons.map(b=>`<button class="btn ${b.cls}" data-i="${buttons.indexOf(b)}" style="${b.locked?'opacity:.5;':''}${b.style||''}">${b.locked?'🔒 ':''}${b.label}</button>`).join('')}
+      </div>
+    `).join('');
     buttons.forEach((b,i)=>{
       controlsEl.querySelector(`[data-i="${i}"]`).addEventListener('click', ()=>{
         if(b.locked){ logMsg(b.lockMsg); render(); return; }
@@ -4321,7 +4336,7 @@
     { id:'start', icon:'🚀', title:'Getting Started', color:'var(--phosphor)', blurb:'The goal, the town, and how saving works.', cards:[
       { h:'The goal', b:'Explore the wilderness, catch monsters, grow your partner stronger, and defeat each biome\'s boss. Beating a boss unlocks the next biome. Neon Haven (the town) is your home base.' },
       { h:'Your partner', b:'One monster is your <b>active partner</b> — the one who explores and fights. Everyone else waits in the Network Registry. Swap partners there any time.' },
-      { h:'The town menu', b:'Buttons are grouped in pairs: <b>Gate / Mine</b> to go out, <b>Wanted / Daily</b> for goals, <b>Jobs / Farm</b> to earn, <b>Training / Splice</b> to grow, <b>Play / Rest</b> to care, <b>Storage / Inventory / Shop</b> to manage, then Dex, Help and System. A 🔒 means it isn\'t unlocked yet — tap it to see how.' },
+      { h:'The town menu', b:'Buttons are grouped by what they\'re for: <b>NETWORK</b> (Wilderness Gate, Data Mine, Daily, Wanted Board) to go out and chase goals, <b>LAB</b> (Network Registry, Training, Splice Lab, Inventory) to manage and grow your monsters, <b>HAVEN</b> (Farm, Jobs, Shop, Play, Rest) to earn Bits and look after your partner, <b>INFO</b> (Dex, Help) to look things up, and <b>SETTINGS</b> (System) for saves and preferences. A 🔒 means it isn\'t unlocked yet — tap it to see how.' },
       { h:'The 📜 Log', b:'The Log button at the top of every screen shows your recent messages, newest first. A small amber dot means something new happened. In battle, a running log of that fight sits under the monsters.' },
       { h:'Motion', b:'Battles, catches, level-ups and evolutions are animated. If motion bothers you or your phone struggles, open <b>System</b> and switch <b>Motion</b> to Reduced. It follows your device\'s reduce-motion setting until you change it.' },
       { h:'Saving', b:'The game saves automatically to this device. Under <b>System</b> you can export your save to a file (a backup, or to move devices) and import it again. Importing overwrites your current progress.' },
@@ -5132,7 +5147,7 @@
 
   const TUTORIAL_STEPS = [
     { t:'Welcome to Neon Haven', b:'Patch is quiet for now, but the town is yours to work with. Explore, catch monsters, grow stronger, and beat each biome\'s boss to open the next.' },
-    { t:'The town menu', b:'The buttons below the screen are your town. <b>Wilderness Gate</b> is where you head out. <b>Shop</b>, <b>Storage</b>, <b>Inventory</b>, <b>Jobs</b> and the rest unlock or grow as you progress — a 🔒 tells you how to open it. The <b>📜 Log</b> at the top shows what just happened, on any screen.' },
+    { t:'The town menu', b:'The buttons below the screen are your town, grouped by what they\'re for. <b>NETWORK</b> is exploring — start with <b>Wilderness Gate</b>. <b>LAB</b> is your monsters and gear. <b>HAVEN</b> is everyday upkeep like the Shop and resting. <b>INFO</b> has the Dex and Help. <b>SETTINGS</b> has System. A 🔒 tells you how to unlock a locked one. The <b>📜 Log</b> at the top shows what just happened, on any screen.' },
     { t:'Exploring', b:'Pick a biome, then use the arrow pad to walk the map. Each step costs Energy and Hunger and earns a little XP. Fog hides the map until you get close. Look for <b>▪</b> chests, <b>✦</b> shrines and the <b>⛩</b> gate back home. Tap <b>❓ Legend</b> for all the symbols.' },
     { t:'Battles', b:'Wild monsters can appear as you walk. Pick a move — <b>▲</b> means strong against that enemy, <b>▼</b> weak. Use <b>Medicine</b> to heal, or <b>Flee</b> if it\'s going badly. A running log of the fight appears under the monsters.' },
     { t:'Acquiring monsters', b:'Wear an enemy down, then run a <b>capture program</b> — start with <b>Basic Capture.exe</b>. The lower its HP, the better your odds; each program shows its chance. You start with 5 Basic Capture.exe runs; buy more (and better programs) in the Shop. Bosses can\'t be captured, only defeated.' },
@@ -8189,6 +8204,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.39', date:'2026-09-28', notes:[
+      'New: Recently Visited entries now show whether they were Layer 1 or Layer 2, and Go actually takes you back into the layer you visited instead of always Layer 1.',
+    ]},
     { version:'25.31', date:'2026-09-25', notes:[
       'New: 19 new Data Mine gear items with 6 mechanics never seen before — critical hits, life-steal, a second follow-up strike, counter-attacks, blocking, and a damage-over-time status (Overheat/Corruption). Each comes in Common, Rare and Legendary tiers, with the strongest versions found only deep in the mine.',
     ]},
@@ -8351,10 +8369,11 @@
     ]},
   ];
   const BUILD = {
-    version: '25.39',
+    version: '25.40',
     date: '2026-09-28',
     notes: [
-      'New: Recently Visited entries now show whether they were Layer 1 or Layer 2, and Go actually takes you back into the layer you visited instead of always Layer 1.',
+      'The town menu is now grouped into sections — NETWORK, LAB, HAVEN, INFO and SETTINGS — instead of one long list of buttons.',
+      'The tutorial and Help hub\'s "Getting Started" topic now describe the new grouped town menu.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

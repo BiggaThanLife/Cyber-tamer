@@ -1,7 +1,8 @@
 {
-  "version": "25.39",
+  "version": "25.40",
   "date": "2026-09-28",
   "notes": [
-    "New: Recently Visited entries now show whether they were Layer 1 or Layer 2, and Go actually takes you back into the layer you visited instead of always Layer 1."
+    "The town menu is now grouped into sections — NETWORK, LAB, HAVEN, INFO and SETTINGS — instead of one long list of buttons.",
+    "The tutorial and Help hub's \"Getting Started\" topic now describe the new grouped town menu."
   ]
 }
