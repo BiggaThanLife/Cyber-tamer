@@ -2190,7 +2190,7 @@
       if(lr() < 0.4){
         const cand = [];
         for(let y=0;y<size;y++) for(let x=0;x<size;x++) if(grid[y][x].role === 'open') cand.push([x,y]);
-        if(cand.length){ const [lx,ly] = cand[Math.floor(lr()*cand.length)]; grid[ly][lx] = { role:'locked', opened:false }; }
+        if(cand.length){ const [lx,ly] = cand[Math.floor(lr()*cand.length)]; grid[ly][lx] = { role:'locked', opened:false, stage:0 }; }
       }
     }
 
@@ -2297,7 +2297,7 @@
           } else if(type === 'breachWeb'){
             const count = 3 + (lmRng() < 0.5 ? 1 : 0); // 3-4 nodes
             nearest.slice(0, count).forEach(([x,y]) => {
-              grid[y][x] = { role:'locked', opened:false };
+              grid[y][x] = { role:'locked', opened:false, stage:0 };
               tiles.push([x,y]);
             });
           } else if(type === 'markedNest'){
@@ -3689,7 +3689,7 @@
         logMsg('🧩 Locked data node — requires a Decrypter to access. Pick one up in the Shop and come back.');
         render(); return;
       }
-      state.breach = generateBreachBoard(w.biomeIndex, nx, ny);
+      state.breach = generateBreachBoard(w.biomeIndex, nx, ny, cell.stage || 0);
       breachSelected = null;
       state.screen = 'breach';
       render(); return;
@@ -6493,6 +6493,15 @@
       moveLimit: 30 - i * 2,                             // 30..20 — a real reduction, but paired with more types/walls, not the only lever
     };
   }
+  // A Locked Node deeper into the game needs multiple full clears, not just one — a gentle ramp
+  // (1/1/2/2/3/3 across the 6 biomes) so a node in the Ghost Server is a real multi-visit
+  // commitment rather than a single harder roll of the same puzzle. Each stage is the SAME
+  // difficulty for that biome (breachDifficultyFor doesn't change within a node) — depth is
+  // expressed as "how many times," not "how much harder each time."
+  function breachStagesFor(biomeIndex){
+    const i = biomeIndex || 0;
+    return i <= 1 ? 1 : (i <= 3 ? 2 : 3);
+  }
   function breachInBounds(size, r, c){ return r >= 0 && c >= 0 && r < size && c < size; }
   function breachFindRuns(grid, size){
     const runs = [];
@@ -6643,8 +6652,10 @@
     if(!breachHasAnyMove(b.grid, b.size)) breachReshuffle(b);
     return anyClears;
   }
-  function generateBreachBoard(biomeIndex, x, y){
+  function generateBreachBoard(biomeIndex, x, y, stageProgress){
     const diff = breachDifficultyFor(biomeIndex);
+    const stagesTotal = breachStagesFor(biomeIndex);
+    const stageNum = Math.min(stagesTotal, (stageProgress||0) + 1);
     const types = BREACH_TILE_TYPES.slice(0, diff.typeCount).map(t => t.id);
     for(let attempt = 0; attempt < 20; attempt++){
       const size = diff.size;
@@ -6667,10 +6678,10 @@
       }
       if(breachFindRuns(grid, size).length > 0) continue; // shouldn't happen given the avoidance above, but be safe
       if(!breachHasAnyMove(grid, size)) continue;
-      return { size, grid, types, moveLeft: diff.moveLimit, target: diff.wallCount, destroyed: 0, biomeIndex, x, y, over:false };
+      return { size, grid, types, moveLeft: diff.moveLimit, target: diff.wallCount, destroyed: 0, biomeIndex, x, y, over:false, stageNum, stagesTotal };
     }
     // Extremely unlikely fallback: fewer walls, same idea, must succeed within a couple more tries.
-    return generateBreachBoard(Math.max(0, (biomeIndex||0) - 1), x, y);
+    return generateBreachBoard(Math.max(0, (biomeIndex||0) - 1), x, y, stageProgress);
   }
 
   let breachSelected = null; // transient UI state: {r,c} of the tile picked as the swap source, or null
@@ -6695,9 +6706,10 @@
     }
     screenEl.innerHTML = `
       ${screenTitle('🛡 DATA BREACH', 'var(--crimson)')}
-      <div style="font-size:10px; color:var(--ink-dim); text-align:center; margin-bottom:8px;">Swap adjacent tiles to match 3+. A match next to a 🛡 Firewall damages it — breach them all before you are out of moves.</div>
+      <div style="font-size:10px; color:var(--ink-dim); text-align:center; margin-bottom:8px;">Swap adjacent tiles to match 3+. A match next to a 🛡 Firewall damages it — breach them all before you are out of moves.${b.stagesTotal>1?' This node needs multiple clears — the reward pays out on the last one.':''}</div>
       <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--ink-dim); margin-bottom:6px;">
         <span>🛡 Firewalls: ${b.destroyed}/${b.target}</span>
+        ${b.stagesTotal>1 ? `<span>Stage ${b.stageNum}/${b.stagesTotal}</span>` : ''}
         <span>Moves left: ${b.moveLeft}</span>
       </div>
       <div id="breach-grid" style="display:grid; grid-template-columns:repeat(${b.size}, 1fr); gap:3px;">${rows}</div>
@@ -6747,22 +6759,33 @@
     if(!b || b.over) return;
     b.over = true;
     const w = state.wild;
+    const cell = (w && w.grid[b.y] && w.grid[b.y][b.x]) || null;
     if(success){
-      if(w && w.grid[b.y] && w.grid[b.y][b.x]) w.grid[b.y][b.x].opened = true; // breached nodes stay open for good
-      const bits = bitsBoost(40 + b.biomeIndex*18 + b.types.length*12);
-      state.bits += bits;
-      const tierProgram = b.types.length >= 6 ? 'containmentExe' : (b.types.length >= 5 ? 'hunterExe' : 'advancedCapture');
-      state.inventory[tierProgram] = (state.inventory[tierProgram]||0) + 1;
-      const progName = CAPTURE_PROGRAMS[tierProgram].name;
-      logMsg(`🛡 Breach complete! +◈${bits} Bits and 1 ${progName}.`);
-      // First Data Breach ever solved in this biome also grants its Network Access Key — one of
-      // the three biome-unlock conditions. Later breaches in the same biome are unaffected.
-      if(!state.biomeKeyFound[b.biomeIndex]){
-        state.biomeKeyFound[b.biomeIndex] = true;
-        logMsg(`🔑 Network Access Key acquired for ${BIOMES[b.biomeIndex].name}!`);
-        raiseTranslationForBiomeKey(b.biomeIndex);
-        raisePortForBiomeKey(b.biomeIndex);
-        checkBiomeUnlocks();
+      if(cell) cell.stage = b.stageNum; // progress is kept even on a later failed stage
+      const isFinal = b.stageNum >= b.stagesTotal;
+      if(isFinal){
+        if(cell) cell.opened = true; // breached nodes stay open for good
+        // A multi-stage node (deeper biomes) pays out only on the LAST stage — but scaled by
+        // stagesTotal, so clearing a 3-stage Ghost Server node isn't worth the same as one clear
+        // used to be. Early stages of a multi-stage node give nothing; all the payoff is here.
+        const bits = bitsBoost((40 + b.biomeIndex*18 + b.types.length*12) * b.stagesTotal);
+        state.bits += bits;
+        const tierProgram = b.types.length >= 6 ? 'containmentExe' : (b.types.length >= 5 ? 'hunterExe' : 'advancedCapture');
+        state.inventory[tierProgram] = (state.inventory[tierProgram]||0) + b.stagesTotal;
+        const progName = CAPTURE_PROGRAMS[tierProgram].name;
+        const progLabel = b.stagesTotal > 1 ? `${b.stagesTotal} ${progName} runs` : `1 ${progName}`;
+        logMsg(`🛡 Breach complete! +◈${bits} Bits and ${progLabel}.`);
+        // First Data Breach ever solved in this biome also grants its Network Access Key — one of
+        // the three biome-unlock conditions. Later breaches in the same biome are unaffected.
+        if(!state.biomeKeyFound[b.biomeIndex]){
+          state.biomeKeyFound[b.biomeIndex] = true;
+          logMsg(`🔑 Network Access Key acquired for ${BIOMES[b.biomeIndex].name}!`);
+          raiseTranslationForBiomeKey(b.biomeIndex);
+          raisePortForBiomeKey(b.biomeIndex);
+          checkBiomeUnlocks();
+        }
+      } else {
+        logMsg(`🛡 Stage ${b.stageNum}/${b.stagesTotal} cleared. The node holds — come back to push through the rest.`);
       }
     } else {
       logMsg('🛡 Out of moves — the node re-secured itself. It stays here if you want another attempt later.');
@@ -7420,6 +7443,7 @@
       cell.role = map[cell.t] !== undefined ? map[cell.t] : 'open';
       delete cell.t;
     }
+    if(cell.role === 'locked' && typeof cell.stage !== 'number') cell.stage = 0;
   }
   function migrateState(s){
     if(!s) return s;
