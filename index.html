@@ -2043,6 +2043,19 @@
   }
   function walkConditionDef(id){ return WALK_CONDITIONS.find(c => c.id === id) || WALK_CONDITIONS[0]; }
 
+  // Rare no-combat "signal" events — a small alternative outcome on the ordinary per-step open-
+  // ground roll, deliberately NOT seeded/deterministic (unlike map layout): it's a walking-flavor
+  // bonus, not something a favorited seed should guarantee at a fixed tile, so it uses Math.random()
+  // same as the ordinary encounter roll it sits beside. Kept well below the 20% base encounter
+  // chance so it supplements the walk without displacing meaningful encounter frequency.
+  const SIGNAL_EVENT_CHANCE = 0.03;
+  const SIGNAL_EVENTS = [
+    { text:'A faint packet drifts by, already tagged as safe. You skim it out of curiosity.', reward:'bits' },
+    { text:'An old cache ping answers, then goes quiet — whatever was there already got taken.', reward:'bits' },
+    { text:'A stray signal resolves into a short, useless string of numbers. Still, the walk pays off.', reward:'bits' },
+    { text:'A discarded data fragment catches your scanner. Nothing dangerous, just leftover salvage.', reward:'item' },
+  ];
+
   // A wild map's entire layout is a pure function of (biomeIndex, size, seed),
   // via a seeded PRNG (mulberry32) — so the same seed always regenerates the
   // identical tile layout. Passing no seed rolls a fresh random one. Fog/opened
@@ -3561,6 +3574,21 @@
       state.screen='town'; render();
       showAlertModal(`<span style="color:var(--crimson);">⚠ Out of Hunger</span><br><br>${pname} was too weak to keep exploring and you're back in Neon Haven. Feed them a Databite (or another food item) from the Inventory before heading out again.`);
       return;
+    }
+    if(cell.role === 'open' && Math.random() < SIGNAL_EVENT_CHANCE){
+      const ev = SIGNAL_EVENTS[Math.floor(Math.random()*SIGNAL_EVENTS.length)];
+      if(ev.reward === 'bits'){
+        const bits = scavengerBitsBoost(5 + w.biomeIndex*3 + Math.floor(Math.random()*8));
+        state.bits += bits;
+        logMsg(`${ev.text} +◈${bits} Bits.`);
+      } else if(Math.random() < 0.5){
+        state.inventory.primeMeat = (state.inventory.primeMeat||0) + 1;
+        logMsg(`${ev.text} +1 Databite.`);
+      } else {
+        state.inventory.medicine = (state.inventory.medicine||0) + 1;
+        logMsg(`${ev.text} +1 Medicine.`);
+      }
+      render(); return;
     }
     if(cell.role === 'open' && Math.random() < encounterChance(p)){
       if(state.wanted.length && Math.random() < 0.15){
