@@ -1701,6 +1701,12 @@
       perfectBest: 0,
       tools: { decrypter: false, packetTracer: false, portScanner: false, firewallBreaker: false },
       breach: null,
+      // In-progress (not-yet-fully-cleared) multi-stage Locked Node progress, keyed by
+      // breachProgressKey(biomeIndex, layer, seed, x, y) — see the comment on that function. Lives
+      // here rather than only on the wild map's grid cell because that grid is fully regenerated
+      // (fresh, unopened) every time a seed is re-entered; without this, "come back to push through
+      // the rest" would be a lie the moment the player actually left and came back.
+      breachProgress: {},
       // --- Story layer (Cyber Tamer story bible) — see STORY.md-equivalent const tables below.
       // Per-biome key/defeated/recycled flags are NOT duplicated here: state.biomeKeyFound,
       // state.bossDefeated and state.recycleCounts already ARE those flags.
@@ -2190,7 +2196,7 @@
       if(lr() < 0.4){
         const cand = [];
         for(let y=0;y<size;y++) for(let x=0;x<size;x++) if(grid[y][x].role === 'open') cand.push([x,y]);
-        if(cand.length){ const [lx,ly] = cand[Math.floor(lr()*cand.length)]; grid[ly][lx] = { role:'locked', opened:false, stage:0 }; }
+        if(cand.length){ const [lx,ly] = cand[Math.floor(lr()*cand.length)]; grid[ly][lx] = { role:'locked', opened:false, stage: breachProgressLookup(biomeIndex, layer, useSeed, lx, ly) }; }
       }
     }
 
@@ -2297,7 +2303,7 @@
           } else if(type === 'breachWeb'){
             const count = 3 + (lmRng() < 0.5 ? 1 : 0); // 3-4 nodes
             nearest.slice(0, count).forEach(([x,y]) => {
-              grid[y][x] = { role:'locked', opened:false, stage:0 };
+              grid[y][x] = { role:'locked', opened:false, stage: breachProgressLookup(biomeIndex, layer, useSeed, x, y) };
               tiles.push([x,y]);
             });
           } else if(type === 'markedNest'){
@@ -6502,6 +6508,18 @@
     const i = biomeIndex || 0;
     return i <= 1 ? 1 : (i <= 3 ? 2 : 3);
   }
+  // In-progress multi-stage node identity: a wild map's grid is fully regenerated (fresh,
+  // unopened) every time its seed is re-entered — deliberate, same as chests/shrines re-offering
+  // themselves — so a Locked Node's `cell.stage` alone can't survive leaving and coming back.
+  // `state.breachProgress` is the persistent side of it, keyed by exactly what identifies a node
+  // across visits: which biome, which layer, which seed, which tile.
+  function breachProgressKey(biomeIndex, layer, seed, x, y){
+    return `${biomeIndex}:${layer||1}:${seed}:${x}:${y}`;
+  }
+  function breachProgressLookup(biomeIndex, layer, seed, x, y){
+    const key = breachProgressKey(biomeIndex, layer, seed, x, y);
+    return (state.breachProgress && state.breachProgress[key]) || 0;
+  }
   function breachInBounds(size, r, c){ return r >= 0 && c >= 0 && r < size && c < size; }
   function breachFindRuns(grid, size){
     const runs = [];
@@ -6760,11 +6778,15 @@
     b.over = true;
     const w = state.wild;
     const cell = (w && w.grid[b.y] && w.grid[b.y][b.x]) || null;
+    const progKey = w ? breachProgressKey(b.biomeIndex, w.layer||1, w.seed, b.x, b.y) : null;
     if(success){
       if(cell) cell.stage = b.stageNum; // progress is kept even on a later failed stage
       const isFinal = b.stageNum >= b.stagesTotal;
       if(isFinal){
         if(cell) cell.opened = true; // breached nodes stay open for good
+        // Fully cleared — no in-progress state left to persist. A future fresh visit to this seed
+        // regenerates an unopened node again, same as any chest/shrine/vault re-offering itself.
+        if(progKey && state.breachProgress) delete state.breachProgress[progKey];
         // A multi-stage node (deeper biomes) pays out only on the LAST stage — but scaled by
         // stagesTotal, so clearing a 3-stage Ghost Server node isn't worth the same as one clear
         // used to be. Early stages of a multi-stage node give nothing; all the payoff is here.
@@ -6785,6 +6807,10 @@
           checkBiomeUnlocks();
         }
       } else {
+        if(progKey){
+          if(!state.breachProgress) state.breachProgress = {};
+          state.breachProgress[progKey] = b.stageNum;
+        }
         logMsg(`🛡 Stage ${b.stageNum}/${b.stagesTotal} cleared. The node holds — come back to push through the rest.`);
       }
     } else {
@@ -7686,6 +7712,7 @@
       }
       delete s.ownedCosmetics;
     }
+    if(!s.breachProgress || typeof s.breachProgress !== 'object') s.breachProgress = {};
     if(s.wild){
       if(typeof s.wild.biomeIndex !== 'number') s.wild.biomeIndex = 0;
       if(typeof s.wild.hasKey !== 'boolean') s.wild.hasKey = false;
