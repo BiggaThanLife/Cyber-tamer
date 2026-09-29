@@ -3077,6 +3077,7 @@
   function feedPartner(){
     const p = getActive();
     if(state.inventory.primeMeat <= 0){ logMsg('No Databite left — visit the shop.'); render(); return; }
+    if(p.hunger >= 100 && p.energy >= 100){ logMsg(`${getForm(p).name} isn't hungry right now.`); render(); return; }
     state.inventory.primeMeat--;
     p.hunger = Math.min(100, p.hunger + 40);
     p.energy = Math.min(100, p.energy + 8);
@@ -7604,9 +7605,11 @@
     if((inv[id]||0) <= 0) return;
     const refuse = (msg) => { logMsg(msg); render(); };
     if(id === 'primeMeat'){
+      if(p.hunger >= 100 && p.energy >= 100) return refuse(`${nm} isn't hungry right now.`);
       inv.primeMeat--; p.hunger = Math.min(100, p.hunger + 40); p.energy = Math.min(100, p.energy + 8);
       logMsg(`Fed ${nm} a Databite.`);
     } else if(id === 'medicine'){
+      if(p.hp >= p.maxHp) return refuse(`${nm} is already at full HP.`);
       inv.medicine--; p.hp = p.maxHp;
       logMsg(`Used Medicine — ${nm}'s HP fully restored.`);
     } else if(id === 'nanoPatch'){
@@ -7645,10 +7648,13 @@
     const inv = state.inventory, p = getActive();
     const card = (icon, title, color, badge, desc, right) => `<div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
       <div><div style="color:${color}">${icon?icon+' ':''}${title} ${badge}</div><div style="font-size:9.5px; color:var(--ink-dim);">${desc}</div></div>${right||''}</div>`;
+    // Mirrors useItem()'s own full-stat guards, and the in-battle Medicine button's existing
+    // disabled condition — a Use button that's clickable but just refuses on tap reads as broken.
+    const atFull = id => (id === 'primeMeat' && p.hunger >= 100 && p.energy >= 100) || (id === 'medicine' && p.hp >= p.maxHp);
     const coreCards = Object.keys(INVENTORY_INFO).map(id => {
       const info = INVENTORY_INFO[id], count = inv[id]||0;
       return card(info.icon, info.name, 'var(--ink)', `<span class="badge">x${count}</span>`, info.desc,
-        info.usableHere ? `<button class="btn btn-primary" style="padding:6px 10px; font-size:11px;" data-use="${id}" ${count<=0?'disabled':''}>Use</button>` : '');
+        info.usableHere ? `<button class="btn btn-primary" style="padding:6px 10px; font-size:11px;" data-use="${id}" ${(count<=0||atFull(id))?'disabled':''}>Use</button>` : '');
     }).join('');
     const groups = {};
     Object.keys(SUPPLY_ITEMS).forEach(id => { if((inv[id]||0) > 0){ const g = SUPPLY_ITEMS[id].group; (groups[g] = groups[g] || []).push(id); } });
@@ -8577,6 +8583,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.47', date:'2026-09-29', notes:[
+      'The opening tutorial is shorter — it now covers just the basics, and you\'ll get a quick tip for battling, capturing, low Hunger/Energy, and Field Barriers right when each one comes up for the first time.',
+    ]},
     { version:'25.46', date:'2026-09-29', notes:[
       'New: your first trip back to Neon Haven now shows a short expedition summary — monsters encountered, captures, Bits earned, and anything new you discovered.',
     ]},
@@ -8765,10 +8774,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.47',
+    version: '25.48',
     date: '2026-09-29',
     notes: [
-      'The opening tutorial is shorter — it now covers just the basics, and you\'ll get a quick tip for battling, capturing, low Hunger/Energy, and Field Barriers right when each one comes up for the first time.',
+      'Fixed: Databite and Medicine could be used (and wasted) even when Hunger/Energy or HP were already full.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

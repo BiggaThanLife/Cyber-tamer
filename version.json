@@ -1,7 +1,7 @@
 {
-  "version": "25.47",
+  "version": "25.48",
   "date": "2026-09-29",
   "notes": [
-    "The opening tutorial is shorter — it now covers just the basics, and you'll get a quick tip for battling, capturing, low Hunger/Energy, and Field Barriers right when each one comes up for the first time."
+    "Fixed: Databite and Medicine could be used (and wasted) even when Hunger/Energy or HP were already full."
   ]
 }
