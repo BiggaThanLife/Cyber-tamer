@@ -8187,26 +8187,30 @@
       if(Date.now() - shown < 400) return;
       if(done_) close(); else showFinal();
     });
-    if(!motionOn()){ showFinal(); at(1400, close); return; }
+    // Reduced motion still waits for a tap rather than auto-closing — same as motion-on below,
+    // and the same pattern playSpliceReveal uses. Nothing underneath this overlay is locked (unlike
+    // playCapture's acquisition animation, which disables the controls and needs a hard fallback),
+    // so there's nothing that requires an unattended auto-close, and having one was cutting the
+    // reveal short before the player could actually read it (direct feedback: "moves too quick").
+    if(!motionOn()){ showFinal(); return; }
 
-    // ---- full sequence (~2.4s) ----
+    // ---- full sequence (~3.4s to the final card, then waits for a tap) ----
     animate(ov, [{opacity:0},{opacity:1}], {duration:250});
     beat.textContent = 'SIGNAL LOCKED';
     animate(beat, [{opacity:0},{opacity:1}], {duration:300});
-    at(550, () => { beat.textContent = 'Capture program deployed...'; animate(beat, [{opacity:0},{opacity:1}], {duration:250}); });
-    at(1150, () => {
+    at(750, () => { beat.textContent = 'Capture program deployed...'; animate(beat, [{opacity:0},{opacity:1}], {duration:250}); });
+    at(1600, () => {
       beat.textContent = 'CAPTURE SUCCESSFUL'; beat.style.color = 'var(--phosphor)';
       animate(beat, [{transform:'scale(.7)', opacity:0},{transform:'scale(1)', opacity:1}], {duration:350, easing:'ease-out'});
       flashEl(ov, 'brightness(1.6)', 260);
       burst(beat, caught.marked ? '#fff44d' : f.color, caught.marked ? 22 : 14, 90);
     });
-    at(1750, () => {
+    at(2500, () => {
       beat.textContent = 'NEW ENTITY REGISTERED';
       card.style.opacity = '1';
       animate(card, [{transform:'scale(.85)', opacity:0},{transform:'scale(1)', opacity:1}], {duration:400, easing:'ease-out'});
     });
-    at(2350, () => { done_ = true; animate(hint, [{opacity:0},{opacity:1}], {duration:300}); hint.style.opacity = '1'; });
-    at(6000, close); // hard fallback: never leave the overlay stuck
+    at(3400, () => { done_ = true; animate(hint, [{opacity:0},{opacity:1}], {duration:300}); hint.style.opacity = '1'; });
   }
 
   // A quick "scanning the target" beat before an encounter, then hands off to playTransition's
@@ -8408,6 +8412,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.42', date:'2026-09-28', notes:[
+      'New: Memory Fragments — 30 story collectibles (5 per biome) found from shrines. Track them on the Dex\'s new Memories tab, organized by biome with a found/total count for each.',
+    ]},
     { version:'25.41', date:'2026-09-28', notes:[
       'Catching a monster is now a moment: a short SIGNAL LOCKED / CAPTURE SUCCESSFUL / NEW ENTITY REGISTERED sequence shows the new arrival\'s sprite, Potential and Personality — with extra flair if it\'s Marked.',
     ]},
@@ -8580,10 +8587,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.42',
+    version: '25.43',
     date: '2026-09-28',
     notes: [
-      'New: Memory Fragments — 30 story collectibles (5 per biome) found from shrines. Track them on the Dex\'s new Memories tab, organized by biome with a found/total count for each.',
+      'Fixed: the new-catch screen no longer cuts itself off early — it now waits for you to tap through instead of auto-closing.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

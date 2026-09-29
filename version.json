@@ -1,7 +1,7 @@
 {
-  "version": "25.42",
+  "version": "25.43",
   "date": "2026-09-28",
   "notes": [
-    "New: Memory Fragments — 30 story collectibles (5 per biome) found from shrines. Track them on the Dex's new Memories tab, organized by biome with a found/total count for each."
+    "Fixed: the new-catch screen no longer cuts itself off early — it now waits for you to tap through instead of auto-closing."
   ]
 }
