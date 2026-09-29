@@ -1,8 +1,7 @@
 {
-  "version": "25.45",
+  "version": "25.46",
   "date": "2026-09-29",
   "notes": [
-    "Patch now says something when the Training Ground first comes online, instead of it just appearing in the menu.",
-    "Recycling now reads like restoring the network rather than a quota — same numbers, new wording."
+    "New: your first trip back to Neon Haven now shows a short expedition summary — monsters encountered, captures, Bits earned, and anything new you discovered."
   ]
 }

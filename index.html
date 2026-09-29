@@ -1323,6 +1323,57 @@
   let wildLegendOpen = false; // transient UI-only toggle, not persisted
   let recentSeedsOpen = true; // transient UI-only toggle, not persisted — Biome Select's Recently Visited card
   let farmPodPage = 0; // transient UI-only, not persisted — clamped to range on every render
+  // First-biome onboarding — expedition summary (item 8 of the design doc): a lightweight,
+  // transient (never persisted) snapshot of a few counters taken the moment the player enters the
+  // wilderness, diffed against current state the moment they return to the Gate/EXIT. Deliberately
+  // NOT new save-schema state beyond the one-time "have I shown this" flag — losing the snapshot on
+  // a page reload mid-expedition just means that one trip doesn't get a summary, which is fine.
+  let expeditionSnapshot = null;
+  function snapshotExpedition(){
+    expeditionSnapshot = {
+      bits: state.bits,
+      storageCount: state.storage.length,
+      dexSeenCount: lineIds.filter(id => state.dex && dexSeenAny(state.dex[id])).length,
+      fragmentsFound: (state.memoryFragmentsFound||[]).length,
+      encounters: 0,
+    };
+  }
+  // Shown once ever, on whichever return to town first has a valid snapshot — per the doc's own
+  // framing ("the FIRST return to town should feel like completing an expedition"), not every trip.
+  function maybeShowExpeditionSummary(){
+    if(state.firstExpeditionSummaryShown) return;
+    if(!expeditionSnapshot) return; // e.g. a Daily Sector visit or a reload mid-trip skipped the snapshot
+    const snap = expeditionSnapshot;
+    expeditionSnapshot = null;
+    state.firstExpeditionSummaryShown = true;
+    const bitsEarned = Math.max(0, state.bits - snap.bits);
+    const captured = Math.max(0, state.storage.length - snap.storageCount);
+    const newSpecies = Math.max(0, lineIds.filter(id => state.dex && dexSeenAny(state.dex[id])).length - snap.dexSeenCount);
+    const newFragments = Math.max(0, (state.memoryFragmentsFound||[]).length - snap.fragmentsFound);
+    const lines = [
+      `👾 Monsters encountered: ${snap.encounters}`,
+      `📡 Captured: ${captured}`,
+      `◈ Bits earned: ${bitsEarned}`,
+    ];
+    const discoveries = [];
+    if(newSpecies) discoveries.push(`${newSpecies} new species`);
+    if(newFragments) discoveries.push(`${newFragments} memory fragment${newFragments===1?'':'s'}`);
+    if(discoveries.length) lines.push(`🔎 New discoveries: ${discoveries.join(', ')}`);
+    const objective = currentObjectiveText();
+    showAlertModal(`
+      <div class="pixel-font glow" style="font-size:11px; color:var(--phosphor); margin-bottom:10px;">EXPEDITION COMPLETE</div>
+      <div style="font-size:10.5px; line-height:1.9;">${lines.join('<br>')}</div>
+      ${objective ? `<div style="margin-top:10px; font-size:10px; color:var(--phosphor);">${escapeHtml(objective)}</div>` : ''}
+    `);
+  }
+  // Shared by the wilderness Gate tile and the EXIT button — the two paths back to town used to
+  // duplicate the same 3 lines each; now they also both trigger the expedition summary check.
+  function returnToTown(){
+    state.screen = 'town';
+    logMsg('Returned to Neon Haven.');
+    render();
+    maybeShowExpeditionSummary();
+  }
 
   function formStats(speciesId, stage, gen, level, ivs){
     const form = EVOLUTION_LINES[speciesId][stage-1];
@@ -1759,6 +1810,7 @@
       rosettaSceneShown: false, // one-time "writing Rosetta.exe" scene, after the first biome boss falls
       memoryFragmentsFound: [], // Memory Fragments (mem_<biomeIndex>_<n>): shrine-found story collectibles
       trainingUnlockNoticeShown: false, // one-time Patch line the moment the Training Ground unlocks
+      firstExpeditionSummaryShown: false, // one-time "expedition complete" summary on the first return to town
     };
   }
 
@@ -3411,6 +3463,7 @@
       const biome = BIOMES[idx];
       playTransition(`Entering<br>${biome.name}${layer===2?' — Layer 2':''}...`, biome.accentColor, ()=>{
         state.wild = generateWildMap(idx, undefined, seed, layer===2 ? {layer:2} : undefined);
+        snapshotExpedition();
         const walkCond = walkConditionDef(state.wild.condition);
         if(walkCond.label) logMsg(walkCond.label);
         // Landmark detection: Packet Tracer/Port Scanner already exist as one-time tools; this is
@@ -3600,7 +3653,7 @@
     controlsEl.querySelector('#mv-down').addEventListener('click', ()=>moveWild(0,1));
     controlsEl.querySelector('#mv-left').addEventListener('click', ()=>moveWild(-1,0));
     controlsEl.querySelector('#mv-right').addEventListener('click', ()=>moveWild(1,0));
-    controlsEl.querySelector('#mv-exit').addEventListener('click', ()=>{ state.screen='town'; logMsg('Returned to Neon Haven.'); render(); });
+    controlsEl.querySelector('#mv-exit').addEventListener('click', ()=>{ returnToTown(); });
     screenEl.querySelector('#copy-seed').addEventListener('click', (ev)=>{
       ev.stopPropagation();
       const seedStr = String(w.seed);
@@ -3752,7 +3805,7 @@
       return;
     }
     if(cell.role === 'gate'){
-      state.screen='town'; logMsg('Returned to Neon Haven.'); render(); return;
+      returnToTown(); return;
     }
     if(cell.role === 'boss'){
       startBossEncounter(w.biomeIndex, w.layer||1);
@@ -3829,6 +3882,7 @@
   }
 
   function startEncounter(){
+    if(expeditionSnapshot) expeditionSnapshot.encounters++;
     const w = state.wild;
     const biome = layerBiomeDef(BIOMES[w.biomeIndex], w.layer||1);
     const pool = encounterPool(biome, w.layer||1);
@@ -3848,6 +3902,7 @@
   }
 
   function startWantedEncounter(entry){
+    if(expeditionSnapshot) expeditionSnapshot.encounters++;
     const enemy = newMonster(entry.speciesId, entry.gen, entry.level, entry.ivs);
     enemy.stage = Math.min(entry.stage, EVOLUTION_LINES[entry.speciesId].length);
     enemy.marked = !!entry.marked; // preserve the original individual's marked status
@@ -3868,6 +3923,7 @@
   }
 
   function startAnomalyEncounter(biomeIndex, mapSeed, x, y, layer){
+    if(expeditionSnapshot) expeditionSnapshot.encounters++;
     const biome = layerBiomeDef(BIOMES[biomeIndex], layer||1);
     const rng = anomalySeedRng(mapSeed, x, y, layer||1);
     const pool = anomalyPool(biome);
@@ -7715,6 +7771,7 @@
     if(typeof s.rosettaSceneShown !== 'boolean') s.rosettaSceneShown = false;
     if(!Array.isArray(s.memoryFragmentsFound)) s.memoryFragmentsFound = [];
     if(typeof s.trainingUnlockNoticeShown !== 'boolean') s.trainingUnlockNoticeShown = false;
+    if(typeof s.firstExpeditionSummaryShown !== 'boolean') s.firstExpeditionSummaryShown = false;
     // Archive/diary: grandfather in any entries whose unlock condition is already true (Trace
     // stage, Rosetta level, etc. from before this feature existed) so a returning player's diary
     // isn't blank despite real story progress — safe to run every load, archiveEntriesToAdd()
@@ -8459,6 +8516,10 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.45', date:'2026-09-29', notes:[
+      'Patch now says something when the Training Ground first comes online, instead of it just appearing in the menu.',
+      'Recycling now reads like restoring the network rather than a quota — same numbers, new wording.',
+    ]},
     { version:'25.44', date:'2026-09-29', notes:[
       'New: a small NEXT: line now appears near the top of the screen early on, pointing you toward your immediate goal in the Neon Outskirts. It fades away once you\'ve got your footing.',
     ]},
@@ -8640,11 +8701,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.45',
+    version: '25.46',
     date: '2026-09-29',
     notes: [
-      'Patch now says something when the Training Ground first comes online, instead of it just appearing in the menu.',
-      'Recycling now reads like restoring the network rather than a quota — same numbers, new wording.',
+      'New: your first trip back to Neon Haven now shows a short expedition summary — monsters encountered, captures, Bits earned, and anything new you discovered.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
