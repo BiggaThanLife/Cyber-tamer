@@ -1269,6 +1269,35 @@
       }
     }
   }
+  // Shared by resolveEnemyDefeat's boss-win unlock message and the NEXT: objective indicator —
+  // one sentence naming whichever of the 3 unlock conditions for biome i still isn't done.
+  // Returns '' once i is already unlocked or fully complete (nothing left to say).
+  function biomeUnlockRemainingText(i){
+    if(state.unlockedBiomeIndex > i) return '';
+    const st = biomeUnlockStatus(i);
+    const remaining = [];
+    if(!st.recycle){ const left = RECYCLE_QUOTA - st.recycled; remaining.push(`recycle ${left} more ${st.type}-type monster${left===1?'':'s'}`); }
+    if(!st.key) remaining.push('find the Network Access Key in a Data Breach here');
+    if(!remaining.length) return '';
+    return remaining.join(', and ');
+  }
+  // Persistent NEXT: hint shown in the status bar, per the first-biome-onboarding pass — a player
+  // fresh out of the story intro shouldn't have to remember the tutorial to know what to do next.
+  // Deliberately reads only existing flags (no new save state): firstBattleDone already marks "the
+  // player's been out and fought something," bossDefeated[0]/biomeUnlockRemainingText already track
+  // the rest. Returns null (hides the line entirely) once biome 0 is fully unlocked — an experienced
+  // player doesn't need a persistent hint any more, and every biome after the first is intentionally
+  // left to normal in-world discovery (Biome Select's own checklist covers those).
+  function currentObjectiveText(){
+    if(!state.storyIntroDone) return null;
+    if(state.unlockedBiomeIndex > 0) return null;
+    const b0 = BIOMES[0];
+    if(!state.firstBattleDone) return `NEXT: Enter the Wilderness Gate and explore ${b0.name}.`;
+    if(!state.bossDefeated[0]) return `NEXT: Track down and defeat ${b0.bossTitle} in ${b0.name}.`;
+    const remaining = biomeUnlockRemainingText(0);
+    if(remaining) return `NEXT: ${remaining.charAt(0).toUpperCase()+remaining.slice(1)} to unlock ${BIOMES[1].name}.`;
+    return null;
+  }
   // For the Recycle Entity button: tells the player exactly where a recycle of THIS type is
   // going, rather than just disappearing into a counter. Returns null if the type isn't currently
   // gating anything (either no biome uses it as a boss type, or that unlock already happened).
@@ -2856,6 +2885,7 @@
     const bar = (val, color, low) => `<div class="barwrap${low?' bar-low':''}"><div class="barfill" style="width:${Math.max(0,Math.min(100,val))}%;background:${low?'var(--crimson)':color}"></div></div>`;
     const hungerLow = p.hunger > 0 && p.hunger <= 20;
     const energyLow = p.energy > 0 && p.energy <= 20;
+    const objective = currentObjectiveText();
     document.getElementById('statusbar').innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <div style="color:${sp.color}; display:flex; align-items:center; gap:5px;" class="glow">${spriteImgHtml(p,20,'mon-bob')} ${p.nickname || sp.name} <span class="badge">Gen ${p.gen} · Lv${p.level}</span></div>
@@ -2864,6 +2894,7 @@
           <div id="bits-val" style="color:var(--amber)" class="glow">◈ ${(motionOn() && shownBits !== null && shownBits !== state.bits) ? shownBits : state.bits} Bits</div>
         </div>
       </div>
+      ${objective ? `<div style="font-size:9px; color:var(--phosphor); margin-bottom:6px; letter-spacing:.3px;">${escapeHtml(objective)}</div>` : ''}
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; font-size:9.5px; color:var(--ink-dim); margin-bottom:5px;">
         <div>HP ${p.hp}/${p.maxHp}${bar(100*p.hp/p.maxHp, 'var(--crimson)')}</div>
         <div class="${hungerLow?'label-low':''}">HUNGER${bar(p.hunger, 'var(--amber)', hungerLow)}</div>
@@ -4131,11 +4162,8 @@
         checkBiomeUnlocks(); // may itself log a separate "path has opened" line if this was the last condition
         const nextIdx = b.biomeIndex + 1;
         if(nextIdx < BIOMES.length && state.unlockedBiomeIndex <= b.biomeIndex){
-          const st = biomeUnlockStatus(b.biomeIndex);
-          const remaining = [];
-          if(!st.recycle){ const left = RECYCLE_QUOTA - st.recycled; remaining.push(`Recycle ${left} more ${st.type}-type monster${left===1?'':'s'}`); }
-          if(!st.key) remaining.push('find the Network Access Key in a Data Breach here');
-          if(remaining.length) unlockMsg = ` To open the path to ${BIOMES[nextIdx].name}: ${remaining.join(', and ')}.`;
+          const remaining = biomeUnlockRemainingText(b.biomeIndex);
+          if(remaining) unlockMsg = ` To open the path to ${BIOMES[nextIdx].name}: ${remaining.charAt(0).toUpperCase() + remaining.slice(1)}.`;
         }
       }
       fx({k:'faint'});
@@ -8412,6 +8440,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.43', date:'2026-09-28', notes:[
+      'Fixed: the new-catch screen no longer cuts itself off early — it now waits for you to tap through instead of auto-closing.',
+    ]},
     { version:'25.42', date:'2026-09-28', notes:[
       'New: Memory Fragments — 30 story collectibles (5 per biome) found from shrines. Track them on the Dex\'s new Memories tab, organized by biome with a found/total count for each.',
     ]},
@@ -8587,10 +8618,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.43',
-    date: '2026-09-28',
+    version: '25.44',
+    date: '2026-09-29',
     notes: [
-      'Fixed: the new-catch screen no longer cuts itself off early — it now waits for you to tap through instead of auto-closing.',
+      'New: a small NEXT: line now appears near the top of the screen early on, pointing you toward your immediate goal in the Neon Outskirts. It fades away once you\'ve got your footing.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

@@ -1,7 +1,7 @@
 {
-  "version": "25.43",
-  "date": "2026-09-28",
+  "version": "25.44",
+  "date": "2026-09-29",
   "notes": [
-    "Fixed: the new-catch screen no longer cuts itself off early — it now waits for you to tap through instead of auto-closing."
+    "New: a small NEXT: line now appears near the top of the screen early on, pointing you toward your immediate goal in the Neon Outskirts. It fades away once you've got your footing."
   ]
 }
