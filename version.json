@@ -1,7 +1,8 @@
 {
-  "version": "25.44",
+  "version": "25.45",
   "date": "2026-09-29",
   "notes": [
-    "New: a small NEXT: line now appears near the top of the screen early on, pointing you toward your immediate goal in the Neon Outskirts. It fades away once you've got your footing."
+    "Patch now says something when the Training Ground first comes online, instead of it just appearing in the menu.",
+    "Recycling now reads like restoring the network rather than a quota — same numbers, new wording."
   ]
 }

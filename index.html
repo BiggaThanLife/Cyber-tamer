@@ -455,7 +455,7 @@
     if(m.module){ invModules().push(m.module); m.module = null; } // held module goes back to the bag
     state.storage.splice(idx,1);
     recycleConfirmUid = null;
-    logMsg(`♻ Recycled ${getForm(m).name} — ${type}-type progress: ${state.recycleCounts[type]}/${RECYCLE_QUOTA}.`);
+    logMsg(`♻ ${getForm(m).name} recycled — its data folds back into the network. ${type}-type progress: ${state.recycleCounts[type]}/${RECYCLE_QUOTA}.`);
     maybeShowRecycleFlavor(type);
     checkBiomeUnlocks();
     render();
@@ -1306,8 +1306,8 @@
     if(i < 0 || i >= BIOMES.length-1) return null; // Ghost Server's type gates nothing further
     if(state.unlockedBiomeIndex > i) return null; // already unlocked past this — recycling more does nothing new
     const recycled = (state.recycleCounts && state.recycleCounts[type]) || 0;
-    if(recycled >= RECYCLE_QUOTA) return `${type}-type quota already met (${Math.min(recycled,RECYCLE_QUOTA)}/${RECYCLE_QUOTA}) for ${BIOMES[i+1].name}.`;
-    return `Counts toward unlocking ${BIOMES[i+1].name}: ${type}-type progress ${recycled}/${RECYCLE_QUOTA}.`;
+    if(recycled >= RECYCLE_QUOTA) return `Enough ${type}-type data has already been recovered (${Math.min(recycled,RECYCLE_QUOTA)}/${RECYCLE_QUOTA}) toward ${BIOMES[i+1].name}.`;
+    return `Recovered data helps stabilize the network toward ${BIOMES[i+1].name}: ${type}-type progress ${recycled}/${RECYCLE_QUOTA}.`;
   }
 
   /* ---------------------------------------------------------
@@ -1758,6 +1758,7 @@
       archiveSeenCount: 0, // how many archiveLog entries have been viewed — drives the unread dot
       rosettaSceneShown: false, // one-time "writing Rosetta.exe" scene, after the first biome boss falls
       memoryFragmentsFound: [], // Memory Fragments (mem_<biomeIndex>_<n>): shrine-found story collectibles
+      trainingUnlockNoticeShown: false, // one-time Patch line the moment the Training Ground unlocks
     };
   }
 
@@ -2604,7 +2605,7 @@
       // call site — faint/flee/catch/flee-fail all end differently) so it can't be missed
       // regardless of which path ended the fight; self-guards via originConfirmationShown so it
       // never pops more than once even if town re-renders before it's answered.
-      if(state.screen === 'town'){ maybeShowOriginConfirmation(); maybeShowRosettaWritingScene(); }
+      if(state.screen === 'town'){ maybeShowOriginConfirmation(); maybeShowRosettaWritingScene(); maybeShowTrainingUnlockNotice(); }
     }catch(err){
       console.error('Render error:', err);
       renderFatalError(err);
@@ -4629,6 +4630,23 @@
       });
     }
     overlay.style.display = 'flex';
+  }
+
+  // First-biome onboarding, Slice 2 — per the design doc's item 9 ("new systems should feel
+  // earned... 'You've proven yourself. A new facility is now online.'"), rather than a system just
+  // silently appearing in the town menu the moment isTrainingUnlocked() flips true. A log line, not
+  // another full-screen modal — Rosetta's writing scene already fires a 4-part modal on this exact
+  // same trigger (first boss defeat), and stacking a second modal on top of that would be the "wall
+  // of systems" feeling this whole pass is trying to avoid, not fix. Same no-grandfather-skip
+  // behavior as maybeShowRosettaWritingScene: a save that already had bossDefeated[0] true before
+  // this shipped gets the notice on its next town visit, same as everyone else, nothing retroactively
+  // hidden. Scoped to Training Ground only (biome 0's own unlock) — Data Mine (2 bosses) and Splice
+  // Lab (farm upgrade) sit outside the first-biome window this pass is about and are left as-is.
+  function maybeShowTrainingUnlockNotice(){
+    if(state.trainingUnlockNoticeShown) return;
+    if(!isTrainingUnlocked()) return;
+    state.trainingUnlockNoticeShown = true;
+    logMsg('🏋 Patch: "You\'ve proven yourself out there. I\'ve brought the Training Ground online — it\'s yours now."');
   }
 
   /* ---------------------------------------------------------
@@ -7696,6 +7714,7 @@
     if(typeof s.archiveSeenCount !== 'number') s.archiveSeenCount = 0;
     if(typeof s.rosettaSceneShown !== 'boolean') s.rosettaSceneShown = false;
     if(!Array.isArray(s.memoryFragmentsFound)) s.memoryFragmentsFound = [];
+    if(typeof s.trainingUnlockNoticeShown !== 'boolean') s.trainingUnlockNoticeShown = false;
     // Archive/diary: grandfather in any entries whose unlock condition is already true (Trace
     // stage, Rosetta level, etc. from before this feature existed) so a returning player's diary
     // isn't blank despite real story progress — safe to run every load, archiveEntriesToAdd()
@@ -8440,6 +8459,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.44', date:'2026-09-29', notes:[
+      'New: a small NEXT: line now appears near the top of the screen early on, pointing you toward your immediate goal in the Neon Outskirts. It fades away once you\'ve got your footing.',
+    ]},
     { version:'25.43', date:'2026-09-28', notes:[
       'Fixed: the new-catch screen no longer cuts itself off early — it now waits for you to tap through instead of auto-closing.',
     ]},
@@ -8618,10 +8640,11 @@
     ]},
   ];
   const BUILD = {
-    version: '25.44',
+    version: '25.45',
     date: '2026-09-29',
     notes: [
-      'New: a small NEXT: line now appears near the top of the screen early on, pointing you toward your immediate goal in the Neon Outskirts. It fades away once you\'ve got your footing.',
+      'Patch now says something when the Training Ground first comes online, instead of it just appearing in the menu.',
+      'Recycling now reads like restoring the network rather than a quota — same numbers, new wording.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }
