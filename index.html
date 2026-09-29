@@ -1811,6 +1811,7 @@
       memoryFragmentsFound: [], // Memory Fragments (mem_<biomeIndex>_<n>): shrine-found story collectibles
       trainingUnlockNoticeShown: false, // one-time Patch line the moment the Training Ground unlocks
       firstExpeditionSummaryShown: false, // one-time "expedition complete" summary on the first return to town
+      contextTipsShown: { explore:false, battle:false, care:false, barrier:false }, // contextual tutorial tips, each fires once ever
     };
   }
 
@@ -2658,6 +2659,8 @@
       // regardless of which path ended the fight; self-guards via originConfirmationShown so it
       // never pops more than once even if town re-renders before it's answered.
       if(state.screen === 'town'){ maybeShowOriginConfirmation(); maybeShowRosettaWritingScene(); maybeShowTrainingUnlockNotice(); }
+      else if(state.screen === 'wild'){ maybeShowExploreTip(); }
+      else if(state.screen === 'battle'){ maybeShowBattleTip(); }
     }catch(err){
       console.error('Render error:', err);
       renderFatalError(err);
@@ -2938,6 +2941,7 @@
     const bar = (val, color, low) => `<div class="barwrap${low?' bar-low':''}"><div class="barfill" style="width:${Math.max(0,Math.min(100,val))}%;background:${low?'var(--crimson)':color}"></div></div>`;
     const hungerLow = p.hunger > 0 && p.hunger <= 20;
     const energyLow = p.energy > 0 && p.energy <= 20;
+    if(hungerLow || energyLow) maybeShowCareTip();
     const objective = currentObjectiveText();
     document.getElementById('statusbar').innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -3739,6 +3743,7 @@
         const bt = TYPE_BARRIER_GLYPHS[req];
         logMsg(`${bt ? bt.glyph : '⚠'} A ${req} Field Barrier blocks the way — your active partner needs to be ${req} type to cross.`);
         fx({k:'bump'});
+        maybeShowBarrierTip();
         render(); return;
       }
       cell.opened = true;
@@ -5336,14 +5341,18 @@
     });
   }
 
+  // Trimmed from 7 steps to 3 (First-biome onboarding, design-doc item 2) — the removed steps
+  // (Exploring/Battles/Acquiring monsters/Looking after your partner) weren't cut, they moved to
+  // contextual tips (see maybeShowExploreTip/maybeShowBattleTip/maybeShowCareTip/maybeShowBarrierTip
+  // below) that fire the moment each mechanic is actually about to matter, instead of all four being
+  // read upfront before the player has even seen a wild map. What's left here is only what a player
+  // genuinely needs before they can act at all: who they are, where the menu is, what to do first.
+  // Full reference text for every mechanic still lives in the Help hub (HELP_SECTIONS), replayable
+  // any time — nothing was deleted, just un-front-loaded.
   const TUTORIAL_STEPS = [
     { t:'Welcome to Neon Haven', b:'Patch is quiet for now, but the town is yours to work with. Explore, catch monsters, grow stronger, and beat each biome\'s boss to open the next.' },
     { t:'The town menu', b:'The buttons below the screen are your town, grouped by what they\'re for. <b>NETWORK</b> is exploring — start with <b>Wilderness Gate</b>. <b>LAB</b> is your monsters and gear. <b>HAVEN</b> is everyday upkeep like the Shop and resting. <b>INFO</b> has the Dex and Help. <b>SETTINGS</b> has System. A 🔒 tells you how to unlock a locked one. The <b>📜 Log</b> at the top shows what just happened, on any screen.' },
-    { t:'Exploring', b:'Pick a biome, then use the arrow pad to walk the map. Each step costs Energy and Hunger and earns a little XP. Fog hides the map until you get close. Look for <b>▪</b> chests, <b>✦</b> shrines and the <b>⛩</b> gate back home. Tap <b>❓ Legend</b> for all the symbols.' },
-    { t:'Battles', b:'Wild monsters can appear as you walk. Pick a move — <b>▲</b> means strong against that enemy, <b>▼</b> weak. Use <b>Medicine</b> to heal, or <b>Flee</b> if it\'s going badly. A running log of the fight appears under the monsters.' },
-    { t:'Acquiring monsters', b:'Wear an enemy down, then run a <b>capture program</b> — start with <b>Basic Capture.exe</b>. The lower its HP, the better your odds; each program shows its chance. You start with 5 Basic Capture.exe runs; buy more (and better programs) in the Shop. Bosses can\'t be captured, only defeated.' },
-    { t:'Looking after your partner', b:'Watch the <b>Hunger</b> and <b>Energy</b> bars. Feed with a Databite from the Inventory, or use <b>Rest Partner</b> in town. If Hunger reaches 0 you can\'t keep exploring.' },
-    { t:'Your first steps', b:'Claim your <b>Daily</b> reward, then head out through the Wilderness Gate. Anytime you\'re unsure, open <b>❓ Help</b> in the town menu — it explains every system by topic, and you can replay this tutorial there.' },
+    { t:'Your first steps', b:'Claim your <b>Daily</b> reward, then head out through the <b>Wilderness Gate</b>. You\'ll get a short tip for battling, capturing, and looking after your partner right when each one comes up — no need to memorize anything now. Anytime you\'re unsure, open <b>❓ Help</b> in the town menu, and you can replay this tutorial there too.' },
   ];
   function showTutorial(step){
     step = Math.max(0, Math.min(TUTORIAL_STEPS.length-1, step));
@@ -5370,6 +5379,46 @@
     if(skip) skip.addEventListener('click', finish);
   }
 
+  // Contextual tips — the other half of trimming TUTORIAL_STEPS above. Each fires exactly once
+  // ever, right when its mechanic first becomes relevant, via state.contextTipsShown (new save
+  // field, plain {explore,battle,care,barrier} bool map, defaulted in defaultState()/migrateState()).
+  // A single-button modal (reuses showAlertModal, no new modal plumbing) rather than the full
+  // Next/Back tutorial UI — short and dismissible, matching the doc's "short explanations rather
+  // than long instructional screens" framing.
+  function showContextTip(title, body){
+    showAlertModal(`<div class="pixel-font glow" style="font-size:10px; color:var(--phosphor); margin-bottom:8px;">${title}</div><div style="font-size:11px; color:var(--ink); line-height:1.55;">${body}</div>`);
+  }
+  // Fires the moment the player's very first wild map renders, before their first step.
+  function maybeShowExploreTip(){
+    if(!state.contextTipsShown || state.contextTipsShown.explore) return;
+    state.contextTipsShown.explore = true;
+    showContextTip('Exploring', 'Use the arrow pad to walk the map. Each step costs a little Energy and Hunger. Fog hides the map until you get close — look for <b>▪</b> chests, <b>✦</b> shrines and the <b>⛩</b> gate back home. Tap <b>❓ Legend</b> for every symbol.');
+  }
+  // Fires the moment the player's very first battle screen renders — covers both fighting and
+  // capturing in one tip rather than two, since capture is already an option in that same first
+  // battle (a separate "capture" tip stacked right after this one would just be a second modal in
+  // the same breath, the exact wall-of-information problem this pass is trying to avoid).
+  function maybeShowBattleTip(){
+    if(!state.contextTipsShown || state.contextTipsShown.battle) return;
+    state.contextTipsShown.battle = true;
+    showContextTip('Your First Battle', 'Pick a move — <b>▲</b> means strong against this enemy, <b>▼</b> weak. Once it\'s worn down, run a <b>capture program</b> to try to catch it — the lower its HP, the better your odds. Use <b>Medicine</b> to heal, or <b>Flee</b> if it\'s going badly.');
+  }
+  // Fires the first time Hunger or Energy actually crosses into "low" (same <=20 threshold that
+  // already drives the status bar's own low-resource glow) — organically, when it's actually about
+  // to matter, instead of explained before the player has ever seen the bars move.
+  function maybeShowCareTip(){
+    if(!state.contextTipsShown || state.contextTipsShown.care) return;
+    state.contextTipsShown.care = true;
+    showContextTip('Running Low', 'Your partner\'s Hunger or Energy is getting low. Feed a Databite from the Inventory, or head back to town and use <b>Rest Partner</b>. If Hunger hits 0, you\'ll be sent back to Neon Haven.');
+  }
+  // Fires the first time the player actually hits a Field Barrier they can't cross yet — the doc's
+  // own "give the player an immediate reason to understand different monsters are useful for
+  // different situations" moment, right as they discover it rather than being told in advance.
+  function maybeShowBarrierTip(){
+    if(!state.contextTipsShown || state.contextTipsShown.barrier) return;
+    state.contextTipsShown.barrier = true;
+    showContextTip('Field Barriers', 'Some paths only open for a specific monster type. This is exactly why catching a variety of monsters pays off — the right partner can cross where another can\'t.');
+  }
 
   let dexFilter = { status:'all', type:'all' }; // transient UI state, not persisted
   let dexTab = 'species'; // transient UI state, not persisted — toggles the Dex screen's Species/Archive/Memories tabs
@@ -7846,6 +7895,18 @@
     s.recentSeeds.forEach(r => { if(r.layer !== 2) r.layer = 1; }); // pre-existing entries predate layer tagging; Layer 1 is the safe default
     if(!Array.isArray(s.dexMilestonesClaimed)) s.dexMilestonesClaimed = [];
     if(typeof s.tutorialDone !== 'boolean') s.tutorialDone = true; // saves that predate the tutorial skip it
+    // Contextual tips (explore/battle/care/barrier) are basic how-to instructions, not narrative —
+    // unlike Rosetta's writing scene or the Training Ground notice, popping "here's how to move"
+    // retroactively on a veteran save would read as patronizing, not charming. A save missing this
+    // object entirely predates the feature: grandfather each tip to s.tutorialDone (already finished
+    // the tutorial => already knows the basics => skip; still mid-tutorial => still eligible, same
+    // as any player who'd see them live). A save that already has the object just gets per-key
+    // hygiene, same defensive pattern as everywhere else.
+    if(!s.contextTipsShown || typeof s.contextTipsShown !== 'object' || !('explore' in s.contextTipsShown)){
+      s.contextTipsShown = { explore:s.tutorialDone, battle:s.tutorialDone, care:s.tutorialDone, barrier:s.tutorialDone };
+    } else {
+      ['explore','battle','care','barrier'].forEach(k => { if(typeof s.contextTipsShown[k] !== 'boolean') s.contextTipsShown[k] = false; });
+    }
     if(typeof s.perfectStreak !== 'number' || s.perfectStreak < 0) s.perfectStreak = 0;
     if(typeof s.perfectBest !== 'number' || s.perfectBest < 0) s.perfectBest = 0;
     if(!s.tools || typeof s.tools !== 'object') s.tools = {};
@@ -8516,6 +8577,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.46', date:'2026-09-29', notes:[
+      'New: your first trip back to Neon Haven now shows a short expedition summary — monsters encountered, captures, Bits earned, and anything new you discovered.',
+    ]},
     { version:'25.45', date:'2026-09-29', notes:[
       'Patch now says something when the Training Ground first comes online, instead of it just appearing in the menu.',
       'Recycling now reads like restoring the network rather than a quota — same numbers, new wording.',
@@ -8701,10 +8765,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.46',
+    version: '25.47',
     date: '2026-09-29',
     notes: [
-      'New: your first trip back to Neon Haven now shows a short expedition summary — monsters encountered, captures, Bits earned, and anything new you discovered.',
+      'The opening tutorial is shorter — it now covers just the basics, and you\'ll get a quick tip for battling, capturing, low Hunger/Energy, and Field Barriers right when each one comes up for the first time.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

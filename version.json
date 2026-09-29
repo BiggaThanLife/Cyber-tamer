@@ -1,7 +1,7 @@
 {
-  "version": "25.46",
+  "version": "25.47",
   "date": "2026-09-29",
   "notes": [
-    "New: your first trip back to Neon Haven now shows a short expedition summary — monsters encountered, captures, Bits earned, and anything new you discovered."
+    "The opening tutorial is shorter — it now covers just the basics, and you'll get a quick tip for battling, capturing, low Hunger/Energy, and Field Barriers right when each one comes up for the first time."
   ]
 }
