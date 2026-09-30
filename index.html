@@ -1012,6 +1012,11 @@
     firewallBreaker:{ id:'firewallBreaker',name:'Firewall Breaker',icon:'🔨', price:900, desc:'Lets your Explorer force through Restricted Zones — rare blocked paths that open for good once cleared, for Bits and new ground beyond them.' },
   };
   function hasTool(id){ return !!(state.tools && state.tools[id]); }
+  // Lightweight, permanent one-shot event flags for things the Achievements list needs that
+  // aren't otherwise derivable from persistent state (a momentary combat proc, a map feature that
+  // only exists on the currently-generated map). Same "set once, never cleared" shape as every
+  // other one-time flag in this file — achievement predicates just read state.achv[key].
+  function markAchv(key){ if(!state.achv) state.achv = {}; state.achv[key] = true; }
   // Insider's Systems Knowledge perk: 15% off every Explorer Tool's price.
   function explorerToolPrice(def){ return state.origin === 'insider' ? Math.round(def.price * INSIDER_TOOL_DISCOUNT) : def.price; }
 
@@ -1812,6 +1817,9 @@
       trainingUnlockNoticeShown: false, // one-time Patch line the moment the Training Ground unlocks
       firstExpeditionSummaryShown: false, // one-time "expedition complete" summary on the first return to town
       contextTipsShown: { explore:false, battle:false, care:false, barrier:false }, // contextual tutorial tips, each fires once ever
+      achv: {}, // one-shot event flags a few Achievements predicates need (see markAchv)
+      achievementsUnlocked: [], // achievement ids, in the order actually earned — same append-only shape as archiveLog
+      achievementsSeenCount: 0, // drives the unread dot, same pattern as archiveSeenCount
     };
   }
 
@@ -2604,6 +2612,7 @@
       statusEl.style.display = '';
       dailyRefresh();
       syncArchiveLog();
+      syncAchievements();
       renderStatusbar();
       const screenChanged = state.screen !== lastRenderedScreen;
       screenEl.innerHTML = '';
@@ -3051,7 +3060,7 @@
         {label:'💤 Rest Partner', cls:'', fn:()=>restPartner()},
       ]},
       { label:'INFO', buttons: [
-        {label:`📖 Dex${archiveUnreadCount()>0 ? '<span style="position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--crimson);"></span>' : ''}`, cls:'btn-violet', style:'position:relative;', fn:()=>{ state.screen='dex'; render(); }},
+        {label:`📖 Dex${(archiveUnreadCount()>0 || achievementsUnreadCount()>0) ? '<span style="position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--crimson);"></span>' : ''}`, cls:'btn-violet', style:'position:relative;', fn:()=>{ state.screen='dex'; render(); }},
         {label:'❓ Help', cls:'', fn:()=>{ helpSection=null; state.screen='statsGuide'; render(); }},
       ]},
       { label:'SETTINGS', buttons: [
@@ -3478,6 +3487,10 @@
           state.wild.landmarkHinted = true;
           logMsg('📡 Unusual signal density detected.');
         }
+        if(state.wild.landmark){
+          markAchv('landmark');
+          if(state.wild.landmark.type === 'memoryPocket') markAchv('memoryPocket');
+        }
         if(layer !== 2){ maybeShowBiomeStoryText(idx); maybeTriggerGhostServerArrival(idx); } // Layer 2 remixes an already-seen biome, so no fresh flavor there
         recordVisitedSeed(idx, state.wild.seed, layer);
         state.screen = 'wild';
@@ -3862,6 +3875,7 @@
       return;
     }
     if(cell.role === 'open' && Math.random() < SIGNAL_EVENT_CHANCE){
+      markAchv('signalEvent');
       const ev = SIGNAL_EVENTS[Math.floor(Math.random()*SIGNAL_EVENTS.length)];
       if(ev.reward === 'bits'){
         const bits = scavengerBitsBoost(5 + w.biomeIndex*3 + Math.floor(Math.random()*8));
@@ -4003,7 +4017,7 @@
     const boss = createBoss(biome);
     dexMarkSeen(boss.speciesId, boss.stage);
     playTransition(`⚠<br>${boss.bossTitle}<br>rises to block your path!`, 'var(--crimson)', ()=>{
-      state.battle = { enemy: boss, over:false, isBoss:true, biomeIndex, layer: layer||1, bossVictory:false, catchAttempted:false, source:'wild' };
+      state.battle = { enemy: boss, over:false, isBoss:true, biomeIndex, layer: layer||1, bossVictory:false, catchAttempted:false, source:'wild', tookDamage:false };
       state.screen = 'battle';
       logMsg(`⚠ ${boss.bossTitle} rises to block your path!`);
       render();
@@ -4217,6 +4231,7 @@
       state.bits += bits;
       gainXp(p, (isL2 ? 140 : 80) + b.enemy.level*8);
       questEvent('win', 1, { type: getForm(b.enemy).type });
+      if(!b.tookDamage) markAchv('flawlessBossWin');
       let unlockMsg = '';
       if(isL2){
         state.layer2Defeated[b.biomeIndex] = true;
@@ -4275,6 +4290,7 @@
       // type (typeless universal moves have no `mv.type`, so they never qualify).
       const stabMult = (mv.type && mv.type === getForm(p).type) ? (1 + gearStabBonus(p)) : 1;
       const isCrit = Math.random() < gearCritChance(p);
+      if(isCrit) markAchv('crit');
       const critMult = isCrit ? 1.6 : 1;
       const dmg = Math.max(1, Math.round(p.str * mv.power * mult * stabMult * critMult * (1 + Math.random()*0.25) - b.enemy.def*0.5));
       b.enemy.hp = Math.max(0, b.enemy.hp - dmg);
@@ -4289,13 +4305,14 @@
         fx({k:'hit', on:'enemy', dmg:dmg2, mult});
         logMsg(`A second strike lands for ${dmg2} more damage!`);
         totalDealt += dmg2;
+        markAchv('multiHit');
       }
 
       // Life-steal gear: heals off the total damage actually dealt this action (both hits, if two landed).
       const stealPct = gearLifesteal(p);
       if(stealPct > 0 && totalDealt > 0){
         const healed = Math.min(Math.max(1, Math.round(totalDealt * stealPct)), p.maxHp - p.hp);
-        if(healed > 0){ p.hp += healed; fx({k:'heal', amt:healed}); logMsg(`${getForm(p).name} drains ${healed} HP.`); }
+        if(healed > 0){ p.hp += healed; fx({k:'heal', amt:healed}); logMsg(`${getForm(p).name} drains ${healed} HP.`); markAchv('lifesteal'); }
       }
 
       // Status-on-hit gear (Overheat/Corruption): rolled independently per equipped piece, only
@@ -4305,6 +4322,7 @@
           if(Math.random() < st.chance){
             b.enemy.status = { name:st.name, dmgPct:st.dmgPct, turnsLeft:st.turns };
             logMsg(`${getForm(b.enemy).name} is afflicted with ${st.name}!`);
+            markAchv('statusInflict');
             break;
           }
         }
@@ -4370,6 +4388,7 @@
     if(Math.random() < gearBlockChance(p)){
       fx({k:'shield'});
       logMsg(`${getForm(p).name}'s barrier blocks the attack completely!`);
+      markAchv('block');
       return;
     }
     if(Math.random() < dodgeChance(p.spd, b.enemy.spd, p)){
@@ -4390,6 +4409,7 @@
       logMsg(`${getForm(p).name}'s Safety Buffer absorbed the killing blow!`);
     }
     p.hp = Math.max(0, p.hp - dmg);
+    b.tookDamage = true;
     fx({k:'hit', on:'player', dmg, mult});
     logMsg(`${getForm(b.enemy).name} struck back for ${dmg} damage.${mult>1 ? ' Super effective!' : (mult<1 ? ' Not very effective...' : '')}`);
     if(p.hp <= 0){
@@ -4414,6 +4434,7 @@
       b.enemy.hp = Math.max(0, b.enemy.hp - counterDmg);
       fx({k:'hit', on:'enemy', dmg:counterDmg, mult:1});
       logMsg(`${getForm(p).name} counters for ${counterDmg} damage!`);
+      markAchv('counter');
       resolveEnemyDefeat(b, p);
     }
   }
@@ -5017,6 +5038,95 @@
     return Math.max(0, (state.archiveLog||[]).length - (state.archiveSeenCount||0));
   }
 
+  /* ---------------------------------------------------------
+     ACHIEVEMENTS — a 4th Dex-screen tab. Same predicate/sweep shape as ARCHIVE_ENTRIES above:
+     each entry's unlocked(s) reads only persistent state (or the one-shot state.achv flags set
+     by markAchv() for momentary events a flat state check can't see, like a single crit landing
+     or a rare map feature on the current wild map). state.achievementsUnlocked is an append-only
+     id array, so once earned an achievement stays earned even if the underlying condition stops
+     being true later (spend your Bits, sell a 5-star monster, whatever) — same "permanent record"
+     behavior the Archive already relies on. Deliberately flat, no tiers — every entry is a single
+     unlock, not a Bronze/Silver/Gold ladder.
+     --------------------------------------------------------- */
+  const dexCaughtCount = s => lineIds.filter(id => s.dex && dexCaughtAny(s.dex[id])).length;
+  const ACHIEVEMENTS = {
+    // --- Beginnings ---
+    first_catch:   { tag:'Start', title:'First Contact', desc:'Capture your first monster.', unlocked:s=>(s.storage||[]).length>=1 },
+    story_intro:   { tag:'Start', title:'Jacked In', desc:'Complete the story intro.', unlocked:s=>!!s.storyIntroDone },
+    origin_chosen: { tag:'Start', title:'Know Thyself', desc:'Choose your origin.', unlocked:s=>!!s.originConfirmed },
+    first_battle:  { tag:'Start', title:'First Blood', desc:'Finish your first battle.', unlocked:s=>!!s.firstBattleDone },
+    first_return:  { tag:'Start', title:'Home Turf', desc:'Return to Neon Haven after your first expedition.', unlocked:s=>!!s.firstExpeditionSummaryShown },
+    // --- Exploration ---
+    seed_collector:{ tag:'Explore', title:'Seed Collector', desc:'Favorite 5 seeds.', unlocked:s=>(s.savedSeeds||[]).length>=5 },
+    signal_chaser: { tag:'Explore', title:'Signal Chaser', desc:'Trigger a rare walking signal event.', unlocked:s=>!!(s.achv&&s.achv.signalEvent) },
+    off_the_map:   { tag:'Explore', title:'Off the Map', desc:'Discover a Seed Landmark.', unlocked:s=>!!(s.achv&&s.achv.landmark) },
+    ghost_pocket:  { tag:'Explore', title:'Ghost in the Wires', desc:'Discover a Memory Pocket in the Ghost Server.', unlocked:s=>!!(s.achv&&s.achv.memoryPocket) },
+    deep_diver:    { tag:'Explore', title:'Deep Diver', desc:'Reach mine depth 25.', unlocked:s=>(s.mineDepthRecord||0)>=25 },
+    vein_runner:   { tag:'Explore', title:'Vein Runner', desc:'Reach mine depth 50.', unlocked:s=>(s.mineDepthRecord||0)>=50 },
+    // --- Capture & Roster ---
+    five_species:  { tag:'Capture', title:'Starter Roster', desc:'Catch 5 different species.', unlocked:s=>dexCaughtCount(s)>=5 },
+    half_dex:      { tag:'Capture', title:'Half the Network', desc:'Catch half of every evolution line.', unlocked:s=>dexCaughtCount(s)>=Math.ceil(lineIds.length/2) },
+    full_dex:      { tag:'Capture', title:'Full Registry', desc:'Catch every evolution line.', unlocked:s=>dexCaughtCount(s)>=lineIds.length },
+    marked_catch:  { tag:'Capture', title:'Marked One', desc:'Catch a ✦ Marked monster.', unlocked:s=>(s.storage||[]).some(m=>m.marked) },
+    five_star:     { tag:'Capture', title:'Five-Star General', desc:'Own a 5-star Potential monster.', unlocked:s=>(s.storage||[]).some(m=>potentialStarCount(m.ivs)>=5) },
+    spliced:       { tag:'Capture', title:'Splicer’s Luck', desc:'Hatch a ❖ Spliced Variant.', unlocked:s=>(s.storage||[]).some(m=>m.spliceVariant) },
+    roster_20:     { tag:'Capture', title:'Full Storage', desc:'Own 20 monsters at once.', unlocked:s=>(s.storage||[]).length>=20 },
+    // --- Growth ---
+    crest_maxed:   { tag:'Growth', title:'Full Bloom', desc:'Max Evolution Crests (3) on one partner.', unlocked:s=>(s.storage||[]).some(m=>(m.crestCount||0)>=3) },
+    drive_maxed:   { tag:'Growth', title:'Hardened', desc:'Max a Stat Drive (5 uses) on one partner.', unlocked:s=>(s.storage||[]).some(m=>m.driveUses && Object.values(m.driveUses).some(u=>u>=5)) },
+    evolved:       { tag:'Growth', title:'Evolved', desc:'Evolve a monster for the first time.', unlocked:s=>(s.storage||[]).some(m=>(m.stage||1)>=2) },
+    training_unlocked: { tag:'Growth', title:'Online', desc:'Unlock the Training Ground.', unlocked:s=>!!s.legacyUnlockAll || (s.bossDefeated||[]).some(Boolean) },
+    splice_unlocked:   { tag:'Growth', title:'Breeder’s Eye', desc:'Unlock the Splice Lab.', unlocked:s=>!!s.legacyUnlockAll || ((s.farm&&s.farm.tierIndex)||0)>=1 },
+    // --- Combat ---
+    crit_hit:      { tag:'Combat', title:'Critical Thinker', desc:'Land a critical hit.', unlocked:s=>!!(s.achv&&s.achv.crit) },
+    lifesteal:     { tag:'Combat', title:'Vampiric', desc:'Heal off Life-Steal gear.', unlocked:s=>!!(s.achv&&s.achv.lifesteal) },
+    multihit:      { tag:'Combat', title:'Double Tap', desc:'Land a Multi-Hit follow-up strike.', unlocked:s=>!!(s.achv&&s.achv.multiHit) },
+    block:         { tag:'Combat', title:'Barrier Up', desc:'Block an attack completely.', unlocked:s=>!!(s.achv&&s.achv.block) },
+    counter:       { tag:'Combat', title:'Counter Puncher', desc:'Finish an enemy with a Counter-Attack.', unlocked:s=>!!(s.achv&&s.achv.counter) },
+    status:        { tag:'Combat', title:'Overclocked', desc:'Inflict Overheat or Corruption.', unlocked:s=>!!(s.achv&&s.achv.statusInflict) },
+    flawless_boss: { tag:'Combat', title:'Untouchable', desc:'Defeat a boss without taking damage.', unlocked:s=>!!(s.achv&&s.achv.flawlessBossWin) },
+    perfect_10:    { tag:'Combat', title:'Streak Breaker', desc:'Reach a Perfect timing streak of 10.', unlocked:s=>(s.perfectBest||0)>=10 },
+    perfect_25:    { tag:'Combat', title:'In The Zone', desc:'Reach a Perfect timing streak of 25.', unlocked:s=>(s.perfectBest||0)>=25 },
+    // --- Bosses & Biomes ---
+    warden_down:    { tag:'Bosses', title:'Warden Down', desc:'Defeat the Crag Warden.', unlocked:s=>!!(s.bossDefeated&&s.bossDefeated[0]) },
+    wastes_boss:    { tag:'Bosses', title:'Mirage Breaker', desc:'Defeat the Sunbaked Wastes boss.', unlocked:s=>!!(s.bossDefeated&&s.bossDefeated[1]) },
+    tundra_boss:    { tag:'Bosses', title:'Frostbreaker', desc:'Defeat the Frostbyte Tundra boss.', unlocked:s=>!!(s.bossDefeated&&s.bossDefeated[2]) },
+    undergrid_boss: { tag:'Bosses', title:'Undergrid Cleared', desc:'Defeat the Undergrid boss.', unlocked:s=>!!(s.bossDefeated&&s.bossDefeated[3]) },
+    foundry_boss:   { tag:'Bosses', title:'Forgebreaker', desc:'Defeat the Overclocked Foundry boss.', unlocked:s=>!!(s.bossDefeated&&s.bossDefeated[4]) },
+    ghost_boss:     { tag:'Bosses', title:'Signal Silenced', desc:'Defeat the Ghost Server boss.', unlocked:s=>!!(s.bossDefeated&&s.bossDefeated[5]) },
+    layer2:         { tag:'Bosses', title:'Layer Two', desc:'Clear a biome’s Layer 2 remix.', unlocked:s=>(s.layer2Defeated||[]).some(Boolean) },
+    all_biomes:     { tag:'Bosses', title:'All Systems Open', desc:'Unlock every biome.', unlocked:s=>(s.unlockedBiomeIndex||0)>=BIOMES.length-1 },
+    key_all:        { tag:'Bosses', title:'Master Key', desc:'Find the Network Access Key in every biome.', unlocked:s=>Array.isArray(s.biomeKeyFound) && s.biomeKeyFound.length>=BIOMES.length && s.biomeKeyFound.every(Boolean) },
+    // --- Economy & Systems ---
+    bits_10k:       { tag:'Economy', title:'Data Baron', desc:'Hold 10,000 Bits at once.', unlocked:s=>(s.bits||0)>=10000 },
+    farm_maxed:     { tag:'Economy', title:'Estate Owner', desc:'Build the farm up to the Large Estate.', unlocked:s=>((s.farm&&s.farm.tierIndex)||0)>=FARM_TIERS.length-1 },
+    gear_collector: { tag:'Economy', title:'Gearhead', desc:'Discover at least half of all Gear items.', unlocked:s=>Object.keys(s.gearSeen||{}).length>=Math.ceil(Object.keys(GEAR_ITEMS).length/2) },
+    tools_all:      { tag:'Economy', title:'Fully Equipped', desc:'Own every Explorer Tool.', unlocked:s=>!!s.tools && ['decrypter','packetTracer','portScanner','firewallBreaker'].every(k=>s.tools[k]) },
+    // --- Story & Lore ---
+    diary_10:       { tag:'Story', title:'Diary Keeper', desc:'Unlock 10 Archive entries.', unlocked:s=>(s.archiveLog||[]).length>=10 },
+    diary_25:       { tag:'Story', title:'Storyteller', desc:'Unlock 25 Archive entries.', unlocked:s=>(s.archiveLog||[]).length>=25 },
+    fragments_15:   { tag:'Story', title:'Fragment Hunter', desc:'Recover 15 Memory Fragments.', unlocked:s=>(s.memoryFragmentsFound||[]).length>=15 },
+    fragments_30:   { tag:'Story', title:'Archivist', desc:'Recover all 30 Memory Fragments.', unlocked:s=>(s.memoryFragmentsFound||[]).length>=MEMORY_FRAGMENT_TOTAL },
+    auditor_max:    { tag:'Story', title:'No Turning Back', desc:'Reach Auditor Stage 6.', unlocked:s=>(s.auditor_stage||0)>=6 },
+  };
+  const ACHIEVEMENT_IDS = Object.keys(ACHIEVEMENTS);
+  function achievementsToAdd(s){
+    if(!Array.isArray(s.achievementsUnlocked)) s.achievementsUnlocked = [];
+    return ACHIEVEMENT_IDS.filter(id => {
+      const def = ACHIEVEMENTS[id];
+      return def && def.unlocked(s) && !s.achievementsUnlocked.includes(id);
+    });
+  }
+  function syncAchievements(){
+    if(!state || introReplayMode) return; // never record anything during a view-only replay
+    achievementsToAdd(state).forEach(id => state.achievementsUnlocked.push(id));
+  }
+  // Drives the red unread dot on the town Dex button and the Achievements tab itself. Cleared by
+  // actually opening the Achievements tab, same pattern archiveUnreadCount already established.
+  function achievementsUnreadCount(){
+    return Math.max(0, (state.achievementsUnlocked||[]).length - (state.achievementsSeenCount||0));
+  }
+
   // Reusable origin-card picker — used by the (future) intro's Scene 5 AND by "Not quite" below,
   // so there's exactly one place that renders the four origin cards.
   // One-time notice shown when a save flagged needsStoryReset (see migrateState/performStoryReset)
@@ -5422,13 +5532,15 @@
   }
 
   let dexFilter = { status:'all', type:'all' }; // transient UI state, not persisted
-  let dexTab = 'species'; // transient UI state, not persisted — toggles the Dex screen's Species/Archive/Memories tabs
+  let dexTab = 'species'; // transient UI state, not persisted — toggles the Dex screen's Species/Archive/Memories/Achievements tabs
   function dexTabToggleHtml(){
     const dot = archiveUnreadCount()>0 ? '<span style="position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--crimson);"></span>' : '';
-    return `<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:10px;">
+    const adot = achievementsUnreadCount()>0 ? '<span style="position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--crimson);"></span>' : '';
+    return `<div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; margin-bottom:10px;">
       <button class="btn ${dexTab==='species'?'btn-cyan':''}" data-dex-tab="species">📖 Species</button>
       <button class="btn ${dexTab==='archive'?'btn-cyan':''}" data-dex-tab="archive" style="position:relative;">🗒 Archive${dot}</button>
       <button class="btn ${dexTab==='memories'?'btn-cyan':''}" data-dex-tab="memories">📼 Memories</button>
+      <button class="btn ${dexTab==='achievements'?'btn-cyan':''}" data-dex-tab="achievements" style="position:relative;">🏆 Awards${adot}</button>
     </div>`;
   }
   function bindDexTabToggle(screenEl){
@@ -5439,6 +5551,7 @@
   function renderDex(screenEl, controlsEl){
     if(dexTab === 'archive'){ renderArchiveTab(screenEl, controlsEl); return; }
     if(dexTab === 'memories'){ renderMemoriesTab(screenEl, controlsEl); return; }
+    if(dexTab === 'achievements'){ renderAchievementsTab(screenEl, controlsEl); return; }
     const dex = state.dex || {};
     const totalLines = lineIds.length;
     const caughtLines = lineIds.filter(id => dexCaughtAny(dex[id])).length;
@@ -5592,6 +5705,49 @@
             }).join('') : `<div style="font-size:9.5px; color:var(--ink-dim);">No fragments recovered here yet.</div>`}
           </div>`;
         }).join('')}
+      </div>
+    `;
+    bindDexTabToggle(screenEl);
+    controlsEl.innerHTML = `<button class="btn" id="back" style="width:100%;">← Back to Town</button>`;
+    controlsEl.querySelector('#back').addEventListener('click', ()=>{ state.screen='town'; render(); });
+  }
+
+  // Grouped by tag (declaration order in ACHIEVEMENTS, same fallback-ordering convention as the
+  // Archive) rather than flat/chronological — a completionist checklist reads better grouped than
+  // as a diary. Locked achievements DO appear here (unlike Archive/Memories) — title + description
+  // shown either way, only the unlock date/checkmark differs — since a checklist you can't see the
+  // rest of isn't useful for deciding what to go do next; this is the one Dex tab that's a goal
+  // list rather than a discovery log.
+  function renderAchievementsTab(screenEl, controlsEl){
+    const unlocked = Array.isArray(state.achievementsUnlocked) ? state.achievementsUnlocked : [];
+    state.achievementsSeenCount = unlocked.length; // opening the tab clears the unread dot
+    const groups = {};
+    ACHIEVEMENT_IDS.forEach(id => {
+      const def = ACHIEVEMENTS[id];
+      (groups[def.tag] = groups[def.tag] || []).push(id);
+    });
+    screenEl.innerHTML = `
+      ${screenTitle('📖 MONSTER DEX', 'var(--violet)')}
+      ${dexTabToggleHtml()}
+      <div style="font-size:10.5px; color:var(--ink-dim); margin-bottom:10px;">🏆 ${unlocked.length}/${ACHIEVEMENT_IDS.length} achievements earned.</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        ${Object.keys(groups).map(tag => `
+          <div class="card">
+            <div style="font-size:10.5px; color:var(--amber); margin-bottom:6px;">${tag}</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              ${groups[tag].map(id => {
+                const def = ACHIEVEMENTS[id];
+                const got = unlocked.includes(id);
+                return `<div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.03); border:1px solid ${got?'var(--phosphor)':'var(--glass-border)'}; border-radius:6px; padding:5px 7px;">
+                  <span style="font-size:13px; ${got?'':'opacity:.35;'}">${got?'🏆':'🔒'}</span>
+                  <div style="flex:1;">
+                    <div style="font-size:9.5px; color:${got?'var(--phosphor)':'var(--ink)'};">${def.title}</div>
+                    <div style="font-size:8.5px; color:var(--ink-dim);">${def.desc}</div>
+                  </div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`).join('')}
       </div>
     `;
     bindDexTabToggle(screenEl);
@@ -7827,12 +7983,16 @@
     if(!Array.isArray(s.memoryFragmentsFound)) s.memoryFragmentsFound = [];
     if(typeof s.trainingUnlockNoticeShown !== 'boolean') s.trainingUnlockNoticeShown = false;
     if(typeof s.firstExpeditionSummaryShown !== 'boolean') s.firstExpeditionSummaryShown = false;
+    if(!s.achv || typeof s.achv !== 'object') s.achv = {};
+    if(!Array.isArray(s.achievementsUnlocked)) s.achievementsUnlocked = [];
+    if(typeof s.achievementsSeenCount !== 'number') s.achievementsSeenCount = 0;
     // Archive/diary: grandfather in any entries whose unlock condition is already true (Trace
     // stage, Rosetta level, etc. from before this feature existed) so a returning player's diary
     // isn't blank despite real story progress — safe to run every load, archiveEntriesToAdd()
     // only ever returns ids not already present.
     archiveEntriesToAdd(s).forEach(id => s.archiveLog.push(id));
     if(Array.isArray(s.storage)) s.storage.forEach(migrateMonster);
+    achievementsToAdd(s).forEach(id => s.achievementsUnlocked.push(id));
     if(s.battle && s.battle.enemy) migrateMonster(s.battle.enemy);
     if(s.battle && typeof s.battle.isBoss !== 'boolean') s.battle.isBoss = false;
     if(!s.inventory) s.inventory = { basicCapture:5, advancedCapture:0, hunterExe:0, containmentExe:0, primeMeat:4, medicine:2, evoCrest:0 };
@@ -8583,6 +8743,9 @@
      Versions compare numerically (25.10 is newer than 25.9).
   --------------------------------------------------------- */
   const CHANGELOG_HISTORY = [
+    { version:'25.48', date:'2026-09-29', notes:[
+      'Fixed: Databite and Medicine could be used (and wasted) even when Hunger/Energy or HP were already full.',
+    ]},
     { version:'25.47', date:'2026-09-29', notes:[
       'The opening tutorial is shorter — it now covers just the basics, and you\'ll get a quick tip for battling, capturing, low Hunger/Energy, and Field Barriers right when each one comes up for the first time.',
     ]},
@@ -8774,10 +8937,10 @@
     ]},
   ];
   const BUILD = {
-    version: '25.48',
-    date: '2026-09-29',
+    version: '25.49',
+    date: '2026-09-30',
     notes: [
-      'Fixed: Databite and Medicine could be used (and wasted) even when Hunger/Energy or HP were already full.',
+      'New: a 4th Dex tab, Awards — 50 achievements to earn across exploring, capturing, combat, bosses, and the story.',
     ],
   };
   function fullChangelog(){ return [{ version:BUILD.version, date:BUILD.date, notes:BUILD.notes }, ...CHANGELOG_HISTORY]; }

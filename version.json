@@ -1,7 +1,7 @@
 {
-  "version": "25.48",
-  "date": "2026-09-29",
+  "version": "25.49",
+  "date": "2026-09-30",
   "notes": [
-    "Fixed: Databite and Medicine could be used (and wasted) even when Hunger/Energy or HP were already full."
+    "New: a 4th Dex tab, Awards — 50 achievements to earn across exploring, capturing, combat, bosses, and the story."
   ]
 }
